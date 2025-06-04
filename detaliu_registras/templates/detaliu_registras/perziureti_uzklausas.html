@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Peržiūrėti užklausas</title>
+    <style>
+        .sena {
+            background-color: #fff3cd; /* Šviesiai oranžinis fonas */
+            padding: 10px; /* Įdėkite šiek tiek vietos aplink tekstą */
+        }
+        .aktualu {
+            background-color: #d4edda; /* Žalia fonas */
+            padding: 10px; /* Įdėkite šiek tiek vietos aplink tekstą */
+            border-radius: 5px; /* Kampai suapvalinti */
+        }
+        .mirksintis {
+            color: red;
+            animation: mirksintis 1s step-start 0s infinite;
+        }
+        @keyframes mirksintis {
+            50% {
+                visibility: hidden;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: grid;
+            grid-template-areas:
+                "blokas-1 blokas-2 blokas-3"
+                "blokas-4 blokas-5 blokas-5";
+            grid-template-columns: repeat(3, 1fr); /* Trys stulpeliai */
+            grid-template-rows: auto auto; /* Dvi eilės */
+            gap: 20px; /* Tarpai tarp blokų */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .blokas-1 {
+            grid-area: blokas-1;
+        }
+        .blokas-2 {
+            grid-area: blokas-2;
+        }
+        .blokas-3 {
+            grid-area: blokas-3;
+        }
+        .blokas-4 {
+            grid-area: blokas-4;
+        }
+        .blokas-5 {
+            grid-area: blokas-5;
+        }
+        .blokas-1, .blokas-2, .blokas-3, .blokas-4, .blokas-5 {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .search-form {
+            margin-bottom: 20px;
+        }
+        .search-form input[type="text"] {
+            padding: 5px;
+            font-size: 16px;
+        }
+        .search-form input[type="submit"] {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Peržiūrėti užklausas</h1>
+    <a href="{% url 'index' %}">Grįžti į pradinį puslapį</a>
+
+    <!-- Paieškos forma -->
+    <form method="GET" action="" class="search-form">
+        <input type="text" name="q" placeholder="Ieškoti..." value="{{ request.GET.q }}">
+        <input type="submit" value="Ieškoti">
+        <!-- Hidden fields to preserve current filters -->
+        {% for key, value in request.GET.items %}
+            {% if key != 'q' %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endif %}
+        {% endfor %}
+    </form>
+
+    <!-- Pranešimas, jei nėra rezultatų -->
+    {% if no_results %}
+        <p>Jūsų paieška nerado ieškomų įrašų.</p>
+    {% endif %}
+
+    {% for uzklausa in uzklausos %}
+    <div class="container">
+        <div class="blokas-1">
+            <p>Kliento pavadinimas: {{ uzklausa.klientas.vardas }}</p>
+            <p>Projekto pavadinimas: {{ uzklausa.projektas.pavadinimas }}</p>
+            <p>Detalės pavadinimas: {{ uzklausa.detale.pavadinimas }}</p>
+            <p>Brėžinio nr.: {{ uzklausa.detale.brezinio_nr }}</p>
+            <p>Užklausos data: {{ uzklausa.projektas.formatted_uzklausos_data }}</p>
+            <p>Pasiūlymo data: {{ uzklausa.projektas.formatted_pasiulymo_data }}</p>
+        </div>
+        <div class="blokas-2">
+            <p>Paslauga: {% for danga in uzklausa.detale.danga.all %} {{ danga.pavadinimas }} {% endfor %}</p>
+            <p>Standartas: {{ uzklausa.detale.standartas }}</p>
+            <p>Metinis kiekis: {{ uzklausa.detale.kiekis_metinis }}</p>
+            <p>Mėnesinis kiekis: {{ uzklausa.detale.kiekis_menesis }}</p>
+            <p>Partijos kiekis: {{ uzklausa.detale.kiekis_partijai }}</p>
+        </div>
+        <div class="blokas-3">
+            <p>Detalės plotas: {{ uzklausa.detale.plotas }}</p>
+            <p>Detalės svoris: {{ uzklausa.detale.svoris }}</p>
+            <p>Kabinimo tipas: {{ uzklausa.detale.kabinimo_tipas }}</p>
+            <p>Kabinimas XYZ: {{ uzklausa.detale.kabinimas_xyz }}</p>
+            <p>Detalės kiekis rėme: {{ uzklausa.detale.kiekis_reme }}</p>
+            <p>Faktinis kiekis rėme: 
+                <span class="{% if uzklausa.detale.faktinis_kiekis_reme != uzklausa.detale.kiekis_reme %}mirksintis{% endif %}">{{ uzklausa.detale.faktinis_kiekis_reme }}</span>
+            </p>
+        </div>
+        <div class="blokas-4">
+            <h3>Kainos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kaina</th>
+                        <th>Būsena</th>
+                        <th>Kainos kiekis</th>
+                        <th>Kainos matas</th>
+                        <th>Kiekis nuo</th>
+                        <th>Kiekis iki</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kaina in uzklausa.detale.kainos.all %}
+                    <tr class="{% if kaina.busena == 'aktuali' %}aktualu{% elif kaina.busena == 'sena' %}sena{% endif %}">
+                        <td>{{ kaina.suma }} Eur</td>
+                        <td>{{ kaina.busena }}</td>
+                        <td>{{ kaina.fiksuotas_kiekis }}</td>
+                        <td>{{ kaina.kainos_matas }}</td>
+                        <td>{{ kaina.kiekis_nuo }}</td>
+                        <td>{{ kaina.kiekis_iki }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="blokas-5">
+            <p>Pakavimas: {{ uzklausa.detale.pakavimas }}</p>
+            <p>Nuoroda į brėžinį: {{ uzklausa.detale.nuoroda_brezinio }}</p>
+            <p>Nuoroda į pasiūlymą: {{ uzklausa.detale.nuoroda_pasiulymo }}</p>
+            <p>Pastabos: {{ uzklausa.detale.pastabos }}</p>
+        </div>
+    </div>
+    <hr>
+    <hr>
+    {% endfor %}
+    <a href="{% url 'index' %}">Grįžti į pradinį puslapį</a>
+</body>
+</html>

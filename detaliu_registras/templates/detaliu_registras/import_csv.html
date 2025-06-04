@@ -1,0 +1,16 @@
+<!-- detaliu_registras/templates/import_csv.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Importuoti CSV</title>
+</head>
+<body>
+    <h1>Importuoti CSV failą</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Importuoti</button>
+    </form>
+</body>
+</html>

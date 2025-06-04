@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redaguoti kainą</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/forms.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/widgets.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/admin.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/base.css' %}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="app-app model-model change-form">
+    <h1>Redaguoti kainą</h1>
+    
+    <p><strong>Klientas:</strong> {{ klientas }}</p>
+    <p><strong>Projekto pavadinimas:</strong> {{ projekto_pavadinimas }}</p>
+    <p><strong>Detalės pavadinimas:</strong> {{ detales_pavadinimas }}</p>
+    <p><strong>Brėžinio nr:</strong> {{ brezinių_nr }}</p>
+    
+    <form method="post">
+        {% csrf_token %}
+        <fieldset class="module aligned wide" id="kaina-formset">
+            <h2>Kainos</h2>
+            {{ kaina_formset.management_form }}
+            {% for form in kaina_formset %}
+                <div class="dynamic-form">
+                    {{ form.as_p }}
+                    <button type="button" class="remove-form">Pašalinti</button>
+                </div>
+            {% endfor %}
+            <button type="button" id="add-form">Pridėti kainą</button>
+        </fieldset>
+        <div class="submit-row">
+            <button type="submit" class="default">Pateikti</button>
+        </div>
+    </form>
+    <a href="{% url 'index' %}">Grįžti į pradžios puslapį</a>
+    <script>
+        $(document).ready(function() {
+            var formset = $('#kaina-formset');
+            var formCount = formset.find('.dynamic-form').length;
+            var totalForms = $('#id_form-TOTAL_FORMS');
+            var addFormButton = $('#add-form');
+
+            addFormButton.on('click', function() {
+                var newForm = formset.find('.dynamic-form:first').clone(true).removeAttr('id');
+                newForm.find('input, select').each(function() {
+                    var name = $(this).attr('name').replace(/-\d+-/, '-' + formCount + '-');
+                    $(this).attr({'name': name, 'id': 'id_' + name}).val('');
+                });
+                formset.append(newForm);
+                totalForms.val(parseInt(totalForms.val(), 10) + 1);
+                formCount++;
+            });
+
+            formset.on('click', '.remove-form', function() {
+                $(this).closest('.dynamic-form').remove();
+                formCount--;
+                totalForms.val(parseInt(totalForms.val(), 10) - 1);
+            });
+        });
+    </script>
+</body>
+</html>
