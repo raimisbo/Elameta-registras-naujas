@@ -1,7 +1,7 @@
 import csv
 from io import StringIO
-from datetime import datetime
 from .models import Klientas, Projektas, Detale, Kaina, Danga, Uzklausa
+
 
 def parse_int(value):
     try:
@@ -9,18 +9,28 @@ def parse_int(value):
     except (ValueError, TypeError):
         return 0
 
+
 def import_csv(file):
+    from datetime import datetime
+    klaidos = []
+
     file.seek(0)
     encoding = 'utf-8'
-    csv_file = file.read().decode(encoding)
-    csv_file = StringIO(csv_file)
-    reader = csv.DictReader(csv_file)
+    raw_data = file.read().decode(encoding)
+    csv_file = StringIO(raw_data, newline='')
 
-    klaidos = []
+    try:
+        sniffer = csv.Sniffer()
+        dialect = sniffer.sniff(raw_data[:1024])
+    except csv.Error:
+        dialect = csv.excel  # Fallback jei Sniffer nepavyksta
+
+    csv_file.seek(0)
+    reader = csv.DictReader(csv_file, dialect=dialect)
 
     for i, row in enumerate(reader, start=1):
         try:
-            # Klientas
+            # --- Klientas ---
             kliento_vardas = row.get('klientas_pavadinimas')
             if not kliento_vardas:
                 klaidos.append(f"Eilutė {i}: Trūksta kliento pavadinimo.")
@@ -30,7 +40,7 @@ def import_csv(file):
                 vardas=kliento_vardas.strip()
             )
 
-            # Projektas
+            # --- Projektas ---
             projektas, _ = Projektas.objects.update_or_create(
                 pavadinimas=row.get('projektas_pavadinimas'),
                 defaults={
@@ -40,7 +50,7 @@ def import_csv(file):
                 }
             )
 
-            # Detalė
+            # --- Detalė ---
             detale, _ = Detale.objects.update_or_create(
                 brezinio_nr=row.get('detale_brezinio_nr'),
                 defaults={
@@ -59,35 +69,35 @@ def import_csv(file):
                     'nuoroda_brezinio': row.get('detale_nuoroda_brezinio'),
                     'nuoroda_pasiulymo': row.get('detale_nuoroda_pasiulymo'),
                     'pastabos': row.get('detale_pastabos'),
-                    'projektas': projektas,
+                    'projektas': projektas
                 }
             )
 
-            # Dangos
-            if row.get('detale_danga'):
+            # --- Danga ---
+            if 'detale_danga' in row and row['detale_danga']:
                 danga_pavadinimai = [d.strip() for d in row['detale_danga'].split(',')]
                 dangos = Danga.objects.filter(pavadinimas__in=danga_pavadinimai)
                 detale.danga.set(dangos)
 
-            # Kaina
-            if row.get('kaina_suma'):
-                try:
-                    suma = float(row.get('kaina_suma'))
-                except ValueError:
-                    suma = 0.0
+            # --- Kaina ---
+            kaina_suma = row.get('kaina_suma')
+            try:
+                kaina_suma = float(kaina_suma) if kaina_suma else 0.00
+            except ValueError:
+                kaina_suma = 0.00
 
-                Kaina.objects.update_or_create(
-                    detalė=detale,
-                    fiksuotas_kiekis=row.get('kaina_fiksuotas_kiekis'),
-                    defaults={
-                        'busena': row.get('kaina_busena'),
-                        'suma': suma,
-                        'kiekis_nuo': parse_int(row.get('kaina_kiekis_nuo')),
-                        'kiekis_iki': parse_int(row.get('kaina_kiekis_iki')),
-                    }
-                )
+            Kaina.objects.update_or_create(
+                detalė=detale,
+                fiksuotas_kiekis=row.get('kaina_fiksuotas_kiekis'),
+                defaults={
+                    'busena': row.get('kaina_busena'),
+                    'suma': kaina_suma,
+                    'kiekis_nuo': parse_int(row.get('kaina_kiekis_nuo')),
+                    'kiekis_iki': parse_int(row.get('kaina_kiekis_iki')),
+                }
+            )
 
-            # Užklausa
+            # --- Užklausa ---
             Uzklausa.objects.get_or_create(
                 klientas=klientas,
                 projektas=projektas,
