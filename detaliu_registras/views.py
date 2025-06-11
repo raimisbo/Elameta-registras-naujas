@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_protect
 import json
 import logging
 import urllib.parse
+from django.contrib import messages
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,14 @@ def import_csv_view(request):
     if request.method == 'POST':
         form = ImportCSVForm(request.POST, request.FILES)
         if form.is_valid():
-            import_csv(form.cleaned_data['csv_file'])
-            return redirect('admin:index')  # Arba kitą peradresavimo puslapį
+            klaidos = import_csv(form.cleaned_data['csv_file'])
+
+            if klaidos:
+                for klaida in klaidos:
+                    messages.warning(request, klaida)
+            else:
+                messages.success(request, "CSV sėkmingai importuotas.")
+
     else:
         form = ImportCSVForm()
     return render(request, 'detaliu_registras/import_csv.html', {'form': form})
