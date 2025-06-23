@@ -2,6 +2,27 @@ import csv
 from io import StringIO
 from .models import Klientas, Projektas, Detale, Kaina, Danga, Uzklausa
 
+def parse_int(value):
+    try:
+        return int(float(value)) if value else 0
+    except (ValueError, TypeError):
+        return 0
+
+def parse_date(date_str):
+    from datetime import datetime
+    if not date_str:
+        return None
+    for fmt in ('%Y-%m-%d', '%d.%m.%Y', '%Y/%m/%d'):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    return None  # jei neatitinka nei vieno formato
+
+from io import StringIO
+import csv
+from .models import Klientas, Projektas, Detale, Danga, Kaina, Uzklausa
+from datetime import datetime
 
 def parse_int(value):
     try:
@@ -9,26 +30,31 @@ def parse_int(value):
     except (ValueError, TypeError):
         return 0
 
+def parse_date(value):
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date() if value else None
+    except (ValueError, TypeError):
+        return None
 
 def import_csv(file):
-    from datetime import datetime
     klaidos = []
 
     file.seek(0)
-    encoding = 'utf-8'
-    raw_data = file.read().decode(encoding)
+    raw_data = file.read().decode('utf-8')
     csv_file = StringIO(raw_data, newline='')
 
+    # Bandome aptikti kabliataškį kaip atskyriklį
     try:
         sniffer = csv.Sniffer()
         dialect = sniffer.sniff(raw_data[:1024])
+        dialect.delimiter = ';'  # Perrašome delimiterį į kabliataškį
     except csv.Error:
-        dialect = csv.excel  # Fallback jei Sniffer nepavyksta
+        dialect = csv.excel
+        dialect.delimiter = ';'
 
-    csv_file.seek(0)
     reader = csv.DictReader(csv_file, dialect=dialect)
 
-    for i, row in enumerate(reader, start=1):
+    for i, row in enumerate(reader, start=2):  # Pradedame nuo 2, nes 1 – antraštė
         try:
             # --- Klientas ---
             kliento_vardas = row.get('klientas_pavadinimas')
@@ -41,12 +67,22 @@ def import_csv(file):
             )
 
             # --- Projektas ---
+            projektas_pavadinimas = row.get('projektas_pavadinimas')
+            if not projektas_pavadinimas:
+                klaidos.append(f"Eilutė {i}: Trūksta projekto pavadinimo.")
+                continue
+
+            uzklausos_data = parse_date(row.get('uzklausos_data'))
+            if uzklausos_data is None:
+                klaidos.append(f"Eilutė {i}: Trūksta arba blogas 'uzklausos_data' formatas.")
+                continue
+
             projektas, _ = Projektas.objects.update_or_create(
-                pavadinimas=row.get('projektas_pavadinimas'),
+                pavadinimas=projektas_pavadinimas.strip(),
                 defaults={
                     'klientas': klientas,
-                    'uzklausos_data': row.get('uzklausos_data') or None,
-                    'pasiulymo_data': row.get('pasiulymo_data') or None,
+                    'uzklausos_data': uzklausos_data,
+                    'pasiulymo_data': parse_date(row.get('pasiulymo_data')),
                 }
             )
 
@@ -55,8 +91,8 @@ def import_csv(file):
                 brezinio_nr=row.get('detale_brezinio_nr'),
                 defaults={
                     'pavadinimas': row.get('detale_pavadinimas'),
-                    'plotas': row.get('detale_plotas'),
-                    'svoris': row.get('detale_svoris'),
+                    'plotas': float(row.get('detale_plotas') or 0),
+                    'svoris': float(row.get('detale_svoris') or 0),
                     'kiekis_metinis': parse_int(row.get('detale_kiekis_metinis')),
                     'kiekis_menesis': parse_int(row.get('detale_kiekis_menesis')),
                     'kiekis_partijai': parse_int(row.get('detale_kiekis_partijai')),
@@ -69,7 +105,8 @@ def import_csv(file):
                     'nuoroda_brezinio': row.get('detale_nuoroda_brezinio'),
                     'nuoroda_pasiulymo': row.get('detale_nuoroda_pasiulymo'),
                     'pastabos': row.get('detale_pastabos'),
-                    'projektas': projektas
+                    'ppap_dokumentai': row.get('ppap_dokumentai') or '',
+                    'projektas': projektas,
                 }
             )
 
@@ -80,20 +117,21 @@ def import_csv(file):
                 detale.danga.set(dangos)
 
             # --- Kaina ---
-            kaina_suma = row.get('kaina_suma')
             try:
-                kaina_suma = float(kaina_suma) if kaina_suma else 0.00
+                kaina_suma = float(row.get('kaina_suma')) if row.get('kaina_suma') else 0.0
             except ValueError:
-                kaina_suma = 0.00
+                kaina_suma = 0.0
 
             Kaina.objects.update_or_create(
                 detalė=detale,
-                fiksuotas_kiekis=row.get('kaina_fiksuotas_kiekis'),
+                fiksuotas_kiekis=parse_int(row.get('kaina_fiksuotas_kiekis')),
                 defaults={
                     'busena': row.get('kaina_busena'),
                     'suma': kaina_suma,
                     'kiekis_nuo': parse_int(row.get('kaina_kiekis_nuo')),
                     'kiekis_iki': parse_int(row.get('kaina_kiekis_iki')),
+                    'yra_fiksuota': True if row.get('kaina_busena') == 'aktuali' else False,
+                    'kainos_matas': row.get('kainos_matas') or 'vnt.',
                 }
             )
 

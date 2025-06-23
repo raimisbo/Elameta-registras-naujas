@@ -16,8 +16,8 @@ class Klientas(models.Model):
 class Projektas(models.Model):
     klientas = models.ForeignKey(Klientas, on_delete=models.CASCADE)  # Ryšys su Klientas modeliu
     pavadinimas = models.CharField(max_length=255)
-    uzklausos_data = models.DateField()
-    pasiulymo_data = models.DateField()
+    uzklausos_data = models.DateField(null=True, blank=True)
+    pasiulymo_data = models.DateField(null=True, blank=True)
 
     def formatted_uzklausos_data(self):
         return self.uzklausos_data.strftime('%Y-%m-%d')
