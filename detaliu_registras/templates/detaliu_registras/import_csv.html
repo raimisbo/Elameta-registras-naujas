@@ -1,36 +1,93 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Importuoti CSV failą{% endblock %}
+
+{% block content %}
+<h2>Importuoti CSV failą</h2>
+
+<a href="{% url 'home' %}" class="btn btn-secondary">← Grįžti</a>
+
+<form method="post" enctype="multipart/form-data" style="margin-top: 20px;">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Įkelti</button>
+</form>
+
+{% if csv_error %}
+    <div style="color: red; margin-top: 20px;"><strong>Klaida skaitant CSV:</strong> {{ csv_error }}</div>
+{% endif %}
+
+{% if preview_data %}
+    <h3 style="margin-top: 30px;">CSV duomenų peržiūra</h3>
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                {% for key in preview_data.0.keys %}
+                    {% if key != "errors" %}
+                        <th>{{ key }}</th>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in preview_data %}
+                <tr>
+                    {% for key, value in row.items %}
+                        {% if key != "errors" %}
+                            {% if key in row.errors %}
+                                <td style="background-color: #f8d7da;" title="{{ row.errors|get_item:key }}">{{ value }}</td>
+                            {% else %}
+                                <td>{{ value }}</td>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not errors_exist %}
+        <p style="color: green;">CSV importuotas sėkmingai.</p>
+    {% else %}
+        <p style="color: red;">Rasta klaidų – pataisykite CSV ir bandykite iš naujo.</p>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
 <!-- detaliu_registras/templates/import_csv.html -->
 
-<!DOCTYPE html>
-<html lang="lt">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Importuoti CSV</title>
-    <!-- Pridėti bazinius stilius arba įtraukti Bootstrap -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center">Importuoti CSV failą</h1>
-        <form method="post" enctype="multipart/form-data" class="mt-4">
-            {% csrf_token %}
-            <div class="form-group">
-                {{ form.as_p }}
-            </div>
-            <div class="text-center">
-                <button type="submit" class="btn btn-primary">Importuoti</button>
-            </div>
-        </form>
+<!--<!DOCTYPE html>-->
+<!--<html lang="lt">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Importuoti CSV</title>-->
+<!--    &lt;!&ndash; Pridėti bazinius stilius arba įtraukti Bootstrap &ndash;&gt;-->
+<!--    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">-->
+<!--</head>-->
+<!--<body>-->
+<!--    <div class="container mt-5">-->
+<!--        <h1 class="text-center">Importuoti CSV failą</h1>-->
+<!--        <form method="post" enctype="multipart/form-data" class="mt-4">-->
+<!--            {% csrf_token %}-->
+<!--            <div class="form-group">-->
+<!--                {{ form.as_p }}-->
+<!--            </div>-->
+<!--            <div class="text-center">-->
+<!--                <button type="submit" class="btn btn-primary">Importuoti</button>-->
+<!--            </div>-->
+<!--        </form>-->
 
-        <!-- Rodyti sėkmės arba klaidos pranešimus -->
-        {% if messages %}
-            <div class="mt-4">
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    </div>
-</body>
-</html>
+<!--        &lt;!&ndash; Rodyti sėkmės arba klaidos pranešimus &ndash;&gt;-->
+<!--        {% if messages %}-->
+<!--            <div class="mt-4">-->
+<!--                {% for message in messages %}-->
+<!--                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>-->
+<!--                {% endfor %}-->
+<!--            </div>-->
+<!--        {% endif %}-->
+<!--    </div>-->
+<!--</body>-->
+<!--</html>-->
 
