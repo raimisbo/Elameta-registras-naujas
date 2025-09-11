@@ -2,11 +2,9 @@ from django import forms
 from .models import Klientas, Projektas, Detale, Kaina, Uzklausa, Danga
 
 class ImportCSVForm(forms.Form):
-    csv_file = forms.FileField()
-
+    file = forms.FileField(label='Pasirinkite CSV failą')
 class ImportCSVForm(forms.Form):
     file = forms.FileField(label='Pasirinkite CSV failą')
-    
 '''class UzklausaSearchForm(forms.Form):
     search_term = forms.CharField(label='Paieškos Terminas', max_length=100, required=False)'''
 
