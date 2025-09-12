@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import Klientas, Projektas, Detale, Kaina, Uzklausa
 
 class KlientasAdmin(admin.ModelAdmin):
-    list_display = ('vardas', 'adresas', 'telefonas', 'email')
+    list_display = ('vardas', 'adresas', 'telefonas', 'el_pastas')
 
 class ProjektasAdmin(admin.ModelAdmin):
     list_display = ('pavadinimas', 'uzklausos_data', 'pasiulymo_data')

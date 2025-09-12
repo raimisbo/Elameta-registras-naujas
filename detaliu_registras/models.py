@@ -4,7 +4,7 @@ class Klientas(models.Model):
     vardas = models.CharField(max_length=100)
     adresas = models.CharField(max_length=255, blank=True, null=True)
     telefonas = models.CharField(max_length=20)
-    email = models.TextField(default='')
+    el_pastas = models.TextField(default='')
 
     class Meta:
         verbose_name = 'Klientas'
