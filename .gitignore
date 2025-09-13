@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# --- Virtualenv ---
+.venv/
+venv/
+env/
+
+# --- Django ---
+db.sqlite3
+/media/
+/staticfiles/
+/logs/
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.iml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- PyCharm specific ---
+*.ipr
+*.iws

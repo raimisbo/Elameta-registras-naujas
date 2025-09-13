@@ -8,28 +8,27 @@ from detaliu_registras.views import (
     UzklausaListView,
     perziureti_uzklausa,
     KainaUpdateView,
-    ivesti_uzklausa_dispatch,   # <— svarbu
+    ivesti_uzklausa_dispatch,
 )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # App su namespace (palik)
+    # Projektinis root -> index
+    path('', IndexView.as_view(), name='home'),
+
+    # App su namespace
     path(
         'detaliu_registras/',
         include(('detaliu_registras.urls', 'detaliu_registras'), namespace='detaliu_registras')
     ),
 
-    # ---- Globalūs alias'ai SENIEMS šablonams (be namespace) ----
-    # Tas pats vardas 'ivesti_uzklausa' su PASIRENKAMU parametru:
-    #  - /detaliu_registras/ivesti_uzklausa/               -> kurti naują
-    #  - /detaliu_registras/ivesti_uzklausa/2/             -> redaguoti kainą (uzklausa_pk=2)
+    # Alias'ai be namespace (laikini)
     re_path(
         r'^detaliu_registras/ivesti_uzklausa(?:/(?P<uzklausa_pk>\d+))?/$',
         ivesti_uzklausa_dispatch,
         name='ivesti_uzklausa'
     ),
-
     path(
         'detaliu_registras/perziureti_uzklausas/<int:klientas_id>/',
         UzklausaListView.as_view(),

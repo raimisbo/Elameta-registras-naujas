@@ -1,325 +1,156 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Index</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .header-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 20%;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .header-links {
-            display: flex;
-            flex-direction: column;
-        }
-        .header-links a {
-            margin-bottom: 10px;
-        }
-        .search-form {
-            margin-top: 20px;
-        }
-        .chart-container {
-            width: 300px;
-            height: 100%;
-            padding: 10px;
-        }
-        .chart-container canvas {
-            width: 100%;
-            height: 100%;
-        }
-        .main-content {
-            flex: 1;
-            overflow: auto;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-        }
-        .table-container {
-            flex: 1;
-            overflow: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            position: sticky;
-            top: 0;
-            background-color: #f4f4f4;
-            z-index: 2;
-        }
-        .scrollable-table {
-            display: block;
-            height: 100%;
-            overflow-y: scroll;
-        }
-        .view-button {
-            cursor: pointer;
-            color: #007BFF;
-            text-decoration: underline;
-        }
-        .view-button:hover {
-            color: #0056b3;
-        }
-        .notes-cell {
-            max-width: 300px; /* Adjust as needed */
-            word-wrap: break-word;
-        }
-        .detale-pavadinimas-cell {
-            max-width: 300px; /* Adjust as needed */
-            word-wrap: break-word; /* Ensure text wraps */
-        }
-        .filter-input {
-            width: 100%;
-        }
-    </style>
-</head>
-<body>
-    <div class="header-container">
-        <div class="header-links">
-            <a href="{% url 'ivesti_uzklausa' %}">Įvesti užklausą</a>
-            <a href="{% url 'perziureti_uzklausas' klientas_id=0 %}">Peržiūrėti užklausas</a>
-        </div>
-        <div class="chart-container">
-            <!-- Grafikas -->
-            <canvas id="detaliuGrafikas"></canvas>
-        </div>
-    </div>
+{% extends "base.html" %}
+{% load static %}
 
-    <div class="main-content">
-        
-        <!-- Paieškos forma -->
-        <div class="UzklausaFilterForm">
-            <form method="get" action="{% url 'perziureti_uzklausas' klientas_id=0 %}">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <input type="text" name="q" placeholder="Ieškoti..." value="{{ request.GET.q }}">
-                <!-- Hidden fields to preserve current filters -->
-                {% for key, value in request.GET.items %}
-                    {% if key != 'q' %}
-                        <input type="hidden" name="{{ key }}" value="{{ value }}">
-                    {% endif %}
-                {% endfor %}
-                <button type="submit">Ieškoti</button>
-                
-            </form>
-        </div>
+{% block title %}Index{% endblock %}
 
-        <script>
-            function clearFilters() {
-                var form = document.querySelector('UzklausaFilterForm');
-                form.querySelector('input[name="q"]').value = '';
-                form.submit();
-            }
-        </script>
-    
-        <!-- Lentelė su filtrais ir scroll barais -->
-        <div class="UzklausaFilterForm">
-            <hr>
-            <button type="button" onclick="clearFilters()">Išvalyti filtrus</button>
-        </div>
-        <div class="table-container">
-            <div class="scrollable-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Kliento pavadinimas</th>
-                            <th>Projekto pavadinimas</th>
-                            <th>Detalės pavadinimas</th>
-                            <th>Užklausos data</th>
-                            <th>Pasiūlymo data</th>
-                            <th>Brėžinio nr.</th>
-                            <th>Kainos būsena</th>
-                            <th>Detalės kainos suma</th>
-                            <th>Kainos fiksuotas kiekis</th>
-                            <th>Kainos matas</th>
-                            <th>Kiekis rėme</th>
-                            <th>Pastabos</th>
-                            <th>Veiksmai</th>
-                        </tr>
-                        <tr>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(0)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(1)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(2)"></th>
-                            <th><input class="filter-input" type="date" oninput="filterTable(3)"></th>
-                            <th><input class="filter-input" type="date" oninput="filterTable(4)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(5)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(6)"></th>
-                            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(7)"></th>
-                            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(8)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(9)"></th>
-                            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(10)"></th>
-                            <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(11)"></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for uzklausa in uzklausos %}
-                        <tr>
-                            <td>{{ uzklausa.klientas.vardas }}</td>
-                            <td>{{ uzklausa.projektas.pavadinimas }}</td>
-                            <td class="detale-pavadinimas-cell">{{ uzklausa.detale.pavadinimas }}</td>
-                            <td>{{ uzklausa.projektas.uzklausos_data }}</td>
-                            <td>{{ uzklausa.projektas.pasiulymo_data }}</td>
-                            <td>{{ uzklausa.detale.brezinio_nr }}</td>
-                            <td>
-                                {% if uzklausa.detale.kainos.all %}
-                                    {{ uzklausa.detale.kainos.last.busena }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if uzklausa.detale.kainos.all %}
-                                    {{ uzklausa.detale.kainos.last.suma }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if uzklausa.detale.kainos.all %}
-                                    {{ uzklausa.detale.kainos.last.fiksuotas_kiekis }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if uzklausa.detale.kainos.all %}
-                                    {{ uzklausa.detale.kainos.last.kainos_matas }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if uzklausa.detale.kainos.all %}
-                                    {{ uzklausa.detale.kiekis_reme }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td class="notes-cell">{{ uzklausa.detale.pastabos }}</td>
-                            <td>
-                                <a class="view-button" href="{% url 'perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Peržiūrėti</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+{% block page_css %}
+<style>
+  body{font-family:Arial,sans-serif;margin:0;padding:0;height:100vh;display:flex;flex-direction:column}
+  .chart-container{width:300px;height:100%;padding:10px}
+  .chart-container canvas{width:100%;height:100%}
+  .table-container{flex:1;overflow:auto;display:flex;flex-direction:column}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}
+  th{position:sticky;top:0;background:#f4f4f4;z-index:2}
+  .scrollable-table{display:block;height:100%;overflow-y:scroll}
+  .view-button{cursor:pointer;color:#007BFF;text-decoration:underline}
+  .view-button:hover{color:#0056b3}
+  .notes-cell,.detale-pavadinimas-cell{max-width:300px;word-wrap:break-word}
+  .filter-input{width:100%}
+</style>
+{% endblock %}
 
-    <script>
-        function filterTable(columnIndex) {
-            var input, filter, table, tr, td, i, txtValue;
-            table = document.querySelector("table");
-            tr = table.getElementsByTagName("tr");
-            input = tr[1].getElementsByTagName("th")[columnIndex].getElementsByTagName("input")[0];
-            filter = input.value.toLowerCase();
+{% block header_right %}
+<div class="chart-container">
+  <canvas id="detaliuGrafikas"></canvas>
+</div>
+{% endblock %}
 
-            for (i = 2; i < tr.length; i++) {
-                td = tr[i].getElementsByTagName("td")[columnIndex];
-                if (td) {
-                    txtValue = td.textContent || td.innerText;
-                    if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
-                }
-            }
-        }
+{% block content %}
+<div class="UzklausaFilterForm">
+  <form method="get" action="{% url 'perziureti_uzklausas' klientas_id=0 %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="text" name="q" placeholder="Ieškoti..." value="{{ request.GET.q }}">
+    {% for key, value in request.GET.items %}
+      {% if key != 'q' %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+    <button type="submit">Ieškoti</button>
+  </form>
+</div>
 
-        function clearFilters() {
-            var inputs = document.querySelectorAll('.filter-input');
-            inputs.forEach(input => input.value = '');
-            var table, tr, i;
-            table = document.querySelector("table");
-            tr = table.getElementsByTagName("tr");
-            for (i = 2; i < tr.length; i++) {
-                tr[i].style.display = "";
-            }
-        }
+<hr>
+<div>
+  <button type="button" onclick="clearFilters()">Išvalyti filtrus</button>
+</div>
 
-        var ctx = document.getElementById('detaliuGrafikas').getContext('2d');
-        var klientuDuomenys = {{ klientu_duomenys_json|safe }};
-        
-        function getRandomColor() {
-            var letters = '0123456789ABCDEF';
-            var color = '#';
-            for (var i = 0; i < 6; i++) {
-                color += letters[Math.floor(Math.random() * 16)];
-            }
-            return color;
-        }
+<div class="table-container">
+  <div class="scrollable-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Kliento pavadinimas</th>
+          <th>Projekto pavadinimas</th>
+          <th>Detalės pavadinimas</th>
+          <th>Užklausos data</th>
+          <th>Pasiūlymo data</th>
+          <th>Brėžinio nr.</th>
+          <th>Kainos būsena</th>
+          <th>Detalės kainos suma</th>
+          <th>Kainos fiksuotas kiekis</th>
+          <th>Kainos matas</th>
+          <th>Kiekis rėme</th>
+          <th>Pastabos</th>
+          <th>Veiksmai</th>
+        </tr>
+        <tr>
+          {% for i in "0,1,2"|cut:"," %}
+          {% endfor %}
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(0)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(1)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(2)"></th>
+          <th><input class="filter-input" type="date" oninput="filterTable(3)"></th>
+          <th><input class="filter-input" type="date" oninput="filterTable(4)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(5)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(6)"></th>
+          <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(7)"></th>
+          <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(8)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(9)"></th>
+          <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(10)"></th>
+          <th><input class="filter-input" type="text" placeholder="Filtruoti..." oninput="filterTable(11)"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for uzklausa in uzklausos %}
+        <tr>
+          <td>{{ uzklausa.klientas.vardas }}</td>
+          <td>{{ uzklausa.projektas.pavadinimas }}</td>
+          <td class="detale-pavadinimas-cell">{{ uzklausa.detale.pavadinimas }}</td>
+          <td>{{ uzklausa.projektas.uzklausos_data }}</td>
+          <td>{{ uzklausa.projektas.pasiulymo_data }}</td>
+          <td>{{ uzklausa.detale.brezinio_nr }}</td>
+          <td>{% if uzklausa.detale.kainos.all %}{{ uzklausa.detale.kainos.last.busena }}{% else %}N/A{% endif %}</td>
+          <td>{% if uzklausa.detale.kainos.all %}{{ uzklausa.detale.kainos.last.suma }}{% else %}N/A{% endif %}</td>
+          <td>{% if uzklausa.detale.kainos.all %}{{ uzklausa.detale.kainos.last.fiksuotas_kiekis }}{% else %}N/A{% endif %}</td>
+          <td>{% if uzklausa.detale.kainos.all %}{{ uzklausa.detale.kainos.last.kainos_matas }}{% else %}N/A{% endif %}</td>
+          <td>{% if uzklausa.detale.kainos.all %}{{ uzklausa.detale.kiekis_reme }}{% else %}N/A{% endif %}</td>
+          <td class="notes-cell">{{ uzklausa.detale.pastabos }}</td>
+          <td><a class="view-button" href="{% url 'perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Peržiūrėti</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
 
-        var labels = [];
-        var data = [];
-        var urls = [];
-        var backgroundColors = [];
-        var borderColors = [];
+{% block page_js_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
 
-        for (var i = 0; i < klientuDuomenys.length; i++) {
-            labels.push(klientuDuomenys[i].klientas__vardas);
-            data.push(klientuDuomenys[i].kiekis);
-            urls.push("{% url 'perziureti_uzklausas' klientas_id=0 %}".replace("0", klientuDuomenys[i].klientas__id));
-            var color = getRandomColor();
-            backgroundColors.push(color + '80'); // Adding alpha for background color
-            borderColors.push(color);
-        }
-        
-        var chart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Užklausų kiekis',
-                    data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: borderColors,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                onClick: function(evt, item) {
-                    if (item.length > 0) {
-                        var index = item[0].index;
-                        var url = urls[index];
-                        if (url) {
-                            window.location.href = url;
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'right' // Move legend to the right
-                    }
-                }
-            }
-        });
-    </script>
-</body>
-</html>
+{% block page_js %}
+<script>
+  function filterTable(columnIndex){
+    const table=document.querySelector("table");
+    const tr=table.getElementsByTagName("tr");
+    const input=tr[1].getElementsByTagName("th")[columnIndex].getElementsByTagName("input")[0];
+    const filter=(input.value||"").toLowerCase();
+    for(let i=2;i<tr.length;i++){
+      const td=tr[i].getElementsByTagName("td")[columnIndex];
+      if(td){
+        const txt=(td.textContent||td.innerText).toLowerCase();
+        tr[i].style.display = txt.indexOf(filter)>-1 ? "" : "none";
+      }
+    }
+  }
+  function clearFilters(){
+    document.querySelectorAll('.filter-input').forEach(i=>i.value='');
+    document.querySelectorAll("table tr").forEach((tr,idx)=>{ if(idx>=2) tr.style.display=""; });
+  }
+
+  const ctx=document.getElementById('detaliuGrafikas').getContext('2d');
+  const klientuDuomenys={{ klientu_duomenys_json|safe }};
+  function randColor(){return '#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');}
+
+  const labels=[],data=[],urls=[],bg=[],border=[];
+  for(let i=0;i<klientuDuomenys.length;i++){
+    labels.push(klientuDuomenys[i].klientas__vardas);
+    data.push(klientuDuomenys[i].kiekis);
+    urls.push("{% url 'perziureti_uzklausas' klientas_id=0 %}".replace("0", klientuDuomenys[i].klientas__id));
+    const c=randColor(); bg.push(c+'80'); border.push(c);
+  }
+
+  new Chart(ctx,{
+    type:'pie',
+    data:{labels:labels,datasets:[{label:'Užklausų kiekis',data:data,backgroundColor:bg,borderColor:border,borderWidth:1}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick:(evt,item)=>{ if(item.length){ const url=urls[item[0].index]; if(url) location.href=url; } },
+      plugins:{legend:{display:true,position:'right'}}
+    }
+  });
+</script>
+{% endblock %}
