@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Registras{% endblock %}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% block page_css %}{% endblock %}
+</head>
+<body>
+  <header class="header-container" style="display:flex;justify-content:space-between;align-items:center;height:20%;padding:10px;box-shadow:0 2px 5px rgba(0,0,0,.1);">
+    <nav class="header-links" style="display:flex;flex-direction:column;">
+      <a href="{% url 'ivesti_uzklausa' %}">Įvesti užklausą</a>
+      <a href="{% url 'perziureti_uzklausas' klientas_id=0 %}">Peržiūrėti užklausas</a>
+    </nav>
+    {% block header_right %}{% endblock %}
+  </header>
+
+  <main class="main-content" style="flex:1;overflow:auto;display:flex;flex-direction:column;padding:20px;min-height:80vh;">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block page_js_head %}{% endblock %}
+  {% block page_js %}{% endblock %}
+</body>
+</html>
