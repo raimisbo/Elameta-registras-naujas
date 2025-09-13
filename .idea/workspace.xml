@@ -5,16 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3cf191c7-ccee-40d3-839d-3b077fc7dfc2" name="Changes" comment="atstatytas projektas 09-12, be CSS, be snippets, be AJAX">
-      <change beforePath="$PROJECT_DIR$/._db.sqlite3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/.___pycache__" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/migrations/.___pycache__" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/urls.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/registras/.___pycache__" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/registras/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/registras/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/registras/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/registras/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/._.idea" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/._workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/import_csv.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/import_csv.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/ivesti_uzklausa.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/ivesti_uzklausa.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausa.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausa.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausas.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausas.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/redaguoti_kaina.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/redaguoti_kaina.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -81,6 +80,7 @@
       <recent name="$PROJECT_DIR$/detaliu_registras" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/templates" />
       <recent name="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras" />
     </key>
   </component>

@@ -1,36 +1,24 @@
-<!-- detaliu_registras/templates/import_csv.html -->
+{% extends "base.html" %}
+{% load static %}
 
-<!DOCTYPE html>
-<html lang="lt">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Importuoti CSV</title>
-    <!-- Pridėti bazinius stilius arba įtraukti Bootstrap -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center">Importuoti CSV failą</h1>
-        <form method="post" enctype="multipart/form-data" class="mt-4">
-            {% csrf_token %}
-            <div class="form-group">
-                {{ form.as_p }}
-            </div>
-            <div class="text-center">
-                <button type="submit" class="btn btn-primary">Importuoti</button>
-            </div>
-        </form>
+{% block title %}Importuoti CSV{% endblock %}
 
-        <!-- Rodyti sėkmės arba klaidos pranešimus -->
-        {% if messages %}
-            <div class="mt-4">
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    </div>
-</body>
-</html>
+{% block content %}
+  <h2>Importuoti CSV failą</h2>
 
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Įkelti</button>
+  </form>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>
+          {{ message }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

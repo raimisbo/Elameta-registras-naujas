@@ -1,293 +1,207 @@
-<!doctype html>
-<html lang="lt">
-<head>
-  <meta charset="utf-8">
-  <title>Įvesti užklausą</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
+{% load static %}
 
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:20px}
-    h1{margin:0 0 16px 0;font-weight:600}
-    .section{margin:18px 0;border:1px solid #d0d7de;border-radius:6px;overflow:hidden}
-    .section > .head{background:#3f6f86;color:#fff;padding:10px 12px;font-weight:600}
-    .section > .body{padding:12px}
-    .row{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}
-    .row .field{display:flex;flex-direction:column}
-    label{font-size:14px;margin-bottom:4px;color:#333}
-    input, select, textarea{padding:6px 8px;border:1px solid #c9d1d9;border-radius:6px;font-size:14px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{border:1px solid #d0d7de;padding:8px;vertical-align:top;text-align:left}
-    .actions{margin-top:16px;display:flex;gap:12px}
-    .btn{display:inline-block;border:1px solid #c9d1d9;border-radius:6px;padding:6px 10px;background:#f6f8fa;cursor:pointer;text-decoration:none;color:#111}
-    .btn:hover{background:#eef1f4}
-    .errorlist{margin:0 0 8px 0;padding-left:18px;color:#b71c1c}
-  </style>
-</head>
-<body>
-  <h1>Įvesti užklausą</h1>
+{% block title %}Įvesti užklausą{% endblock %}
 
-  <form method="post">
-    {% csrf_token %}
+{% block page_css %}
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:20px}
+  h1{margin:0 0 16px 0;font-weight:600}
+  .section{margin:18px 0;border:1px solid #d0d7de;border-radius:6px;overflow:hidden}
+  .section > .head{background:#3f6f86;color:#fff;padding:10px 12px;font-weight:600}
+  .section > .body{padding:12px}
+  .row{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}
+  .row .field{display:flex;flex-direction:column}
+  label{font-size:14px;margin-bottom:4px;color:#333}
+  input, select, textarea{padding:6px 8px;border:1px solid #c9d1d9;border-radius:6px;font-size:14px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid #d0d7de;padding:8px;vertical-align:top;text-align:left}
+  .actions{margin-top:16px;display:flex;gap:12px}
+  .btn{display:inline-block;border:1px solid #c9d1d9;border-radius:6px;padding:6px 10px;background:#f6f8fa;cursor:pointer;text-decoration:none;color:#111}
+  .btn:hover{background:#eef1f4}
+  .errorlist{margin:0 0 8px 0;padding-left:18px;color:#b71c1c}
+</style>
+{% endblock %}
 
-    {# ––––– Užklausa (kompozitinė forma) ––––– #}
-    <div class="section">
-      <div class="head">Užklausa</div>
-      <div class="body">
-        {% with f=uzklausa_form|default:form %}
-          {{ f.non_field_errors }}
-          <div class="row">
-            <div class="field">
-              <label>Pasirinkti esamą klientą</label>
-              {{ f.existing_klientas.errors }}
-              {{ f.existing_klientas }}
-            </div>
-            <div class="field">
-              <label>Arba įvesti naują klientą</label>
-              {{ f.new_klientas_vardas.errors }}
-              {{ f.new_klientas_vardas }}
-            </div>
-            <div class="field">
-              <label>Projekto pavadinimas</label>
-              {{ f.projekto_pavadinimas.errors }}
-              {{ f.projekto_pavadinimas }}
-            </div>
-            <div class="field">
-              <label>Užklausos data</label>
-              {{ f.uzklausos_data.errors }}
-              {{ f.uzklausos_data }}
-            </div>
-            <div class="field">
-              <label>Pasiūlymo data</label>
-              {{ f.pasiulymo_data.errors }}
-              {{ f.pasiulymo_data }}
-            </div>
+{% block content %}
+<h1>Įvesti užklausą</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  {# ––––– Užklausa (kompozitinė forma) ––––– #}
+  <div class="section">
+    <div class="head">Užklausa</div>
+    <div class="body">
+      {% with f=uzklausa_form|default:form %}
+        {{ f.non_field_errors }}
+        <div class="row">
+          <div class="field">
+            <label>Pasirinkti esamą klientą</label>
+            {{ f.existing_klientas.errors }}
+            {{ f.existing_klientas }}
           </div>
-        {% endwith %}
-      </div>
+          <div class="field">
+            <label>Arba įvesti naują klientą</label>
+            {{ f.new_klientas_vardas.errors }}
+            {{ f.new_klientas_vardas }}
+          </div>
+          <div class="field">
+            <label>Projekto pavadinimas</label>
+            {{ f.projekto_pavadinimas.errors }}
+            {{ f.projekto_pavadinimas }}
+          </div>
+          <div class="field">
+            <label>Užklausos data</label>
+            {{ f.uzklausos_data.errors }}
+            {{ f.uzklausos_data }}
+          </div>
+          <div class="field">
+            <label>Pasiūlymo data</label>
+            {{ f.pasiulymo_data.errors }}
+            {{ f.pasiulymo_data }}
+          </div>
+        </div>
+      {% endwith %}
     </div>
+  </div>
 
-    {# ––––– Pasirenkamos „subformos“ – rodom tik jei paduotos į kontekstą ––––– #}
-    {% if klientas_form or projektas_form or detale_form %}
-      <div class="section">
-        <div class="head">Papildomi duomenys</div>
-        <div class="body">
-          {% if klientas_form %}
-            <h3>Klientas</h3>
-            {{ klientas_form.non_field_errors }}
-            <div class="row">
-              <div class="field">
-                <label>Vardas</label>
-                {{ klientas_form.vardas.errors }}{{ klientas_form.vardas }}
-              </div>
-              <div class="field">
-                <label>Adresas</label>
-                {{ klientas_form.adresas.errors }}{{ klientas_form.adresas }}
-              </div>
-              <div class="field">
-                <label>Telefonas</label>
-                {{ klientas_form.telefonas.errors }}{{ klientas_form.telefonas }}
-              </div>
-              <div class="field">
-                <label>El. paštas</label>
-                {{ klientas_form.el_pastas.errors }}{{ klientas_form.el_pastas }}
-              </div>
-            </div>
-            <hr>
-          {% endif %}
-
-          {% if projektas_form %}
-            <h3>Projektas</h3>
-            {{ projektas_form.non_field_errors }}
-            <div class="row">
-              <div class="field">
-                <label>Klientas</label>
-                {{ projektas_form.klientas.errors }}{{ projektas_form.klientas }}
-              </div>
-              <div class="field">
-                <label>Pavadinimas</label>
-                {{ projektas_form.pavadinimas.errors }}{{ projektas_form.pavadinimas }}
-              </div>
-              <div class="field">
-                <label>Užklausos data</label>
-                {{ projektas_form.uzklausos_data.errors }}{{ projektas_form.uzklausos_data }}
-              </div>
-              <div class="field">
-                <label>Pasiūlymo data</label>
-                {{ projektas_form.pasiulymo_data.errors }}{{ projektas_form.pasiulymo_data }}
-              </div>
-            </div>
-            <hr>
-          {% endif %}
-
-          {% if detale_form %}
-            <h3>Detalė</h3>
-            {{ detale_form.non_field_errors }}
-            <div class="row">
-              <div class="field">
-                <label>Pavadinimas</label>
-                {{ detale_form.pavadinimas.errors }}{{ detale_form.pavadinimas }}
-              </div>
-              <div class="field">
-                <label>Brėžinio Nr.</label>
-                {{ detale_form.brezinio_nr.errors }}{{ detale_form.brezinio_nr }}
-              </div>
-              <div class="field">
-                <label>Plotas</label>
-                {{ detale_form.plotas.errors }}{{ detale_form.plotas }}
-              </div>
-              <div class="field">
-                <label>Svoris</label>
-                {{ detale_form.svoris.errors }}{{ detale_form.svoris }}
-              </div>
-              <div class="field">
-                <label>Kiekis (metinis)</label>
-                {{ detale_form.kiekis_metinis.errors }}{{ detale_form.kiekis_metinis }}
-              </div>
-              <div class="field">
-                <label>Kiekis (mėnesio)</label>
-                {{ detale_form.kiekis_menesis.errors }}{{ detale_form.kiekis_menesis }}
-              </div>
-              <div class="field">
-                <label>Kiekis (partijai)</label>
-                {{ detale_form.kiekis_partijai.errors }}{{ detale_form.kiekis_partijai }}
-              </div>
-              <div class="field">
-                <label>PPAP dokumentai</label>
-                {{ detale_form.ppap_dokumentai.errors }}{{ detale_form.ppap_dokumentai }}
-              </div>
-              <div class="field">
-                <label>Danga</label>
-                {{ detale_form.danga.errors }}{{ detale_form.danga }}
-              </div>
-              <div class="field">
-                <label>Standartas</label>
-                {{ detale_form.standartas.errors }}{{ detale_form.standartas }}
-              </div>
-              <div class="field">
-                <label>Kabinimo tipas</label>
-                {{ detale_form.kabinimo_tipas.errors }}{{ detale_form.kabinimo_tipas }}
-              </div>
-              <div class="field">
-                <label>Kabinimas XYZ</label>
-                {{ detale_form.kabinimas_xyz.errors }}{{ detale_form.kabinimas_xyz }}
-              </div>
-              <div class="field">
-                <label>Kiekis rėme</label>
-                {{ detale_form.kiekis_reme.errors }}{{ detale_form.kiekis_reme }}
-              </div>
-              <div class="field">
-                <label>Faktinis kiekis rėme</label>
-                {{ detale_form.faktinis_kiekis_reme.errors }}{{ detale_form.faktinis_kiekis_reme }}
-              </div>
-              <div class="field">
-                <label>Pakavimas</label>
-                {{ detale_form.pakavimas.errors }}{{ detale_form.pakavimas }}
-              </div>
-              <div class="field">
-                <label>Nuoroda į brėžinį</label>
-                {{ detale_form.nuoroda_brezinio.errors }}{{ detale_form.nuoroda_brezinio }}
-              </div>
-              <div class="field">
-                <label>Nuoroda į pasiūlymą</label>
-                {{ detale_form.nuoroda_pasiulymo.errors }}{{ detale_form.nuoroda_pasiulymo }}
-              </div>
-              <div class="field" style="grid-column:1/-1">
-                <label>Pastabos</label>
-                {{ detale_form.pastabos.errors }}{{ detale_form.pastabos }}
-              </div>
-            </div>
-          {% endif %}
+  {# ––––– Papildomi duomenys (jei formos paduotos) ––––– #}
+  {% if klientas_form or projektas_form or detale_form %}
+  <div class="section">
+    <div class="head">Papildomi duomenys</div>
+    <div class="body">
+      {% if klientas_form %}
+        <h3>Klientas</h3>
+        {{ klientas_form.non_field_errors }}
+        <div class="row">
+          <div class="field"><label>Vardas</label>{{ klientas_form.vardas.errors }}{{ klientas_form.vardas }}</div>
+          <div class="field"><label>Adresas</label>{{ klientas_form.adresas.errors }}{{ klientas_form.adresas }}</div>
+          <div class="field"><label>Telefonas</label>{{ klientas_form.telefonas.errors }}{{ klientas_form.telefonas }}</div>
+          <div class="field"><label>El. paštas</label>{{ klientas_form.el_pastas.errors }}{{ klientas_form.el_pastas }}</div>
         </div>
-      </div>
-    {% endif %}
+        <hr>
+      {% endif %}
 
-    {# ––––– Kainos – formset ––––– #}
-    <div class="section" id="kainos">
-      <div class="head">Kaina</div>
-      <div class="body">
-        {{ kaina_formset.non_form_errors }}
-        {{ kaina_formset.management_form }}
-
-        <table id="kainos-table">
-          <thead>
-            <tr>
-              <th>Būsena</th>
-              <th>Kaina</th>
-              <th>Kiekis nuo</th>
-              <th>Kiekis iki</th>
-              <th>Fiksuotas kiekis</th>
-              <th>Kainos matas</th>
-              <th>Trinti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for form in kaina_formset %}
-              <tr class="kaina-row">
-                <td>{{ form.busena.errors }}{{ form.busena }}</td>
-                <td>{{ form.suma.errors }}{{ form.suma }}</td>
-                <td>{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
-                <td>{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
-                <td>{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
-                <td>{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
-                <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
-              </tr>
-            {% empty %}
-              {# Jei nėra eilučių – nieko. Pridėsime per „Pridėti kainą“. #}
-            {% endfor %}
-          </tbody>
-        </table>
-
-        <div class="actions">
-          <button type="button" class="btn" id="add-price">Pridėti kainą</button>
+      {% if projektas_form %}
+        <h3>Projektas</h3>
+        {{ projektas_form.non_field_errors }}
+        <div class="row">
+          <div class="field"><label>Klientas</label>{{ projektas_form.klientas.errors }}{{ projektas_form.klientas }}</div>
+          <div class="field"><label>Pavadinimas</label>{{ projektas_form.pavadinimas.errors }}{{ projektas_form.pavadinimas }}</div>
+          <div class="field"><label>Užklausos data</label>{{ projektas_form.uzklausos_data.errors }}{{ projektas_form.uzklausos_data }}</div>
+          <div class="field"><label>Pasiūlymo data</label>{{ projektas_form.pasiulymo_data.errors }}{{ projektas_form.pasiulymo_data }}</div>
         </div>
+        <hr>
+      {% endif %}
 
-        {# Paslėpta tuščios formos eilutė klonavimui (empty_form su __prefix__) #}
-        <template id="kaina-empty-row">
-          <tr class="kaina-row">
-            <td>{{ kaina_formset.empty_form.busena }}</td>
-            <td>{{ kaina_formset.empty_form.suma }}</td>
-            <td>{{ kaina_formset.empty_form.kiekis_nuo }}</td>
-            <td>{{ kaina_formset.empty_form.kiekis_iki }}</td>
-            <td>{{ kaina_formset.empty_form.fiksuotas_kiekis }}</td>
-            <td>{{ kaina_formset.empty_form.kainos_matas }}</td>
-            <td>{% if kaina_formset.empty_form.DELETE %}{{ kaina_formset.empty_form.DELETE }}{% endif %}</td>
+      {% if detale_form %}
+        <h3>Detalė</h3>
+        {{ detale_form.non_field_errors }}
+        <div class="row">
+          <div class="field"><label>Pavadinimas</label>{{ detale_form.pavadinimas.errors }}{{ detale_form.pavadinimas }}</div>
+          <div class="field"><label>Brėžinio Nr.</label>{{ detale_form.brezinio_nr.errors }}{{ detale_form.brezinio_nr }}</div>
+          <div class="field"><label>Plotas</label>{{ detale_form.plotas.errors }}{{ detale_form.plotas }}</div>
+          <div class="field"><label>Svoris</label>{{ detale_form.svoris.errors }}{{ detale_form.svoris }}</div>
+          <div class="field"><label>Kiekis (metinis)</label>{{ detale_form.kiekis_metinis.errors }}{{ detale_form.kiekis_metinis }}</div>
+          <div class="field"><label>Kiekis (mėnesio)</label>{{ detale_form.kiekis_menesis.errors }}{{ detale_form.kiekis_menesis }}</div>
+          <div class="field"><label>Kiekis (partijai)</label>{{ detale_form.kiekis_partijai.errors }}{{ detale_form.kiekis_partijai }}</div>
+          <div class="field"><label>PPAP dokumentai</label>{{ detale_form.ppap_dokumentai.errors }}{{ detale_form.ppap_dokumentai }}</div>
+          <div class="field"><label>Danga</label>{{ detale_form.danga.errors }}{{ detale_form.danga }}</div>
+          <div class="field"><label>Standartas</label>{{ detale_form.standartas.errors }}{{ detale_form.standartas }}</div>
+          <div class="field"><label>Kabinimo tipas</label>{{ detale_form.kabinimo_tipas.errors }}{{ detale_form.kabinimo_tipas }}</div>
+          <div class="field"><label>Kabinimas XYZ</label>{{ detale_form.kabinimas_xyz.errors }}{{ detale_form.kabinimas_xyz }}</div>
+          <div class="field"><label>Kiekis rėme</label>{{ detale_form.kiekis_reme.errors }}{{ detale_form.kiekis_reme }}</div>
+          <div class="field"><label>Faktinis kiekis rėme</label>{{ detale_form.faktinis_kiekis_reme.errors }}{{ detale_form.faktinis_kiekis_reme }}</div>
+          <div class="field"><label>Pakavimas</label>{{ detale_form.pakavimas.errors }}{{ detale_form.pakavimas }}</div>
+          <div class="field"><label>Nuoroda į brėžinį</label>{{ detale_form.nuoroda_brezinio.errors }}{{ detale_form.nuoroda_brezinio }}</div>
+          <div class="field"><label>Nuoroda į pasiūlymą</label>{{ detale_form.nuoroda_pasiulymo.errors }}{{ detale_form.nuoroda_pasiulymo }}</div>
+          <div class="field" style="grid-column:1/-1"><label>Pastabos</label>{{ detale_form.pastabos.errors }}{{ detale_form.pastabos }}</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ––––– Kainos formset ––––– #}
+  <div class="section" id="kainos">
+    <div class="head">Kaina</div>
+    <div class="body">
+      {{ kaina_formset.non_form_errors }}
+      {{ kaina_formset.management_form }}
+
+      <table id="kainos-table">
+        <thead>
+          <tr>
+            <th>Būsena</th>
+            <th>Kaina</th>
+            <th>Kiekis nuo</th>
+            <th>Kiekis iki</th>
+            <th>Fiksuotas kiekis</th>
+            <th>Kainos matas</th>
+            <th>Trinti</th>
           </tr>
-        </template>
+        </thead>
+        <tbody>
+          {% for form in kaina_formset %}
+          <tr class="kaina-row">
+            <td>{{ form.busena.errors }}{{ form.busena }}</td>
+            <td>{{ form.suma.errors }}{{ form.suma }}</td>
+            <td>{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
+            <td>{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
+            <td>{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
+            <td>{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
+            <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="actions">
+        <button type="button" class="btn" id="add-price">Pridėti kainą</button>
       </div>
+
+      <template id="kaina-empty-row">
+        <tr class="kaina-row">
+          <td>{{ kaina_formset.empty_form.busena }}</td>
+          <td>{{ kaina_formset.empty_form.suma }}</td>
+          <td>{{ kaina_formset.empty_form.kiekis_nuo }}</td>
+          <td>{{ kaina_formset.empty_form.kiekis_iki }}</td>
+          <td>{{ kaina_formset.empty_form.fiksuotas_kiekis }}</td>
+          <td>{{ kaina_formset.empty_form.kainos_matas }}</td>
+          <td>{% if kaina_formset.empty_form.DELETE %}{{ kaina_formset.empty_form.DELETE }}{% endif %}</td>
+        </tr>
+      </template>
     </div>
+  </div>
 
-    <div class="actions">
-      <button type="submit" class="btn">Pateikti</button>
-      <a class="btn" href="{% url 'index' %}">Atgal</a>
-    </div>
-  </form>
+  <div class="actions">
+    <button type="submit" class="btn">Pateikti</button>
+    <a class="btn" href="{% url 'detaliu_registras:index' %}">Atgal</a>
+  </div>
+</form>
+{% endblock %}
 
-  <script>
-    (function(){
-      const addBtn = document.getElementById('add-price');
-      if(!addBtn) return;
+{% block page_js %}
+<script>
+(function(){
+  const addBtn = document.getElementById('add-price');
+  if(!addBtn) return;
 
-      addBtn.addEventListener('click', function(){
-        // surandam TOTAL_FORMS inputą (pagal formset management formą)
-        const totalInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
-        if(!totalInput) return;
-
-        const currentCount = parseInt(totalInput.value, 10) || 0;
-        const tmpl = document.getElementById('kaina-empty-row');
-        if(!tmpl) return;
-
-        // pasiimam template HTML ir pakeičiam __prefix__ į naują indeksą
-        const html = tmpl.innerHTML.replace(/__prefix__/g, String(currentCount));
-
-        const tbody = document.querySelector('#kainos-table tbody');
-        const tempContainer = document.createElement('tbody');
-        tempContainer.innerHTML = html.trim();
-        const newRow = tempContainer.firstElementChild;
-
-        tbody.appendChild(newRow);
-        totalInput.value = String(currentCount + 1);
-      });
-    })();
-  </script>
-</body>
-</html>
+  addBtn.addEventListener('click', function(){
+    const totalInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+    if(!totalInput) return;
+    const currentCount = parseInt(totalInput.value, 10) || 0;
+    const tmpl = document.getElementById('kaina-empty-row');
+    if(!tmpl) return;
+    const html = tmpl.innerHTML.replace(/__prefix__/g, String(currentCount));
+    const tbody = document.querySelector('#kainos-table tbody');
+    const temp = document.createElement('tbody');
+    temp.innerHTML = html.trim();
+    const newRow = temp.firstElementChild;
+    tbody.appendChild(newRow);
+    totalInput.value = String(currentCount + 1);
+  });
+})();
+</script>
+{% endblock %}

@@ -1,126 +1,109 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="lt">
-<head>
-  <meta charset="utf-8">
-  <title>Kainų redagavimas</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:20px}
-    h1{margin:0 0 16px 0;font-weight:600}
-    .info{margin:8px 0 16px 0;color:#333}
-    table{width:100%;border-collapse:collapse}
-    th,td{border:1px solid #d0d7de;padding:8px;vertical-align:top;text-align:left}
-    th{background:#f6f8fa}
-    .actions{margin-top:14px;display:flex;gap:10px}
-    .btn{display:inline-block;border:1px solid #c9d1d9;border-radius:6px;padding:6px 10px;background:#f6f8fa;cursor:pointer;text-decoration:none;color:#111}
-    .btn:hover{background:#eef1f4}
-    .errorlist{margin:0 0 8px 0;padding-left:18px;color:#b71c1c}
-    .small-note{font-size:12px;color:#666}
-    .right{float:right}
-  </style>
-</head>
-<body>
-  <h1>Kainų redagavimas</h1>
-  <div class="info">
-    Užklausa #{{ uzklausa.id }} —
-    <strong>{{ uzklausa.detale.pavadinimas }}</strong>
-    <span class="small-note">| Projektas: {{ uzklausa.projektas.pavadinimas }}</span>
+{% block title %}Kainų redagavimas{% endblock %}
+
+{% block page_css %}
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:20px}
+  h1{margin:0 0 16px 0;font-weight:600}
+  .info{margin:8px 0 16px 0;color:#333}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #d0d7de;padding:8px;vertical-align:top;text-align:left}
+  th{background:#f6f8fa}
+  .actions{margin-top:14px;display:flex;gap:10px}
+  .btn{display:inline-block;border:1px solid #c9d1d9;border-radius:6px;padding:6px 10px;background:#f6f8fa;cursor:pointer;text-decoration:none;color:#111}
+  .btn:hover{background:#eef1f4}
+  .errorlist{margin:0 0 8px 0;padding-left:18px;color:#b71c1c}
+  .small-note{font-size:12px;color:#666}
+  .right{margin-left:auto}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Kainų redagavimas</h1>
+<div class="info">
+  Užklausa #{{ uzklausa.id }} — <strong>{{ uzklausa.detale.pavadinimas }}</strong>
+  <span class="small-note">| Projektas: {{ uzklausa.projektas.pavadinimas }}</span>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.non_form_errors }}
+  {{ formset.management_form }}
+
+  <table id="kainos-table">
+    <thead>
+      <tr>
+        <th>Būsena</th>
+        <th>Kaina</th>
+        <th>Yra fiksuota?</th>
+        <th>Kiekis nuo</th>
+        <th>Kiekis iki</th>
+        <th>Fiksuotas kiekis</th>
+        <th>Kainos matas</th>
+        <th>Trinti</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for form in formset %}
+        {{ form.id }}
+        <tr class="kaina-row">
+          <td>{{ form.busena.errors }}{{ form.busena }}</td>
+          <td>{{ form.suma.errors }}{{ form.suma }}</td>
+          <td>{{ form.yra_fiksuota.errors }}{{ form.yra_fiksuota }}</td>
+          <td>{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
+          <td>{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
+          <td>{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
+          <td>{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
+          <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
+        </tr>
+      {% empty %}
+        {# nieko – pridėsime per „Pridėti eilutę“ #}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="actions">
+    <button type="button" class="btn" id="add-row">Pridėti eilutę</button>
+    <button type="submit" class="btn">Išsaugoti</button>
+    <a class="btn right" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Atgal</a>
   </div>
 
-  <form method="post">
-    {% csrf_token %}
-    {{ formset.non_form_errors }}
+  <template id="empty-row">
+    {{ formset.empty_form.id }}
+    <tr class="kaina-row">
+      <td>{{ formset.empty_form.busena }}</td>
+      <td>{{ formset.empty_form.suma }}</td>
+      <td>{{ formset.empty_form.yra_fiksuota }}</td>
+      <td>{{ formset.empty_form.kiekis_nuo }}</td>
+      <td>{{ formset.empty_form.kiekis_iki }}</td>
+      <td>{{ formset.empty_form.fiksuotas_kiekis }}</td>
+      <td>{{ formset.empty_form.kainos_matas }}</td>
+      <td>{% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}</td>
+    </tr>
+  </template>
+</form>
+{% endblock %}
 
-    {# PRIVALOMA: formset management laukeliai #}
-    {{ formset.management_form }}
-
-    <table id="kainos-table">
-      <thead>
-        <tr>
-          <th>Būsena</th>
-          <th>Kaina</th>
-          <th>Yra fiksuota?</th>
-          <th>Kiekis nuo</th>
-          <th>Kiekis iki</th>
-          <th>Fiksuotas kiekis</th>
-          <th>Kainos matas</th>
-          <th>Trinti</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for form in formset %}
-          {# ID paslėptas laukas – būtinas esamoms eilutėms atpažinti #}
-          {{ form.id }}
-          <tr class="kaina-row">
-            <td>{{ form.busena.errors }}{{ form.busena }}</td>
-            <td>{{ form.suma.errors }}{{ form.suma }}</td>
-            <td>{{ form.yra_fiksuota.errors }}{{ form.yra_fiksuota }}</td>
-            <td>{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
-            <td>{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
-            <td>{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
-            <td>{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
-            <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
-          </tr>
-        {% empty %}
-          {# Jei nėra eilučių – paliekam tuščią; „Pridėti eilutę“ sukurs naują #}
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <div class="actions">
-      <button type="button" class="btn" id="add-row">Pridėti eilutę</button>
-      <button type="submit" class="btn">Išsaugoti</button>
-      <a class="btn right" href="{% url 'perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Atgal</a>
-    </div>
-
-    {# Paslėptas „empty_form“ prototipas – su __prefix__ #}
-    <template id="empty-row">
-      {{ formset.empty_form.id }}
-      <tr class="kaina-row">
-        <td>{{ formset.empty_form.busena }}</td>
-        <td>{{ formset.empty_form.suma }}</td>
-        <td>{{ formset.empty_form.yra_fiksuota }}</td>
-        <td>{{ formset.empty_form.kiekis_nuo }}</td>
-        <td>{{ formset.empty_form.kiekis_iki }}</td>
-        <td>{{ formset.empty_form.fiksuotas_kiekis }}</td>
-        <td>{{ formset.empty_form.kainos_matas }}</td>
-        <td>{% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}</td>
-      </tr>
-    </template>
-  </form>
-
-  <script>
-    (function(){
-      const addBtn = document.getElementById('add-row');
-      if(!addBtn) return;
-
-      addBtn.addEventListener('click', function(){
-        // Surandam TOTAL_FORMS – veiks su bet kokiu prefix'u (pvz., kaina_set)
-        const total = document.querySelector('input[name$="-TOTAL_FORMS"]');
-        if(!total) return;
-
-        const count = parseInt(total.value, 10) || 0;
-        const tpl = document.getElementById('empty-row');
-        if(!tpl) return;
-
-        // Pakeičiam __prefix__ į naują indeksą
-        const html = tpl.innerHTML.replace(/__prefix__/g, String(count));
-
-        const tbody = document.querySelector('#kainos-table tbody');
-        const container = document.createElement('tbody');
-        container.innerHTML = html.trim();
-
-        // ID hidden input’as (jei sugeneruotas) turi būti tame pačiame konteineryje kaip eilutė,
-        // todėl perkeliam visus child'us iš laikinio container'io
-        while (container.firstChild) {
-          tbody.appendChild(container.firstChild);
-        }
-
-        total.value = String(count + 1);
-      });
-    })();
-  </script>
-</body>
-</html>
+{% block page_js %}
+<script>
+(function(){
+  const addBtn=document.getElementById('add-row');
+  if(!addBtn) return;
+  addBtn.addEventListener('click',function(){
+    const total=document.querySelector('input[name$="-TOTAL_FORMS"]');
+    if(!total) return;
+    const count=parseInt(total.value,10)||0;
+    const tpl=document.getElementById('empty-row');
+    if(!tpl) return;
+    const html=tpl.innerHTML.replace(/__prefix__/g,String(count));
+    const tbody=document.querySelector('#kainos-table tbody');
+    const container=document.createElement('tbody');
+    container.innerHTML=html.trim();
+    while(container.firstChild){tbody.appendChild(container.firstChild);}
+    total.value=String(count+1);
+  });
+})();
+</script>
+{% endblock %}
