@@ -5,18 +5,23 @@
   <meta charset="utf-8">
   <title>{% block title %}Registras{% endblock %}</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- Globalūs stiliai -->
+  <link rel="stylesheet" href="{% static 'detaliu_registras/css/style.css' %}">
+
   {% block page_css %}{% endblock %}
 </head>
 <body>
-  <header class="header-container" style="display:flex;justify-content:space-between;align-items:center;height:20%;padding:10px;box-shadow:0 2px 5px rgba(0,0,0,.1);">
-    <nav class="header-links" style="display:flex;flex-direction:column;">
-      <a href="{% url 'ivesti_uzklausa' %}">Įvesti užklausą</a>
-      <a href="{% url 'perziureti_uzklausas' klientas_id=0 %}">Peržiūrėti užklausas</a>
+  <header class="header-container">
+    <nav class="header-links">
+      <a href="{% url 'detaliu_registras:ivesti_uzklausa' %}">Įvesti užklausą</a>
+      <a href="{% url 'detaliu_registras:perziureti_uzklausas' klientas_id=0 %}">Peržiūrėti užklausas</a>
     </nav>
     {% block header_right %}{% endblock %}
   </header>
 
-  <main class="main-content" style="flex:1;overflow:auto;display:flex;flex-direction:column;padding:20px;min-height:80vh;">
+  <main class="main-content">
+    {% include "snippets/messages.html" %}
     {% block content %}{% endblock %}
   </main>
 

@@ -4,16 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3cf191c7-ccee-40d3-839d-3b077fc7dfc2" name="Changes" comment="atstatytas projektas 09-12, be CSS, be snippets, be AJAX">
-      <change beforePath="$PROJECT_DIR$/._.idea" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/._workspace.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/import_csv.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/import_csv.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/ivesti_uzklausa.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/ivesti_uzklausa.html" afterDir="false" />
+    <list default="true" id="3cf191c7-ccee-40d3-839d-3b077fc7dfc2" name="Changes" comment="09-13 idetas base.html">
+      <change afterPath="$PROJECT_DIR$/detaliu_registras/static/detaliu_registras/css/style.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/snippets/detale_info.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/snippets/kaina_table.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/snippets/messages.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/snippets/search_form.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/index.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausa.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausa.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausas.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/perziureti_uzklausas.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/redaguoti_kaina.html" beforeDir="false" afterPath="$PROJECT_DIR$/detaliu_registras/templates/detaliu_registras/redaguoti_kaina.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -191,7 +192,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757707062269</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="09-13 idetas base.html">
+      <option name="closed" value="true" />
+      <created>1757757081391</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1757757081391</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -203,6 +212,7 @@
     <MESSAGE value="Django Elameta su kabliataskiais ir reportu" />
     <MESSAGE value="atstatytas projektas 09-11" />
     <MESSAGE value="atstatytas projektas 09-12, be CSS, be snippets, be AJAX" />
-    <option name="LAST_COMMIT_MESSAGE" value="atstatytas projektas 09-12, be CSS, be snippets, be AJAX" />
+    <MESSAGE value="09-13 idetas base.html" />
+    <option name="LAST_COMMIT_MESSAGE" value="09-13 idetas base.html" />
   </component>
 </project>

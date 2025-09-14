@@ -1,0 +1,28 @@
+<table class="kainos-table">
+  <thead>
+    <tr>
+      <th>Kaina</th>
+      <th>Būsena</th>
+      <th>Kiekis</th>
+      <th>Kainos matas</th>
+      <th>Kiekis nuo</th>
+      <th>Kiekis iki</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for kaina in kainos %}
+      <tr class="{% if kaina.busena == 'aktuali' %}aktualu{% elif kaina.busena == 'sena' %}sena{% endif %}">
+        <td>{{ kaina.suma }} Eur</td>
+        <td>{{ kaina.busena }}</td>
+        <td>{{ kaina.fiksuotas_kiekis }}</td>
+        <td>{{ kaina.kainos_matas }}</td>
+        <td>{{ kaina.kiekis_nuo }}</td>
+        <td>{{ kaina.kiekis_iki }}</td>
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="6">Kainų nėra.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

@@ -1,0 +1,194 @@
+/* ====== Bendri stiliai ====== */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 20%;
+  padding: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.header-links {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-links a {
+  margin-bottom: 10px;
+}
+
+/* ====== Pagrindinis turinys ====== */
+.main-content {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+/* ====== Lentelės ====== */
+.table-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.scrollable-table {
+  display: block;
+  height: 100%;
+  overflow-y: scroll;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background-color: #f4f4f4;
+  z-index: 2;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+/* ====== Specialūs stulpeliai ====== */
+.notes-cell {
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+.detale-pavadinimas-cell {
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+/* ====== Mygtukai ====== */
+.view-button {
+  cursor: pointer;
+  color: #007BFF;
+  text-decoration: underline;
+}
+
+.view-button:hover {
+  color: #0056b3;
+}
+
+/* ====== Chart konteineris ====== */
+.chart-container {
+  width: 300px;
+  height: 100%;
+  padding: 10px;
+}
+
+.chart-container canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ====== Užklausų blokai ====== */
+.container {
+  display: grid;
+  grid-template-areas:
+    "blokas-1 blokas-2 blokas-3"
+    "blokas-4 blokas-5 blokas-5";
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  gap: 20px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.blokas-1 { grid-area: blokas-1; }
+.blokas-2 { grid-area: blokas-2; }
+.blokas-3 { grid-area: blokas-3; }
+.blokas-4 { grid-area: blokas-4; }
+.blokas-5 { grid-area: blokas-5; }
+
+.blokas-1,
+.blokas-2,
+.blokas-3,
+.blokas-4,
+.blokas-5 {
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+/* ====== Kainų spalvos ====== */
+.sena {
+  background-color: #fff3cd;
+  padding: 10px;
+}
+
+.aktualu {
+  background-color: #d4edda;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+/* ====== Mirksintis tekstas ====== */
+.mirksintis {
+  color: #d32f2f;
+  font-weight: 600;
+  animation: mirksintis 1s step-start infinite;
+}
+
+@keyframes mirksintis {
+  50% { visibility: hidden; }
+}
+
+/* ====== Žinutės ====== */
+.messages {
+  margin: 1em 0;
+  padding: 0;
+  list-style: none;
+}
+
+.messages li {
+  padding: .6em 1em;
+  border-radius: 4px;
+  margin-bottom: .5em;
+}
+
+.messages li.success { background: #d4edda; color: #155724; }
+.messages li.error   { background: #f8d7da; color: #721c24; }
+.messages li.warning { background: #fff3cd; color: #856404; }
+.messages li.info    { background: #d1ecf1; color: #0c5460; }
+
+/* ====== Paieškos forma ====== */
+.search-form {
+  margin-bottom: 20px;
+}
+
+.search-form input[type="text"] {
+  padding: 5px;
+  font-size: 16px;
+}
+
+.search-form input[type="submit"] {
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
