@@ -1,28 +1,30 @@
-<table class="kainos-table">
+<table>
   <thead>
     <tr>
-      <th>Kaina</th>
       <th>Būsena</th>
-      <th>Kiekis</th>
-      <th>Kainos matas</th>
+      <th>Tipas</th>
+      <th>Kaina</th>
       <th>Kiekis nuo</th>
       <th>Kiekis iki</th>
+      <th>Fiksuotas kiekis</th>
+      <th>Matas</th>
     </tr>
   </thead>
   <tbody>
-    {% for kaina in kainos %}
-      <tr class="{% if kaina.busena == 'aktuali' %}aktualu{% elif kaina.busena == 'sena' %}sena{% endif %}">
-        <td>{{ kaina.suma }} Eur</td>
-        <td>{{ kaina.busena }}</td>
-        <td>{{ kaina.fiksuotas_kiekis }}</td>
-        <td>{{ kaina.kainos_matas }}</td>
-        <td>{{ kaina.kiekis_nuo }}</td>
-        <td>{{ kaina.kiekis_iki }}</td>
-      </tr>
+    {% for k in kainos %}
+    <tr>
+      <td>{{ k.busena }}</td>
+      <td>{{ k.get_tipas_display|default:"—" }}</td>
+      <td>{{ k.suma }}</td>
+      <td>{{ k.kiekis_nuo|default:"" }}</td>
+      <td>{{ k.kiekis_iki|default:"" }}</td>
+      <td>{{ k.fiksuotas_kiekis|default:"" }}</td>
+      <td>{{ k.kainos_matas }}</td>
+    </tr>
     {% empty %}
-      <tr>
-        <td colspan="6">Kainų nėra.</td>
-      </tr>
+    <tr>
+      <td colspan="7" style="text-align:center;color:#6a737d">Kainų nėra</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>

@@ -1,204 +1,174 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Index{% endblock %}
+{% block title %}Pradinis{% endblock %}
+{% block body_class %}compact-top{% endblock %}
+{% block global_links %}{% endblock %}
 
-{# Vietinis CSS tik šiam puslapiui — atkuria ankstesnę išvaizdą #}
 {% block page_css %}
 <style>
-  .header-container{display:flex;justify-content:space-between;align-items:center;height:20%;padding:10px;box-shadow:0 2px 5px rgba(0,0,0,.1)}
-  .header-links{display:flex;flex-direction:column}
-  .header-links a{margin-bottom:10px}
+  :root{
+    --chart-h:clamp(120px,18vw,220px);
+  }
 
-  .chart-container{width:300px;max-width:300px;height:300px;padding:10px}
-  .chart-container canvas{width:100% !important;height:100% !important}
+  /* Viršutinė juosta: mygtukai KAIRĖJE, grafikas DEŠINĖJE */
+  .header-right .header-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin:4px 0;
+  }
+  .header-right .top-links{
+    display:flex; gap:8px; flex-wrap:nowrap; align-items:center;
+  }
+  .btn{display:inline-block;border:1px solid #d0d7de;border-radius:6px;
+       padding:4px 8px;background:#f6f8fa;color:#111;text-decoration:none;font-size:14px}
+  .btn:hover{background:#eef1f4}
 
-  .main-content{flex:1;overflow:auto;display:flex;flex-direction:column;padding:20px}
-  .table-container{flex:1;overflow:auto;display:flex;flex-direction:column}
-  .scrollable-table{display:block;height:100%;overflow-y:auto}
-
-  table{width:100%;border-collapse:collapse;table-layout:fixed}
-  th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}
-  thead th{position:sticky;top:0;background:#f4f4f4;z-index:2}
-  .filter-input{width:100%}
-
-  .view-button{cursor:pointer;color:#007BFF;text-decoration:underline}
-  .view-button:hover{color:#0056b3}
-
-  .notes-cell,.detale-pavadinimas-cell{max-width:300px;word-wrap:break-word}
+  .header-right .chart-wrap{
+    flex:0 0 30%;   /* rezervuoja max 30% pločio */
+    min-width:200px;
+    display:flex; justify-content:flex-end;
+  }
+  #detaliuGrafikas{
+    width:100%!important;
+    height:var(--chart-h)!important;
+    display:block;
+  }
 </style>
 {% endblock %}
 
-{# Diagrama dešinėje – kaip buvo #}
 {% block header_right %}
-<div class="chart-container">
-  <canvas id="detaliuGrafikas"></canvas>
+<div class="header-top">
+  <!-- KAIRĖJE: 2 mygtukai -->
+  <div class="top-links">
+    <a class="btn" href="{% url 'detaliu_registras:ivesti_uzklausa' %}">Įvesti užklausą</a>
+    <a class="btn" href="{% url 'detaliu_registras:uzklausa_list' %}">Peržiūrėti užklausas</a>
+  </div>
+
+  <!-- DEŠINĖJE: grafikas -->
+  <div class="chart-wrap">
+    <canvas id="detaliuGrafikas"></canvas>
+  </div>
 </div>
 {% endblock %}
 
 {% block content %}
+<h1>Pradinis</h1>
 
-  {# Paieškos forma (kaip anksčiau) #}
-  <div class="UzklausaFilterForm">
-    <form method="get" action="{% url 'perziureti_uzklausas' klientas_id=0 %}">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <input type="text" name="q" placeholder="Ieškoti..." value="{{ request.GET.q }}">
-      {% for key, value in request.GET.items %}
-        {% if key != 'q' %}
-          <input type="hidden" name="{{ key }}" value="{{ value }}">
-        {% endif %}
-      {% endfor %}
-      <button type="submit">Ieškoti</button>
-    </form>
-  </div>
-
-  <div class="UzklausaFilterForm">
-    <hr>
-    <button type="button" onclick="clearFilters()">Išvalyti filtrus</button>
-  </div>
-
-  {# Lentelė su ANTROSIOS eilutės filtrais (atkūriau pilnai) #}
-  <div class="table-container">
-    <div class="scrollable-table">
-      <table>
-        <thead>
+<div class="card pad">
+  <h3 class="section-title">Naujausios užklausos</h3>
+  <div class="table-wrap">
+    <table id="uzklausu-lentele">
+      <thead>
+        <tr class="labels">
+          <th>ID</th>
+          <th>Klientas</th>
+          <th>Projektas</th>
+          <th>Detalė</th>
+          <th>Brėžinio Nr.</th>
+          <th>Užklausos data</th>
+          <th>Pastabos</th>
+          <th>Veiksmai</th>
+        </tr>
+        <tr class="filters">
+          <th><input oninput="filterTable(0)" placeholder="ID"></th>
+          <th><input oninput="filterTable(1)" placeholder="Klientas"></th>
+          <th><input oninput="filterTable(2)" placeholder="Projektas"></th>
+          <th><input oninput="filterTable(3)" placeholder="Detalė"></th>
+          <th><input oninput="filterTable(4)" placeholder="Brėžinys"></th>
+          <th><input oninput="filterTable(5)" placeholder="Data"></th>
+          <th><input oninput="filterTable(6)" placeholder="Pastabos"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for uzklausa in uzklausos %}
           <tr>
-            <th>Kliento pavadinimas</th>
-            <th>Projekto pavadinimas</th>
-            <th>Detalės pavadinimas</th>
-            <th>Užklausos data</th>
-            <th>Pasiūlymo data</th>
-            <th>Brėžinio nr.</th>
-            <th>Kainos būsena</th>
-            <th>Detalės kainos suma</th>
-            <th>Kainos fiksuotas kiekis</th>
-            <th>Kainos matas</th>
-            <th>Kiekis rėme</th>
-            <th>Pastabos</th>
-            <th>Veiksmai</th>
-          </tr>
-          <tr>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(0)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(1)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(2)"></th>
-            <th><input class="filter-input" type="date"  oninput="filterTable(3)"></th>
-            <th><input class="filter-input" type="date"  oninput="filterTable(4)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(5)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(6)"></th>
-            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(7)"></th>
-            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(8)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(9)"></th>
-            <th><input class="filter-input" type="number" placeholder="Filtruoti..." oninput="filterTable(10)"></th>
-            <th><input class="filter-input" type="text"  placeholder="Filtruoti..." oninput="filterTable(11)"></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for uzklausa in uzklausos %}
-          <tr>
+            <td>#{{ uzklausa.id }}</td>
             <td>{{ uzklausa.klientas.vardas }}</td>
             <td>{{ uzklausa.projektas.pavadinimas }}</td>
-            <td class="detale-pavadinimas-cell">{{ uzklausa.detale.pavadinimas }}</td>
-            <td>{{ uzklausa.projektas.uzklausos_data }}</td>
-            <td>{{ uzklausa.projektas.pasiulymo_data }}</td>
+            <td>{{ uzklausa.detale.pavadinimas }}</td>
             <td>{{ uzklausa.detale.brezinio_nr }}</td>
-            <td>
-              {% if uzklausa.detale.kainos.all %}
-                {{ uzklausa.detale.kainos.last.busena }}
-              {% else %} N/A {% endif %}
-            </td>
-            <td>
-              {% if uzklausa.detale.kainos.all %}
-                {{ uzklausa.detale.kainos.last.suma }}
-              {% else %} N/A {% endif %}
-            </td>
-            <td>
-              {% if uzklausa.detale.kainos.all %}
-                {{ uzklausa.detale.kainos.last.fiksuotas_kiekis }}
-              {% else %} N/A {% endif %}
-            </td>
-            <td>
-              {% if uzklausa.detale.kainos.all %}
-                {{ uzklausa.detale.kainos.last.kainos_matas }}
-              {% else %} N/A {% endif %}
-            </td>
-            <td>
-              {% if uzklausa.detale.kainos.all %}
-                {{ uzklausa.detale.kiekis_reme }}
-              {% else %} N/A {% endif %}
-            </td>
+            <td>{{ uzklausa.projektas.uzklausos_data }}</td>
             <td class="notes-cell">{{ uzklausa.detale.pastabos }}</td>
-            <td>
-              <a class="view-button" href="{% url 'perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Peržiūrėti</a>
-            </td>
+            <td><a class="btn" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa_id=uzklausa.id %}">Peržiūrėti</a></td>
           </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+        {% empty %}
+          <tr><td colspan="8" style="text-align:center;color:#6a737d">Įrašų nėra</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+</div>
 {% endblock %}
 
 {% block page_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // STULPELIŲ FILTRAI — kaip buvo
-  function filterTable(columnIndex) {
-    var table = document.querySelector("table");
-    var tr = table.getElementsByTagName("tr");
-    var input = tr[1].getElementsByTagName("th")[columnIndex].getElementsByTagName("input")[0];
-    var filter = (input.value || "").toLowerCase();
+  function filterTable(col){
+    const t=document.getElementById("uzklausu-lentele"); if(!t) return;
+    const v=((t.tHead&&t.tHead.rows[1]&&t.tHead.rows[1].cells[col].querySelector("input")||{}).value||"").toLowerCase();
+    [...t.tBodies[0].rows].forEach(r=>{
+      const txt=(r.cells[col]?.innerText||"").toLowerCase();
+      r.style.display=txt.includes(v)?"":"none";
+    });
+  }
 
-    for (var i = 2; i < tr.length; i++) {
-      var td = tr[i].getElementsByTagName("td")[columnIndex];
-      if (td) {
-        var txtValue = (td.textContent || td.innerText || "").toLowerCase();
-        tr[i].style.display = (txtValue.indexOf(filter) > -1) ? "" : "none";
+  (function(){
+    const raw = {{ klientu_duomenys_json|default:"[]"|safe }};
+    const el = document.getElementById('detaliuGrafikas'); if(!el) return;
+
+    const items = raw.map(r => ({
+      name: r.klientas__vardas || r.vardas || "Nenurodyta",
+      count: Number(r.uzklausu_kiekis ?? r.kiekis ?? 0)
+    })).filter(i => i.count > 0);
+
+    function randomColors(n){
+      const start=Math.random()*360, g=137.508, colors=[], hovers=[];
+      for(let i=0;i<n;i++){
+        const h=(start+i*g)%360;
+        colors.push(`hsl(${h.toFixed(1)},70%,55%)`);
+        hovers.push(`hsl(${h.toFixed(1)},70%,45%)`);
       }
+      return {colors, hovers};
     }
-  }
-  function clearFilters() {
-    var inputs = document.querySelectorAll('.filter-input');
-    inputs.forEach(input => input.value = '');
-    var tr = document.querySelectorAll("table tr");
-    for (var i = 2; i < tr.length; i++) tr[i].style.display = "";
-  }
+    const {colors, hovers} = randomColors(items.length);
 
-  // DIAGRAMA — stabilus dydis (be „slidinėjimo“), bet vizualiai kaip buvo
-  var ctx = document.getElementById('detaliuGrafikas').getContext('2d');
-  var klientuDuomenys = {{ klientu_duomenys_json|safe }};
-
-  function getRandomColor(){
-    var letters='0123456789ABCDEF', color='#';
-    for (var i=0;i<6;i++) color+=letters[Math.floor(Math.random()*16)];
-    return color;
-  }
-
-  var labels=[], data=[], urls=[], backgroundColors=[], borderColors=[];
-  for (var i=0;i<klientuDuomenys.length;i++){
-    labels.push(klientuDuomenys[i].klientas__vardas);
-    data.push(klientuDuomenys[i].kiekis);
-    urls.push("{% url 'perziureti_uzklausas' klientas_id=0 %}".replace("0", klientuDuomenys[i].klientas__id));
-    var c=getRandomColor(); backgroundColors.push(c+'80'); borderColors.push(c);
-  }
-
-  var chart = new Chart(ctx, {
-    type: 'pie',
-    data: { labels: labels,
-      datasets: [{ label:'Užklausų kiekis', data:data, backgroundColor:backgroundColors, borderColor:borderColors, borderWidth:1 }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      onClick: function(evt, item){
-        if (item.length>0){
-          var url = urls[item[0].index];
-          if (url) window.location.href = url;
-        }
+    const chart = new Chart(el.getContext('2d'), {
+      type:'doughnut',
+      data:{
+        labels: items.map(i=>i.name),
+        datasets:[{
+          data: items.map(i=>i.count),
+          backgroundColor: colors,
+          hoverBackgroundColor: hovers,
+          borderWidth: 0
+        }]
       },
-      plugins: { legend: { display:true, position:'right' } }
-    }
-  });
+      options:{
+        responsive:true, maintainAspectRatio:false, cutout:'55%',
+        plugins:{
+          legend:{
+            position:'right',
+            labels:{ boxWidth:10, padding:8 },
+            onClick:(e, item, legend)=>{
+              const c=legend.chart, i=item.index;
+              c.toggleDataVisibility(i); c.update();
+            }
+          },
+          tooltip:{ callbacks:{ label:(c)=>`${c.label}: ${c.formattedValue}` } }
+        },
+        onClick:(evt, els)=>{
+          if(!els?.length) return;
+          const i = els[0].index;
+          const name = chart.data.labels[i] || '';
+          const url = "{% url 'detaliu_registras:uzklausa_list' %}?q=" + encodeURIComponent(name);
+          window.location.href = url;
+        }
+      }
+    });
+  })();
 </script>
 {% endblock %}

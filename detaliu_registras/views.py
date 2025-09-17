@@ -1,378 +1,269 @@
+# detaliu_registras/views.py
+from __future__ import annotations
+
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, TemplateView
-from django.db.models import Q, Count
+from django.views import View
+from django.views.generic import DetailView, ListView
+from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.forms import formset_factory, modelformset_factory,inlineformset_factory
-from django.template import TemplateDoesNotExist
-import json
-import logging
+from django.db import transaction
+from django.db.models import Q, Prefetch
 
-from .models import Klientas, Detale, Uzklausa, Projektas, Kaina
-from .forms import (
-    ImportCSVForm, UzklausaCreationForm, KainaForm,
-    UzklausaFilterForm, DetaleForm, ProjektasForm,KlientasForm
+from .models import (
+    Klientas, Projektas, Detale, Uzklausa,
+    UzklausosProjektoDuomenys, KiekiaiTerminai, KabinimasRemai,
+    Pakavimas, Kainodara, KainosPartijai,
+    DetalesIdentifikacija, DetalesSpecifikacija, PavirsiaiDangos,
 )
-from .services import UzklausaService
-from .utils import import_csv
-
-logger = logging.getLogger(__name__)
-
-
-# --------------------------
-# Pagalbinės funkcijos
-# --------------------------
-
-def convert_network_path_to_url(network_path):
-    """
-    Konvertuoja tinklo kelią (\\server\dir\file) į HTTP-lik kelią (server/dir/file).
-    Gražina None, jei įėjimas None arba tuščias.
-    """
-    if not network_path:
-        return None
-    s = str(network_path)
-    if s.startswith("http://") or s.startswith("https://"):
-        return s
-    return s.strip("\\").replace("\\", "/")
+from .forms import (
+    KlientasForm, ProjektasForm, DetaleForm, UzklausaForm,
+    UzklausosProjektoDuomenysForm, KiekiaiTerminaiForm, KabinimasRemaiForm,
+    PakavimasForm, KainodaraForm, build_kainos_partijai_formset,
+    DetalesIdentifikacijaForm, DetalesSpecifikacijaForm, PavirsiaiDangosForm,
+    UzklausaFilterForm, UzklausaBlokuSet
+)
 
 
-# --------------------------
-# Pagrindiniai vaizdai
-# --------------------------
+# ========= Pagalbinės funkcijos =========
+def _success_url_for(uzklausa: Uzklausa) -> str:
+    return reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk])
 
-class IndexView(TemplateView):
-    """
-    Pradinis dashboard puslapis su klientų statistika.
-    Išlaikome seną išvaizdą – fallback į 'index.html', jei app prefiksuoto nėra.
-    """
-    template_name = "detaliu_registras/index.html"
 
-    def get_template_names(self):
-        return ["detaliu_registras/index.html", "index.html"]
+def _context_base():
+    """Bendra vieta, jei norėsi paduoti bendrą kontekstą (pvz., breadcrumbs)."""
+    return {}
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        klientu_duomenys = (
-            Uzklausa.objects.values('klientas__vardas', 'klientas__id')
-            .annotate(kiekis=Count('id'))
+
+# ========= CREATE =========
+class UzklausaCreateView(View):
+    template_name = "detaliu_registras/ivesti_uzklausa.html"
+    success_message = "Užklausa sėkmingai sukurta."
+
+    def get(self, request, *args, **kwargs):
+        ctx = _context_base()
+        ctx["uzklausa_form"] = UzklausaForm()
+        # Pagrindinių formų „starteriai“, kol nepasirinkta detale/uzklausa
+        ctx["projekto_form"] = UzklausosProjektoDuomenysForm()
+        ctx["kiekiai_form"] = KiekiaiTerminaiForm()
+        ctx["kabinimas_form"] = KabinimasRemaiForm()
+        ctx["pakavimas_form"] = PakavimasForm()
+        ctx["kainodara_form"] = KainodaraForm()
+        FS = build_kainos_partijai_formset()
+        ctx["kainos_partijai_formset"] = FS(prefix="kainos_partijai")
+
+        ctx["ident_form"] = DetalesIdentifikacijaForm()
+        ctx["spec_form"] = DetalesSpecifikacijaForm()
+        ctx["dangos_form"] = PavirsiaiDangosForm()
+        return render(request, self.template_name, ctx)
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        ctx = _context_base()
+        uzklausa_form = UzklausaForm(request.POST)
+        ctx["uzklausa_form"] = uzklausa_form
+
+        if not uzklausa_form.is_valid():
+            messages.error(request, "Patikrinkite privalomus laukus.")
+            # rodom tuščius sub-formus, kad vartotojas matytų struktūrą
+            ctx.update({
+                "projekto_form": UzklausosProjektoDuomenysForm(request.POST),
+                "kiekiai_form": KiekiaiTerminaiForm(request.POST),
+                "kabinimas_form": KabinimasRemaiForm(request.POST),
+                "pakavimas_form": PakavimasForm(request.POST),
+                "kainodara_form": KainodaraForm(request.POST),
+                "kainos_partijai_formset": build_kainos_partijai_formset()(data=request.POST, prefix="kainos_partijai"),
+                "ident_form": DetalesIdentifikacijaForm(request.POST),
+                "spec_form": DetalesSpecifikacijaForm(request.POST),
+                "dangos_form": PavirsiaiDangosForm(request.POST),
+            })
+            return render(request, self.template_name, ctx)
+
+        # Sukuriam pačią užklausą
+        uzklausa: Uzklausa = uzklausa_form.save(commit=True)
+        detale = uzklausa.detale  # iš formos pasirinkimo
+
+        # Paruošiam blokų formų rinkinį „ant konkrečių instance“
+        blokai = UzklausaBlokuSet.for_instances(
+            uzklausa=uzklausa, detale=detale, data=request.POST, files=request.FILES, extra_partiju=3
         )
-        context.update({
-            "uzklausos": Uzklausa.objects.select_related("klientas", "projektas", "detale")[:10],
-            "klientu_duomenys_json": json.dumps(list(klientu_duomenys)),
+
+        if not (blokai.is_valid()):
+            messages.error(request, "Yra klaidų blokuose — pataisykite pažymėtus laukus.")
+            # grąžinam formų rinkinį su klaidomis
+            ctx.update({
+                "projekto_form": blokai.projekto,
+                "kiekiai_form": blokai.kiekiai,
+                "kabinimas_form": blokai.kabinimas,
+                "pakavimas_form": blokai.pakavimas,
+                "kainodara_form": blokai.kainodara,
+                "kainos_partijai_formset": blokai.kainos_partijai_fs,
+                "ident_form": blokai.ident,
+                "spec_form": blokai.spec,
+                "dangos_form": blokai.dangos,
+            })
+            return render(request, self.template_name, ctx)
+
+        # Išsaugom visas sub-formas
+        blokai.save(commit=True)
+        messages.success(request, self.success_message)
+        return redirect(_success_url_for(uzklausa))
+
+
+# ========= UPDATE =========
+class UzklausaUpdateView(View):
+    template_name = "detaliu_registras/ivesti_uzklausa.html"  # galima naudoti tą patį
+    success_message = "Užklausa sėkmingai atnaujinta."
+
+    def get_object(self, pk: int) -> Uzklausa:
+        return get_object_or_404(Uzklausa, pk=pk)
+
+    def get(self, request, pk: int, *args, **kwargs):
+        uzklausa = self.get_object(pk)
+        detale = uzklausa.detale
+
+        ctx = _context_base()
+        ctx["uzklausa_form"] = UzklausaForm(instance=uzklausa)
+
+        # Užpildytos blokų formos
+        blokai = UzklausaBlokuSet.for_instances(uzklausa, detale)
+        ctx.update({
+            "projekto_form": blokai.projekto,
+            "kiekiai_form": blokai.kiekiai,
+            "kabinimas_form": blokai.kabinimas,
+            "pakavimas_form": blokai.pakavimas,
+            "kainodara_form": blokai.kainodara,
+            "kainos_partijai_formset": blokai.kainos_partijai_fs,
+            "ident_form": blokai.ident,
+            "spec_form": blokai.spec,
+            "dangos_form": blokai.dangos,
+            "uzklausa_obj": uzklausa,
         })
-        return context
+        return render(request, self.template_name, ctx)
+
+    @transaction.atomic
+    def post(self, request, pk: int, *args, **kwargs):
+        uzklausa = self.get_object(pk)
+        detale = uzklausa.detale
+
+        ctx = _context_base()
+        uzklausa_form = UzklausaForm(request.POST, instance=uzklausa)
+        ctx["uzklausa_form"] = uzklausa_form
+
+        if not uzklausa_form.is_valid():
+            messages.error(request, "Patikrinkite privalomus laukus.")
+            blokai = UzklausaBlokuSet.for_instances(uzklausa, detale, data=request.POST, files=request.FILES)
+            ctx.update({
+                "projekto_form": blokai.projekto,
+                "kiekiai_form": blokai.kiekiai,
+                "kabinimas_form": blokai.kabinimas,
+                "pakavimas_form": blokai.pakavimas,
+                "kainodara_form": blokai.kainodara,
+                "kainos_partijai_formset": blokai.kainos_partijai_fs,
+                "ident_form": blokai.ident,
+                "spec_form": blokai.spec,
+                "dangos_form": blokai.dangos,
+                "uzklausa_obj": uzklausa,
+            })
+            return render(request, self.template_name, ctx)
+
+        uzklausa_form.save(commit=True)
+
+        # Su POST duomenimis
+        blokai = UzklausaBlokuSet.for_instances(uzklausa, detale, data=request.POST, files=request.FILES)
+        if not blokai.is_valid():
+            messages.error(request, "Yra klaidų blokuose — pataisykite pažymėtus laukus.")
+            ctx.update({
+                "projekto_form": blokai.projekto,
+                "kiekiai_form": blokai.kiekiai,
+                "kabinimas_form": blokai.kabinimas,
+                "pakavimas_form": blokai.pakavimas,
+                "kainodara_form": blokai.kainodara,
+                "kainos_partijai_formset": blokai.kainos_partijai_fs,
+                "ident_form": blokai.ident,
+                "spec_form": blokai.spec,
+                "dangos_form": blokai.dangos,
+                "uzklausa_obj": uzklausa,
+            })
+            return render(request, self.template_name, ctx)
+
+        blokai.save(commit=True)
+        messages.success(request, self.success_message)
+        return redirect(_success_url_for(uzklausa))
 
 
-class UzklausaListView(ListView):
-    """
-    Užklausų sąrašas su filtru ir suderinamumu 'klientas_id' URL paramui (senas maršrutas).
-    """
+# ========= DETAIL =========
+class UzklausaDetailView(DetailView):
     model = Uzklausa
-    template_name = "detaliu_registras/uzklausa_list.html"
+    template_name = "detaliu_registras/perziureti_uzklausa.html"
+    context_object_name = "uzklausa"
+
+    def get_queryset(self):
+        qs = (Uzklausa.objects
+              .select_related(
+                  "klientas", "projektas", "detale",
+                  "projekto_duomenys", "kiekiai_terminai",
+                  "kabinimas_remai", "pakavimas", "kainodara",
+              )
+              .prefetch_related(
+                  Prefetch("kainodara__kainos_partijoms", queryset=KainosPartijai.objects.order_by("partijos_kiekis_vnt")),
+              )
+              )
+        # papildomai prikabiname detales „palydovus“
+        qs = qs.prefetch_related(
+            Prefetch("detale__identifikacija"),
+            Prefetch("detale__specifikacija"),
+            Prefetch("detale__pavirsiu_dangos"),
+        )
+        return qs
+
+
+# ========= LIST (su filtru) =========
+class UzklausaListView(ListView):
+    model = Uzklausa
+    template_name = "detaliu_registras/perziureti_uzklausas.html"  # 👈 pakeista
     context_object_name = "uzklausos"
     paginate_by = 20
 
-    def get_template_names(self):
-        # 1) naujas pavadinimas; 2-3) seni pavadinimai (su ir be app prefikso)
-        return [
-            "detaliu_registras/uzklausa_list.html",
-            "detaliu_registras/perziureti_uzklausas.html",
-            "perziureti_uzklausas.html",
-        ]
-
     def get_queryset(self):
-        queryset = Uzklausa.objects.select_related('klientas', 'projektas', 'detale').all()
+        qs = (Uzklausa.objects
+              .select_related("klientas", "projektas", "detale")
+              .order_by("-id"))
+        f = UzklausaFilterForm(self.request.GET or None)
+        self.filter_form = f
 
-        # Suderinamumas su senu maršrutu /perziureti_uzklausas/<klientas_id>/
-        klientas_id = self.kwargs.get('klientas_id')
-        if klientas_id is not None:
-            try:
-                kid = int(klientas_id)
-                if kid > 0:
-                    queryset = queryset.filter(klientas_id=kid)
-            except (TypeError, ValueError):
-                pass
+        if f.is_valid():
+            data = f.cleaned_data
+            q = data.get("q")
+            if q:
+                qs = qs.filter(
+                    Q(detale__pavadinimas__icontains=q) |
+                    Q(detale__brezinio_nr__icontains=q) |
+                    Q(projektas__pavadinimas__icontains=q) |
+                    Q(klientas__vardas__icontains=q)
+                )
+            if data.get("klientas"):
+                qs = qs.filter(klientas=data["klientas"])
+            if data.get("projektas"):
+                qs = qs.filter(projektas=data["projektas"])
+            if data.get("brezinio_nr"):
+                qs = qs.filter(detale__brezinio_nr__icontains=data["brezinio_nr"])
+            if data.get("metalas"):
+                qs = qs.filter(detale__specifikacija__metalas__icontains=data["metalas"])
+            if data.get("padengimas"):
+                qs = qs.filter(
+                    Q(detale__pavirsiu_dangos__ktl_ec_name__icontains=data["padengimas"]) |
+                    Q(detale__pavirsiu_dangos__miltelinis_name__icontains=data["padengimas"])
+                )
 
-        query = self.request.GET.get('q', '')
-        if query:
-            queryset = queryset.filter(
-                Q(klientas__vardas__icontains=query) |
-                Q(projektas__pavadinimas__icontains=query) |
-                Q(detale__pavadinimas__icontains=query) |
-                Q(detale__brezinio_nr__icontains=query)
-            )
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        try:
-            context['filter_form'] = UzklausaFilterForm(self.request.GET)
-        except Exception:
-            context['filter_form'] = None
-        return context
-
-
-class UzklausaDetailView(DetailView):
-    """
-    Vienos užklausos detalės (naujas kelias).
-    Šablono fallback’ai leidžia naudoti senuosius 'perziureti_uzklausa.html' pavadinimus.
-    """
-    model = Uzklausa
-    template_name = "detaliu_registras/uzklausa_detail.html"
-    context_object_name = "uzklausa"
-
-    def get_template_names(self):
-        return [
-            "detaliu_registras/uzklausa_detail.html",
-            "detaliu_registras/perziureti_uzklausa.html",
-            "perziureti_uzklausa.html",
-        ]
-
-    def get_queryset(self):
-        return Uzklausa.objects.select_related('klientas', 'projektas', 'detale') \
-                               .prefetch_related('detale__kainos')
-
-
-class UzklausaCreateView(CreateView):
-    """
-    Naudojam kompozitinę formą UzklausaCreationForm,
-    BET į kontekstą taip pat paduodam senus šablono kintamuosius:
-    uzklausa_form, klientas_form, projektas_form, detale_form, kaina_formset.
-    """
-    form_class = UzklausaCreationForm
-    template_name = "detaliu_registras/uzklausa_create.html"
-
-    def get_template_names(self):
-        # paliakau senus pavadinimus
-        return [
-            "detaliu_registras/uzklausa_create.html",
-            "detaliu_registras/ivesti_uzklausa.html",
-            "uzklausa_create.html",
-            "ivesti_uzklausa.html",
-        ]
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs.pop('instance', None)  # CreateView prideda 'instance' -> pašalinam (čia ne ModelForm)
-        return kwargs
-
-    def _kaina_formset_class(self):
-        return modelformset_factory(
-            Kaina,
-            form=KainaForm,
-            extra=1,
-            can_delete=True,
-        )
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-
-        # Pagrindinė kompozitinė forma (naudojama servisui)
-        form = ctx.get('form') or self.get_form()
-        ctx['form'] = form
-        ctx['uzklausa_form'] = form  # senasis šablonas tikisi šito vardo
-
-        # Senasis šablonas dažnai rodo atskiras "subformas" – paduodam tuščias (kad būtų input’ai)
-        ctx.setdefault('klientas_form', KlientasForm())
-        ctx.setdefault('projektas_form', ProjektasForm())
-        ctx.setdefault('detale_form', DetaleForm())
-
-        # Kainų formset’as (privaloma: management form turi būti šablone)
-        KainaFS = self._kaina_formset_class()
-        # kuriant naują – dar nėra kainų, todėl queryset=none()
-        ctx['kaina_formset'] = kwargs.get('kaina_formset') or KainaFS(queryset=Kaina.objects.none())
-
+        ctx["filter_form"] = getattr(self, "filter_form", UzklausaFilterForm())
         return ctx
 
-    def post(self, request, *args, **kwargs):
-        # Surenkam visas dalis
-        form = self.get_form()
-        KainaFS = modelformset_factory(Kaina, form=KainaForm, extra=1, can_delete=True)
-        kaina_formset = KainaFS(request.POST, queryset=Kaina.objects.none())
-
-        # (Pas tave šablonas gali POST’inti ir atskirų subformų laukus – jų nenaudojame validacijai,
-        #  nes logiką atlieka servisas, bet jos reikalingos, kad būtų input’ai UI.)
-        klientas_form = KlientasForm(request.POST or None)
-        projektas_form = ProjektasForm(request.POST or None)
-        detale_form = DetaleForm(request.POST or None)
-
-        if form.is_valid() and kaina_formset.is_valid():
-            try:
-                # Sukuriam UZKLAUSA, PROJEKTĄ, DETALĘ per serviso sluoksnį
-                uzklausa = UzklausaService.create_full_request(form.cleaned_data)
-
-                # Pririšam kainas prie ką tik sukurtos detalės
-                instances = kaina_formset.save(commit=False)
-                for obj in instances:
-                    obj.detale = uzklausa.detale
-                    obj.save()
-                for obj in kaina_formset.deleted_objects:
-                    # teoriškai nieko čia nebus kuriant naują, bet paliekam pilnumui
-                    obj.delete()
-
-                messages.success(request, "Užklausa sukurta, kainos išsaugotos")
-                return redirect("detaliu_registras:uzklausa_detail", pk=uzklausa.pk)
-
-            except Exception as e:
-                logger.error(f"Klaida kuriant užklausą: {e}")
-                messages.error(request, "Klaida kuriant užklausą")
-
-        # Jei klaidos – grąžinam tą patį puslapį su visomis formomis / formset’u
-        ctx = self.get_context_data(
-            form=form,
-            klientas_form=klientas_form,
-            projektas_form=projektas_form,
-            detale_form=detale_form,
-            kaina_formset=kaina_formset,
-        )
-        return self.render_to_response(ctx)
-
-
-class UzklausaUpdateView(TemplateView):
-    """
-    Suderinamumo „tiltas“ – jei senas maršrutas kviečia redagavimą, grąžinam į detalių peržiūrą.
-    """
-    def get(self, request, pk):
-        return redirect('detaliu_registras:uzklausa_detail', pk=pk)
-
-
-class KainaListView(TemplateView):
-    """
-    Suderinamumo „tiltas“ – nukreipiam į tą pačią redagavimo formą.
-    """
-    def get(self, request, uzklausa_pk):
-        return redirect('detaliu_registras:kaina_update', uzklausa_pk=uzklausa_pk)
-
-
-class KainaUpdateView(UpdateView):
-    """
-    Pilnai redaguojamos kainos per InlineFormSet (Detale -> Kaina).
-    """
-    def get_template_names(self):
-        return [
-            "detaliu_registras/kaina_update.html",
-            "detaliu_registras/redaguoti_kaina.html",
-            "kaina_update.html",
-            "redaguoti_kaina.html",
-        ]
-
-    def _render_with_fallback(self, request, context):
-        last_exc = None
-        for tpl in self.get_template_names():
-            try:
-                return render(request, tpl, context)
-            except TemplateDoesNotExist as e:
-                last_exc = e
-                continue
-        raise TemplateDoesNotExist(", ".join(self.get_template_names())) from last_exc
-
-    def _get_formset_class(self):
-        # Inline formset automatiškai nustato kaina.detale = instance
-        return inlineformset_factory(
-            Detale,
-            Kaina,
-            form=KainaForm,
-            extra=1,
-            can_delete=True,
-        )
-
-    def get(self, request, uzklausa_pk):
-        uzklausa = get_object_or_404(Uzklausa.objects.select_related("detale"), pk=uzklausa_pk)
-        FormSet = self._get_formset_class()
-        formset = FormSet(instance=uzklausa.detale)
-        return self._render_with_fallback(request, {"formset": formset, "uzklausa": uzklausa})
-
-    def post(self, request, uzklausa_pk):
-        uzklausa = get_object_or_404(Uzklausa.objects.select_related("detale"), pk=uzklausa_pk)
-        FormSet = self._get_formset_class()
-        formset = FormSet(request.POST, instance=uzklausa.detale)
-
-        if formset.is_valid():
-            formset.save()  # išsaugo naujas/redaguotas/trinamas kainas
-            messages.success(request, "Kainos atnaujintos")
-            return redirect("perziureti_uzklausa", uzklausa_id=uzklausa.pk)
-
-        return self._render_with_fallback(request, {"formset": formset, "uzklausa": uzklausa})
-
-
-class ImportCSVView(TemplateView):
-    """
-    CSV importas – su paprastu pranešimų mechanizmu.
-    """
-    template_name = "detaliu_registras/import_csv.html"
-
-    def get_template_names(self):
-        return ["detaliu_registras/import_csv.html", "import_csv.html"]
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['form'] = ImportCSVForm()
-        return context
-
-    def post(self, request):
-        form = ImportCSVForm(request.POST, request.FILES)
-        if form.is_valid():
-            try:
-                # palaikome tiek 'file', tiek 'csv_file' laukų pavadinimus
-                uploaded = form.cleaned_data.get('file') or form.cleaned_data.get('csv_file') \
-                           or request.FILES.get('file') or request.FILES.get('csv_file')
-                if not uploaded:
-                    raise ValueError("Nerastas CSV failas (laukas 'file' arba 'csv_file').")
-                import_csv(uploaded)
-                messages.success(request, "CSV failas sėkmingai importuotas")
-                return redirect("admin:index")
-            except Exception as e:
-                logger.error(f"CSV importo klaida: {e}")
-                messages.error(request, "Klaida importuojant CSV failą")
-        return render(request, self.template_name, {'form': form})
-
-
-class KlientoUzklausosView(ListView):
-    """
-    Konkretaus kliento užklausos (senas šablonas išlaikomas per fallback).
-    """
-    model = Uzklausa
-    template_name = "detaliu_registras/kliento_uzklausos.html"
-    context_object_name = "uzklausos"
-
-    def get_template_names(self):
-        return ["detaliu_registras/kliento_uzklausos.html", "kliento_uzklausos.html"]
-
-    def get_queryset(self):
-        klientas_id = self.kwargs['klientas_id']
-        return Uzklausa.objects.filter(
-            klientas_id=klientas_id
-        ).select_related('projektas', 'detale')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        klientas_id = self.kwargs['klientas_id']
-        context['klientas'] = get_object_or_404(Klientas, pk=klientas_id)
-        return context
-
-
-# --------------------------
-# Suderinamumo vaizdai
-# --------------------------
-
-def perziureti_uzklausa(request, uzklausa_id):
-    """
-    Senas maršrutas 'perziureti_uzklausa/<id>/' – šablonas 'perziureti_uzklausa.html' palaikomas.
-    """
-    uzklausa = get_object_or_404(
-        Uzklausa.objects.select_related("detale", "klientas", "projektas"),
-        pk=uzklausa_id
-    )
-    brezinio_url = convert_network_path_to_url(getattr(uzklausa.detale, "nuoroda_brezinio", None))
-    ctx = {"uzklausa": uzklausa, "brezinio_url": brezinio_url}
-    return render(request, "detaliu_registras/perziureti_uzklausa.html", ctx)
-
-
-def ivesti_uzklausa_dispatch(request, uzklausa_pk=None):
-    """
-    Tas pats URL vardas 'ivesti_uzklausa' dirba dviem režimais, kad senų šablonų nekeisti:
-      - be argumento -> naujos užklausos kūrimas (UzklausaCreateView)
-      - su <uzklausa_pk> -> kainų redagavimas (KainaUpdateView)
-    """
-    if uzklausa_pk is not None:
-        return KainaUpdateView.as_view()(request, uzklausa_pk=uzklausa_pk)
-    return UzklausaCreateView.as_view()(request)
+        ctx = super().get_context_data(**kwargs)
+        ctx["filter_form"] = getattr(self, "filter_form", UzklausaFilterForm())
+        return ctx

@@ -1,9 +1,33 @@
-<form method="GET" action="" class="search-form">
-  <input type="text" name="q" placeholder="Ieškoti..." value="{{ request.GET.q }}">
-  <input type="submit" value="Ieškoti">
-  {% for key,value in request.GET.items %}
-    {% if key != 'q' %}
-      <input type="hidden" name="{{ key }}" value="{{ value }}">
-    {% endif %}
-  {% endfor %}
+<form method="get" action="" class="search-form">
+  <div class="field">
+    {{ filter_form.q.errors }}
+    {{ filter_form.q }}
+    <button type="submit">Ieškoti</button>
+  </div>
 </form>
+
+<style>
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 15px 0;
+}
+.search-form input[type="text"] {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #c9d1d9;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.search-form button {
+  padding: 6px 12px;
+  border: 1px solid #c9d1d9;
+  border-radius: 6px;
+  background: #f6f8fa;
+  cursor: pointer;
+}
+.search-form button:hover {
+  background: #eef1f4;
+}
+</style>

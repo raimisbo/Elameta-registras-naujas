@@ -5,10 +5,30 @@ Separates complex operations from views and models
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.db.models import Count
-from .models import Klientas, Projektas, Detale, Uzklausa, Kaina
+from .models import Klientas, Projektas, Detale, Uzklausa, Kaina, Danga
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_path(value):
+    """
+    Konvertuoja tinklo kelią (\\server\dir\file) į HTTP-like kelią (server/dir/file).
+    Jei jau http(s) – palieka. Jei None/tuščia – grąžina None.
+    """
+    if not value:
+        return None
+    s = str(value)
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    return s.strip("\\").replace("\\", "/")
+
+
+def _extract(data, keys):
+    """Grąžina naują dict tik su nurodytais raktais (jei yra)."""
+    if not data:
+        return {}
+    return {k: data.get(k) for k in keys if k in data}
 
 
 class UzklausaService:
@@ -16,19 +36,23 @@ class UzklausaService:
 
     @staticmethod
     @transaction.atomic
-    def create_full_request(form_data):
+    def create_full_request(form_data, projektas_data=None, detale_data=None):
         """
-        Sukuria pilną užklausą (Klientas/Projektas/Detale/Uzklausa) arba panaudoja jau duotus egzistuojančius objektus.
-        Tikslas – nelaužyti projekto, jeigu kai kurie modelių laukai yra privalomi.
-        Tikėtini raktai form_data:
-          - existing_klientas (obj arba pk) | new_klientas_vardas
-          - existing_projektas (obj arba pk) | projekto_pavadinimas, uzklausos_data, pasiulymo_data
-          - existing_detale (obj arba pk) | detale_fields (žodynas su laukais)
+        Sukuria pilną užklausą (Klientas/Projektas/Detale/Uzklausa).
+        Atgalinis suderinamumas su senu parašu (ignoruoja papildomus argumentus, jei jų nėra).
+
+        Tikėtini raktai form_data (senas kelias):
+          - existing_klientas | new_klientas_vardas
+          - existing_projektas | projekto_pavadinimas, uzklausos_data, pasiulymo_data
+          - existing_detale | detale_fields (dict)
+        Naujieji (pasirinktinai):
+          - projektas_data (dict) – papildomi Projektas laukai
+          - detale_data (dict) – papildomi Detale laukai
         """
         try:
             klientas = UzklausaService._get_or_create_klientas(form_data)
-            projektas = UzklausaService._get_or_create_projektas(form_data, klientas)
-            detale = UzklausaService._get_or_create_detale(form_data, projektas)
+            projektas = UzklausaService._get_or_create_projektas(form_data, klientas, projektas_data)
+            detale = UzklausaService._get_or_create_detale(form_data, projektas, detale_data)
 
             uzklausa = Uzklausa.objects.create(
                 klientas=klientas,
@@ -46,7 +70,7 @@ class UzklausaService:
 
     @staticmethod
     def _resolve_instance_or_pk(model_cls, value, field_name="id"):
-        """Leidžia paduoti arba instancą, arba pirminį raktą; grąžina instancą."""
+        """Leidžia paduoti arba instancą, arba PK – grąžina instancą."""
         if value is None:
             return None
         if isinstance(value, model_cls):
@@ -64,55 +88,87 @@ class UzklausaService:
         if new_kl_vardas:
             return Klientas.objects.create(
                 vardas=new_kl_vardas,
-                # jei turi privalomų laukų – pildyk čia saugiomis reikšmėmis
                 telefonas=form_data.get("klientas_telefonas", ""),
                 el_pastas=form_data.get("klientas_el_pastas", ""),
             )
         raise ValidationError("Klientas privalomas (pasirinkite esamą arba nurodykite naują vardą).")
 
     @staticmethod
-    def _get_or_create_projektas(form_data, klientas):
-        """Naudoja esamą projektą arba sukuria naują; validuoja datas, jei abi pateiktos."""
+    def _get_or_create_projektas(form_data, klientas, projektas_data=None):
+        """
+        Naudoja esamą projektą arba sukuria naują.
+        Papildomi laukai (nauji): projekto_pradzia, projekto_pabaiga, kaina_galioja_iki,
+        apmokejimo_salygos, transportavimo_salygos.
+        """
         existing_pr = form_data.get("existing_projektas")
         if existing_pr:
             return UzklausaService._resolve_instance_or_pk(Projektas, existing_pr)
 
-        pavadinimas = form_data.get("projekto_pavadinimas")
+        pavadinimas = form_data.get("projekto_pavadinimas") or form_data.get("projekto_pavadinimas_default") or "Projektas"
         uzklausos_data = form_data.get("uzklausos_data")
         pasiulymo_data = form_data.get("pasiulymo_data")
 
-        # Jei abi datos pateiktos – validuojam
         if uzklausos_data and pasiulymo_data:
             ValidationService.validate_project_dates(uzklausos_data, pasiulymo_data)
 
-        if not pavadinimas:
-            # Jei nepaduotas pavadinimas – bandome su default, kad nesulūžtų (arba keliam ValidationError)
-            pavadinimas = form_data.get("projekto_pavadinimas_default") or "Projektas"
+        extra = _extract(
+            projektas_data,
+            ["projekto_pradzia", "projekto_pabaiga", "kaina_galioja_iki", "apmokejimo_salygos", "transportavimo_salygos"]
+        )
 
         return Projektas.objects.create(
             klientas=klientas,
             pavadinimas=pavadinimas,
             uzklausos_data=uzklausos_data,
             pasiulymo_data=pasiulymo_data,
+            **extra
         )
 
     @staticmethod
-    def _get_or_create_detale(form_data, projektas):
-        """Naudoja esamą detalę arba kuria naują iš pateiktų laukų; jei trūksta – kelia klaidą aiškiai."""
+    def _get_or_create_detale(form_data, projektas, detale_data=None):
+        """
+        Naudoja esamą detalę arba sukuria naują.
+        Sujungia seną `detale_fields` + naują `detale_data`. Sutvarko M2M `danga` ir nuorodų normalizavimą.
+        """
         existing_det = form_data.get("existing_detale")
         if existing_det:
             return UzklausaService._resolve_instance_or_pk(Detale, existing_det)
 
-        detale_fields = form_data.get("detale_fields") or {}
-        # Jeigu tavo Detale turi privalomų laukų (pvz., pavadinimas, kodas ir pan.) – pasiimk iš detale_fields
-        # Jei būtini laukai nepaduoti, kilstelėkim aiškią klaidą:
-        required = []  # prireikus: ['pavadinimas', 'kodas']
-        missing = [f for f in required if not detale_fields.get(f)]
-        if missing:
-            raise ValidationError(f"Trūksta Detalės laukų: {', '.join(missing)}")
+        payload = {}
+        payload.update(form_data.get("detale_fields") or {})
+        payload.update(detale_data or {})
 
-        # BENT jau projektas turi būti nustatytas
-        detale = Detale.objects.create(projektas=projektas, **detale_fields)
+        # Normalizuojam nuorodas
+        if "nuoroda_brezinio" in payload:
+            payload["nuoroda_brezinio"] = _normalize_path(payload.get("nuoroda_brezinio"))
+        if "nuoroda_pasiulymo" in payload:
+            payload["nuoroda_pasiulymo"] = _normalize_path(payload.get("nuoroda_pasiulymo"))
+
+        # ManyToMany 'danga' atskirai
+        danga_values = payload.pop("danga", None)
+
+        # BENT projektas privalomas
+        detale = Detale.objects.create(projektas=projektas, **payload)
+
+        # Pririšam dangas (gali būti id sąrašas arba pavadinimų sąrašas)
+        if danga_values:
+            ids = []
+            for v in danga_values:
+                try:
+                    # jei skaičius/id
+                    ids.append(int(v))
+                    continue
+                except (TypeError, ValueError):
+                    pass
+                # bandome pagal pavadinimą
+                try:
+                    d = Danga.objects.get(pavadinimas=v)
+                    ids.append(d.id)
+                except Danga.DoesNotExist:
+                    logger.warning("Danga '%s' nerasta – praleidžiama", v)
+            if ids:
+                detale.danga.set(ids)
+
         return detale
 
     @staticmethod
@@ -122,31 +178,34 @@ class UzklausaService:
         Atnaujina visas detalės kainas:
           - esamas „aktuali“ → „sena“
           - sukuria naujas ir pažymi kaip „aktuali“
-        Veikia tiek su ModelForm, tiek su paprastu Form.
         """
         try:
-            # Pažymim senas
             detale.kainos.filter(busena="aktuali").update(busena="sena")
 
-            # Pereinam per naujas formas
             for form in formset:
                 cd = getattr(form, "cleaned_data", None)
                 if not cd or cd.get("DELETE"):
                     continue
 
-                # Jeigu tai ModelForm – paprasčiau
+                # Jei ModelForm – tiesiog commit=False
                 try:
-                    kaina = form.save(commit=False)  # ModelForm atvejis
+                    kaina = form.save(commit=False)
                 except Exception:
-                    # Paprastas Form – kuriam iš cleaned_data
                     fields = {}
-                    for key in ("suma", "kiekis_nuo", "kiekis_iki", "fiksuotas_kiekis", "kainos_matas"):
+                    for key in ("suma", "kiekis_nuo", "kiekis_iki", "fiksuotas_kiekis", "kainos_matas", "tipas"):
                         if key in cd:
                             fields[key] = cd.get(key)
                     kaina = Kaina(**fields)
 
                 kaina.detale = detale
                 kaina.busena = "aktuali"
+                # Jeigu modelyje nėra 'tipas' (labai sena schema) – ignore
+                if hasattr(kaina, "tipas") and not getattr(kaina, "tipas", None):
+                    # default – vieneto kaina
+                    try:
+                        kaina.tipas = "VIENETO"
+                    except Exception:
+                        pass
                 kaina.save()
 
             logger.info("Kainos atnaujintos detalei id=%s", getattr(detale, "id", None))
@@ -187,17 +246,11 @@ class ReportService:
 
     @staticmethod
     def get_client_statistics():
-        """
-        Stabiliai, be related_name prielaidų:
-        - skaičiuoja užklausas per Uzklausa
-        - skaičiuoja projektus per Projektas
-        """
-        # Užklausų kiekiai per klientą
+        """Skaičiuoja užklausas per Uzklausa ir projektus per Projektas."""
         uzk_counts = {
             row["klientas_id"]: row["c"]
             for row in Uzklausa.objects.values("klientas_id").annotate(c=Count("id"))
         }
-        # Projektų kiekiai per klientą
         proj_counts = {
             row["klientas_id"]: row["c"]
             for row in Projektas.objects.values("klientas_id").annotate(c=Count("id"))
@@ -213,10 +266,7 @@ class ReportService:
 
     @staticmethod
     def get_coating_usage_stats():
-        """
-        Statistika pagal dangas (jei ryšys yra):
-        Grupuoja pagal danga__pavadinimas.
-        """
+        """Statistika pagal dangas (jei ryšys yra)."""
         return list(
             Detale.objects.values("danga__pavadinimas")
             .annotate(usage_count=Count("id"))
@@ -244,7 +294,7 @@ class ValidationService:
 
     @staticmethod
     def validate_project_dates(uzklausos_data, pasiulymo_data):
-        """Validuoja projektų datas (pasiūlymas negali būti anksčiau už užklausą)."""
+        """Pasiūlymo data negali būti ankstesnė už užklausos datą."""
         if uzklausos_data and pasiulymo_data and uzklausos_data > pasiulymo_data:
             raise ValidationError("Pasiūlymo data negali būti ankstesnė už užklausos datą")
         return True

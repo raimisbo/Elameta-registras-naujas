@@ -1,207 +1,492 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Įvesti užklausą{% endblock %}
-
-{% block page_css %}
-<style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;margin:20px}
-  h1{margin:0 0 16px 0;font-weight:600}
-  .section{margin:18px 0;border:1px solid #d0d7de;border-radius:6px;overflow:hidden}
-  .section > .head{background:#3f6f86;color:#fff;padding:10px 12px;font-weight:600}
-  .section > .body{padding:12px}
-  .row{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}
-  .row .field{display:flex;flex-direction:column}
-  label{font-size:14px;margin-bottom:4px;color:#333}
-  input, select, textarea{padding:6px 8px;border:1px solid #c9d1d9;border-radius:6px;font-size:14px}
-  table{width:100%;border-collapse:collapse;margin-top:8px}
-  th,td{border:1px solid #d0d7de;padding:8px;vertical-align:top;text-align:left}
-  .actions{margin-top:16px;display:flex;gap:12px}
-  .btn{display:inline-block;border:1px solid #c9d1d9;border-radius:6px;padding:6px 10px;background:#f6f8fa;cursor:pointer;text-decoration:none;color:#111}
-  .btn:hover{background:#eef1f4}
-  .errorlist{margin:0 0 8px 0;padding-left:18px;color:#b71c1c}
-</style>
-{% endblock %}
+{% block title %}{% if uzklausa_obj %}Redaguoti užklausą #{{ uzklausa_obj.pk }}{% else %}Įvesti užklausą{% endif %}{% endblock %}
 
 {% block content %}
-<h1>Įvesti užklausą</h1>
+<div class="container">
+  {% include "snippets/messages.html" %}
 
-<form method="post">
-  {% csrf_token %}
+  <h1 class="page-title">
+    {% if uzklausa_obj %}Redaguoti užklausą #{{ uzklausa_obj.pk }}{% else %}Įvesti užklausą{% endif %}
+  </h1>
 
-  {# ––––– Užklausa (kompozitinė forma) ––––– #}
-  <div class="section">
-    <div class="head">Užklausa</div>
-    <div class="body">
-      {% with f=uzklausa_form|default:form %}
-        {{ f.non_field_errors }}
-        <div class="row">
-          <div class="field">
-            <label>Pasirinkti esamą klientą</label>
-            {{ f.existing_klientas.errors }}
-            {{ f.existing_klientas }}
-          </div>
-          <div class="field">
-            <label>Arba įvesti naują klientą</label>
-            {{ f.new_klientas_vardas.errors }}
-            {{ f.new_klientas_vardas }}
-          </div>
-          <div class="field">
-            <label>Projekto pavadinimas</label>
-            {{ f.projekto_pavadinimas.errors }}
-            {{ f.projekto_pavadinimas }}
-          </div>
-          <div class="field">
-            <label>Užklausos data</label>
-            {{ f.uzklausos_data.errors }}
-            {{ f.uzklausos_data }}
-          </div>
-          <div class="field">
-            <label>Pasiūlymo data</label>
-            {{ f.pasiulymo_data.errors }}
-            {{ f.pasiulymo_data }}
-          </div>
-        </div>
-      {% endwith %}
-    </div>
-  </div>
+  <form method="post">
+    {% csrf_token %}
 
-  {# ––––– Papildomi duomenys (jei formos paduotos) ––––– #}
-  {% if klientas_form or projektas_form or detale_form %}
-  <div class="section">
-    <div class="head">Papildomi duomenys</div>
-    <div class="body">
-      {% if klientas_form %}
-        <h3>Klientas</h3>
-        {{ klientas_form.non_field_errors }}
-        <div class="row">
-          <div class="field"><label>Vardas</label>{{ klientas_form.vardas.errors }}{{ klientas_form.vardas }}</div>
-          <div class="field"><label>Adresas</label>{{ klientas_form.adresas.errors }}{{ klientas_form.adresas }}</div>
-          <div class="field"><label>Telefonas</label>{{ klientas_form.telefonas.errors }}{{ klientas_form.telefonas }}</div>
-          <div class="field"><label>El. paštas</label>{{ klientas_form.el_pastas.errors }}{{ klientas_form.el_pastas }}</div>
-        </div>
-        <hr>
+    <!-- PAGRINDINĖ UŽKLAUSOS INFORMACIJA -->
+    <details open class="form-section">
+      <summary><strong>Užklausa</strong></summary>
+
+      {% if uzklausa_form.non_field_errors %}
+        <div class="form-errors">{{ uzklausa_form.non_field_errors }}</div>
       {% endif %}
 
-      {% if projektas_form %}
-        <h3>Projektas</h3>
-        {{ projektas_form.non_field_errors }}
-        <div class="row">
-          <div class="field"><label>Klientas</label>{{ projektas_form.klientas.errors }}{{ projektas_form.klientas }}</div>
-          <div class="field"><label>Pavadinimas</label>{{ projektas_form.pavadinimas.errors }}{{ projektas_form.pavadinimas }}</div>
-          <div class="field"><label>Užklausos data</label>{{ projektas_form.uzklausos_data.errors }}{{ projektas_form.uzklausos_data }}</div>
-          <div class="field"><label>Pasiūlymo data</label>{{ projektas_form.pasiulymo_data.errors }}{{ projektas_form.pasiulymo_data }}</div>
+      <div class="form-grid">
+        <div class="form-field">
+          {{ uzklausa_form.klientas.label_tag }} {{ uzklausa_form.klientas }}
+          {% if uzklausa_form.klientas.errors %}<div class="field-error">{{ uzklausa_form.klientas.errors }}</div>{% endif %}
         </div>
-        <hr>
+        <div class="form-field">
+          {{ uzklausa_form.projektas.label_tag }} {{ uzklausa_form.projektas }}
+          {% if uzklausa_form.projektas.errors %}<div class="field-error">{{ uzklausa_form.projektas.errors }}</div>{% endif %}
+        </div>
+        <div class="form-field">
+          {{ uzklausa_form.detale.label_tag }} {{ uzklausa_form.detale }}
+          {% if uzklausa_form.detale.errors %}<div class="field-error">{{ uzklausa_form.detale.errors }}</div>{% endif %}
+        </div>
+      </div>
+    </details>
+
+    <!-- 1) PROJEKTO DUOMENYS -->
+    <details class="form-section" open>
+      <summary><strong>1) Projekto duomenys</strong></summary>
+
+      {% if projekto_form.non_field_errors %}
+        <div class="form-errors">{{ projekto_form.non_field_errors }}</div>
       {% endif %}
 
-      {% if detale_form %}
-        <h3>Detalė</h3>
-        {{ detale_form.non_field_errors }}
-        <div class="row">
-          <div class="field"><label>Pavadinimas</label>{{ detale_form.pavadinimas.errors }}{{ detale_form.pavadinimas }}</div>
-          <div class="field"><label>Brėžinio Nr.</label>{{ detale_form.brezinio_nr.errors }}{{ detale_form.brezinio_nr }}</div>
-          <div class="field"><label>Plotas</label>{{ detale_form.plotas.errors }}{{ detale_form.plotas }}</div>
-          <div class="field"><label>Svoris</label>{{ detale_form.svoris.errors }}{{ detale_form.svoris }}</div>
-          <div class="field"><label>Kiekis (metinis)</label>{{ detale_form.kiekis_metinis.errors }}{{ detale_form.kiekis_metinis }}</div>
-          <div class="field"><label>Kiekis (mėnesio)</label>{{ detale_form.kiekis_menesis.errors }}{{ detale_form.kiekis_menesis }}</div>
-          <div class="field"><label>Kiekis (partijai)</label>{{ detale_form.kiekis_partijai.errors }}{{ detale_form.kiekis_partijai }}</div>
-          <div class="field"><label>PPAP dokumentai</label>{{ detale_form.ppap_dokumentai.errors }}{{ detale_form.ppap_dokumentai }}</div>
-          <div class="field"><label>Danga</label>{{ detale_form.danga.errors }}{{ detale_form.danga }}</div>
-          <div class="field"><label>Standartas</label>{{ detale_form.standartas.errors }}{{ detale_form.standartas }}</div>
-          <div class="field"><label>Kabinimo tipas</label>{{ detale_form.kabinimo_tipas.errors }}{{ detale_form.kabinimo_tipas }}</div>
-          <div class="field"><label>Kabinimas XYZ</label>{{ detale_form.kabinimas_xyz.errors }}{{ detale_form.kabinimas_xyz }}</div>
-          <div class="field"><label>Kiekis rėme</label>{{ detale_form.kiekis_reme.errors }}{{ detale_form.kiekis_reme }}</div>
-          <div class="field"><label>Faktinis kiekis rėme</label>{{ detale_form.faktinis_kiekis_reme.errors }}{{ detale_form.faktinis_kiekis_reme }}</div>
-          <div class="field"><label>Pakavimas</label>{{ detale_form.pakavimas.errors }}{{ detale_form.pakavimas }}</div>
-          <div class="field"><label>Nuoroda į brėžinį</label>{{ detale_form.nuoroda_brezinio.errors }}{{ detale_form.nuoroda_brezinio }}</div>
-          <div class="field"><label>Nuoroda į pasiūlymą</label>{{ detale_form.nuoroda_pasiulymo.errors }}{{ detale_form.nuoroda_pasiulymo }}</div>
-          <div class="field" style="grid-column:1/-1"><label>Pastabos</label>{{ detale_form.pastabos.errors }}{{ detale_form.pastabos }}</div>
+      <div class="form-grid">
+        <div class="form-field">
+          {{ projekto_form.uzklausos_nr.label_tag }} {{ projekto_form.uzklausos_nr }}
+          {{ projekto_form.uzklausos_nr.errors }}
         </div>
+        <div class="form-field">
+          {{ projekto_form.uzklausos_data.label_tag }} {{ projekto_form.uzklausos_data }}
+          {{ projekto_form.uzklausos_data.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.pasiulymo_data.label_tag }} {{ projekto_form.pasiulymo_data }}
+          {{ projekto_form.pasiulymo_data.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.projekto_pradzia_metai.label_tag }} {{ projekto_form.projekto_pradzia_metai }}
+          {{ projekto_form.projekto_pradzia_metai.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.projekto_pabaiga_metai.label_tag }} {{ projekto_form.projekto_pabaiga_metai }}
+          {{ projekto_form.projekto_pabaiga_metai.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.kaina_vnt.label_tag }} {{ projekto_form.kaina_vnt }}
+          {{ projekto_form.kaina_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.kaina_galioja_iki.label_tag }} {{ projekto_form.kaina_galioja_iki }}
+          {{ projekto_form.kaina_galioja_iki.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.apmokejimo_salygos.label_tag }} {{ projekto_form.apmokejimo_salygos }}
+          {{ projekto_form.apmokejimo_salygos.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.transportavimo_salygos.label_tag }} {{ projekto_form.transportavimo_salygos }}
+          {{ projekto_form.transportavimo_salygos.errors }}
+        </div>
+        <div class="form-field">
+          {{ projekto_form.atsakingas.label_tag }} {{ projekto_form.atsakingas }}
+          {{ projekto_form.atsakingas.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 2) DETALĖS IDENTIFIKACIJA -->
+    <details class="form-section">
+      <summary><strong>2) Detalės identifikacija</strong></summary>
+
+      {% if ident_form.non_field_errors %}
+        <div class="form-errors">{{ ident_form.non_field_errors }}</div>
       {% endif %}
-    </div>
-  </div>
-  {% endif %}
 
-  {# ––––– Kainos formset ––––– #}
-  <div class="section" id="kainos">
-    <div class="head">Kaina</div>
-    <div class="body">
-      {{ kaina_formset.non_form_errors }}
-      {{ kaina_formset.management_form }}
+      <div class="form-grid">
+        <div class="form-field">
+          {{ ident_form.pavadinimas.label_tag }} {{ ident_form.pavadinimas }}
+          {{ ident_form.pavadinimas.errors }}
+        </div>
+        <div class="form-field">
+          {{ ident_form.brezinio_numeris.label_tag }} {{ ident_form.brezinio_numeris }}
+          {{ ident_form.brezinio_numeris.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ ident_form.paruosimas.label_tag }} {{ ident_form.paruosimas }}
+          {{ ident_form.paruosimas.errors }}
+        </div>
+      </div>
+    </details>
 
-      <table id="kainos-table">
-        <thead>
-          <tr>
-            <th>Būsena</th>
-            <th>Kaina</th>
-            <th>Kiekis nuo</th>
-            <th>Kiekis iki</th>
-            <th>Fiksuotas kiekis</th>
-            <th>Kainos matas</th>
-            <th>Trinti</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for form in kaina_formset %}
-          <tr class="kaina-row">
-            <td>{{ form.busena.errors }}{{ form.busena }}</td>
-            <td>{{ form.suma.errors }}{{ form.suma }}</td>
-            <td>{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
-            <td>{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
-            <td>{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
-            <td>{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
-            <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- 3) PAVIRŠIAI / DANGOS -->
+    <details class="form-section">
+      <summary><strong>3) Paviršiai / dangos</strong></summary>
 
-      <div class="actions">
-        <button type="button" class="btn" id="add-price">Pridėti kainą</button>
+      {% if dangos_form.non_field_errors %}
+        <div class="form-errors">{{ dangos_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ dangos_form.ktl_ec_name.label_tag }} {{ dangos_form.ktl_ec_name }}
+          {{ dangos_form.ktl_ec_name.errors }}
+        </div>
+        <div class="form-field">
+          {{ dangos_form.miltelinis_name.label_tag }} {{ dangos_form.miltelinis_name }}
+          {{ dangos_form.miltelinis_name.errors }}
+        </div>
+        <div class="form-field">
+          {{ dangos_form.storis_ktl_mkm.label_tag }} {{ dangos_form.storis_ktl_mkm }}
+          {{ dangos_form.storis_ktl_mkm.errors }}
+        </div>
+        <div class="form-field">
+          {{ dangos_form.storis_ktl_plus_miltai_mkm.label_tag }} {{ dangos_form.storis_ktl_plus_miltai_mkm }}
+          {{ dangos_form.storis_ktl_plus_miltai_mkm.errors }}
+        </div>
+        <div class="form-field">
+          {{ dangos_form.padengimo_standartas.label_tag }} {{ dangos_form.padengimo_standartas }}
+          {{ dangos_form.padengimo_standartas.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ dangos_form.testai.label_tag }} {{ dangos_form.testai }}
+          {{ dangos_form.testai.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 4) MATMENYS & MEDŽIAGA -->
+    <details class="form-section">
+      <summary><strong>4) Matmenys & medžiaga</strong></summary>
+
+      {% if spec_form.non_field_errors %}
+        <div class="form-errors">{{ spec_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ spec_form.aukstis_x_cm.label_tag }} {{ spec_form.aukstis_x_cm }}
+          {{ spec_form.aukstis_x_cm.errors }}
+        </div>
+        <div class="form-field">
+          {{ spec_form.plotis_y_cm.label_tag }} {{ spec_form.plotis_y_cm }}
+          {{ spec_form.plotis_y_cm.errors }}
+        </div>
+        <div class="form-field">
+          {{ spec_form.ilgis_z_cm.label_tag }} {{ spec_form.ilgis_z_cm }}
+          {{ spec_form.ilgis_z_cm.errors }}
+        </div>
+        <div class="form-field">
+          {{ spec_form.metalo_storis_mm.label_tag }} {{ spec_form.metalo_storis_mm }}
+          {{ spec_form.metalo_storis_mm.errors }}
+        </div>
+        <div class="form-field">
+          {{ spec_form.svoris_kg.label_tag }} {{ spec_form.svoris_kg }}
+          {{ spec_form.svoris_kg.errors }}
+        </div>
+        <div class="form-field">
+          {{ spec_form.plotas_m2.label_tag }} {{ spec_form.plotas_m2 }}
+          {{ spec_form.plotas_m2.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ spec_form.metalas.label_tag }} {{ spec_form.metalas }}
+          {{ spec_form.metalas.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 5) KIEKIAI & TERMINAI -->
+    <details class="form-section">
+      <summary><strong>5) Kiekiai & terminai</strong></summary>
+
+      {% if kiekiai_form.non_field_errors %}
+        <div class="form-errors">{{ kiekiai_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ kiekiai_form.metinis_kiekis_vnt.label_tag }} {{ kiekiai_form.metinis_kiekis_vnt }}
+          {{ kiekiai_form.metinis_kiekis_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kiekiai_form.partijos_dydis_vnt.label_tag }} {{ kiekiai_form.partijos_dydis_vnt }}
+          {{ kiekiai_form.partijos_dydis_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kiekiai_form.minimalus_kiekis_vnt.label_tag }} {{ kiekiai_form.minimalus_kiekis_vnt }}
+          {{ kiekiai_form.minimalus_kiekis_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kiekiai_form.terminai_darbo_dienomis.label_tag }} {{ kiekiai_form.terminai_darbo_dienomis }}
+          {{ kiekiai_form.terminai_darbo_dienomis.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 6) KABINIMAS / RĖMAI -->
+    <details class="form-section">
+      <summary><strong>6) Kabinimas / rėmai</strong></summary>
+
+      {% if kabinimas_form.non_field_errors %}
+        <div class="form-errors">{{ kabinimas_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ kabinimas_form.kabinimo_budas.label_tag }} {{ kabinimas_form.kabinimo_budas }}
+          {{ kabinimas_form.kabinimo_budas.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.kiekis_reme_planuotas.label_tag }} {{ kabinimas_form.kiekis_reme_planuotas }}
+          {{ kabinimas_form.kiekis_reme_planuotas.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.kiekis_reme_faktinis.label_tag }} {{ kabinimas_form.kiekis_reme_faktinis }}
+          {{ kabinimas_form.kiekis_reme_faktinis.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.kabliukai.label_tag }} {{ kabinimas_form.kabliukai }}
+          {{ kabinimas_form.kabliukai.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.spyruoke.label_tag }} {{ kabinimas_form.spyruoke }}
+          {{ kabinimas_form.spyruoke.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ kabinimas_form.kontaktines_vietos_ktl.label_tag }} {{ kabinimas_form.kontaktines_vietos_ktl }}
+          {{ kabinimas_form.kontaktines_vietos_ktl.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ kabinimas_form.kontaktines_vietos_miltelinis.label_tag }} {{ kabinimas_form.kontaktines_vietos_miltelinis }}
+          {{ kabinimas_form.kontaktines_vietos_miltelinis.errors }}
+        </div>
+        <div class="form-field">
+          <label for="{{ kabinimas_form.nepilnas_remas.id_for_label }}">Nepilnas rėmas</label>
+          {{ kabinimas_form.nepilnas_remas }}
+          {{ kabinimas_form.nepilnas_remas.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.sukabinimo_dienos_norma_vnt.label_tag }} {{ kabinimas_form.sukabinimo_dienos_norma_vnt }}
+          {{ kabinimas_form.sukabinimo_dienos_norma_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kabinimas_form.pakavimo_dienos_norma_vnt.label_tag }} {{ kabinimas_form.pakavimo_dienos_norma_vnt }}
+          {{ kabinimas_form.pakavimo_dienos_norma_vnt.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 7) PAKAVIMAS -->
+    <details class="form-section">
+      <summary><strong>7) Pakavimas</strong></summary>
+
+      {% if pakavimas_form.non_field_errors %}
+        <div class="form-errors">{{ pakavimas_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ pakavimas_form.tara.label_tag }} {{ pakavimas_form.tara }}
+          {{ pakavimas_form.tara.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ pakavimas_form.pakavimo_instrukcija.label_tag }} {{ pakavimas_form.pakavimo_instrukcija }}
+          {{ pakavimas_form.pakavimo_instrukcija.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ pakavimas_form.pakavimas_po_ktl.label_tag }} {{ pakavimas_form.pakavimas_po_ktl }}
+          {{ pakavimas_form.pakavimas_po_ktl.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ pakavimas_form.pakavimas_po_miltelinio.label_tag }} {{ pakavimas_form.pakavimas_po_miltelinio }}
+          {{ pakavimas_form.pakavimas_po_miltelinio.errors }}
+        </div>
+        <div class="form-field col-span-2">
+          {{ pakavimas_form.papildomos_paslaugos.label_tag }} {{ pakavimas_form.papildomos_paslaugos }}
+          {{ pakavimas_form.papildomos_paslaugos.errors }}
+        </div>
+      </div>
+    </details>
+
+    <!-- 8) KAINODARA -->
+    <details class="form-section">
+      <summary><strong>8) Kainodara</strong></summary>
+
+      {% if kainodara_form.non_field_errors %}
+        <div class="form-errors">{{ kainodara_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-field">
+          {{ kainodara_form.kabliuku_kaina_vnt.label_tag }} {{ kainodara_form.kabliuku_kaina_vnt }}
+          {{ kainodara_form.kabliuku_kaina_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.pakavimo_medziagu_kaina_vnt.label_tag }} {{ kainodara_form.pakavimo_medziagu_kaina_vnt }}
+          {{ kainodara_form.pakavimo_medziagu_kaina_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.milteliniu_dazu_kaina_kg.label_tag }} {{ kainodara_form.milteliniu_dazu_kaina_kg }}
+          {{ kainodara_form.milteliniu_dazu_kaina_kg.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.darbo_kaina.label_tag }} {{ kainodara_form.darbo_kaina }}
+          {{ kainodara_form.darbo_kaina.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.viso_savikaina.label_tag }} {{ kainodara_form.viso_savikaina }}
+          {{ kainodara_form.viso_savikaina.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.fiksuota_kaina_vnt.label_tag }} {{ kainodara_form.fiksuota_kaina_vnt }}
+          {{ kainodara_form.fiksuota_kaina_vnt.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.remo_kaina.label_tag }} {{ kainodara_form.remo_kaina }}
+          {{ kainodara_form.remo_kaina.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.faktine_kaina.label_tag }} {{ kainodara_form.faktine_kaina }}
+          {{ kainodara_form.faktine_kaina.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.sukabinimas_pagal_fakta.label_tag }} {{ kainodara_form.sukabinimas_pagal_fakta }}
+          {{ kainodara_form.sukabinimas_pagal_fakta.errors }}
+        </div>
+        <div class="form-field">
+          {{ kainodara_form.valiuta.label_tag }} {{ kainodara_form.valiuta }}
+          {{ kainodara_form.valiuta.errors }}
+        </div>
       </div>
 
-      <template id="kaina-empty-row">
-        <tr class="kaina-row">
-          <td>{{ kaina_formset.empty_form.busena }}</td>
-          <td>{{ kaina_formset.empty_form.suma }}</td>
-          <td>{{ kaina_formset.empty_form.kiekis_nuo }}</td>
-          <td>{{ kaina_formset.empty_form.kiekis_iki }}</td>
-          <td>{{ kaina_formset.empty_form.fiksuotas_kiekis }}</td>
-          <td>{{ kaina_formset.empty_form.kainos_matas }}</td>
-          <td>{% if kaina_formset.empty_form.DELETE %}{{ kaina_formset.empty_form.DELETE }}{% endif %}</td>
-        </tr>
-      </template>
+      <!-- Kainos partijai (inline formset) -->
+      <h3 class="section-subtitle">Kainos partijai</h3>
+      <div class="formset-wrapper" id="kainos-partijai-wrapper">
+        {{ kainos_partijai_formset.management_form }}
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Partijos kiekis (vnt)</th>
+              <th>Kaina bendra</th>
+              <th>Šalinti</th>
+            </tr>
+          </thead>
+          <tbody id="kainos-partijai-body">
+            {% for f in kainos_partijai_formset %}
+              <tr class="formset-row">
+                <td>
+                  {{ f.partijos_kiekis_vnt }}
+                  {{ f.partijos_kiekis_vnt.errors }}
+                </td>
+                <td>
+                  {{ f.kaina_bendra }}
+                  {{ f.kaina_bendra.errors }}
+                </td>
+                <td>
+                  {% if f.instance.pk %}
+                    {{ f.DELETE }} <label for="{{ f.DELETE.id_for_label }}">šalinti</label>
+                  {% else %}
+                    <button type="button" class="btn btn-link remove-row" onclick="removeRow(this)">✕</button>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <!-- jei nėra eilučių, rodyti tuščią vieną -->
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- Šablonas naujai eilutei -->
+        <template id="kainos-partijai-empty-form">
+          <tr class="formset-row">
+            <td>__prefix__-partijos_kiekis_vnt</td>
+            <td>__prefix__-kaina_bendra</td>
+            <td><button type="button" class="btn btn-link remove-row" onclick="removeRow(this)">✕</button></td>
+          </tr>
+        </template>
+
+        <!-- Paslėptas „empty_form“, kurį naudosim prototipui -->
+        <div id="kainos-partijai-empty-inputs" style="display:none">
+          {{ kainos_partijai_formset.empty_form.partijos_kiekis_vnt }}
+          {{ kainos_partijai_formset.empty_form.kaina_bendra }}
+        </div>
+
+        <button type="button" class="btn" id="add-kainos-partijai">+ Pridėti eilutę</button>
+      </div>
+    </details>
+
+    <!-- 9) (Pastabos — jei darysi atskiruose puslapiuose, galima praleisti šiame šablone) -->
+
+    <div class="form-actions">
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">Atšaukti</a>
+      <button type="submit" class="btn btn-primary">
+        {% if uzklausa_obj %}Išsaugoti{% else %}Sukurti{% endif %}
+      </button>
     </div>
-  </div>
+  </form>
+</div>
 
-  <div class="actions">
-    <button type="submit" class="btn">Pateikti</button>
-    <a class="btn" href="{% url 'detaliu_registras:index' %}">Atgal</a>
-  </div>
-</form>
-{% endblock %}
-
-{% block page_js %}
+<!-- Minimalus JS formset'ui -->
 <script>
-(function(){
-  const addBtn = document.getElementById('add-price');
-  if(!addBtn) return;
+(function() {
+  const wrapper = document.getElementById('kainos-partijai-wrapper');
+  if (!wrapper) return;
 
-  addBtn.addEventListener('click', function(){
-    const totalInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
-    if(!totalInput) return;
-    const currentCount = parseInt(totalInput.value, 10) || 0;
-    const tmpl = document.getElementById('kaina-empty-row');
-    if(!tmpl) return;
-    const html = tmpl.innerHTML.replace(/__prefix__/g, String(currentCount));
-    const tbody = document.querySelector('#kainos-table tbody');
-    const temp = document.createElement('tbody');
-    temp.innerHTML = html.trim();
-    const newRow = temp.firstElementChild;
-    tbody.appendChild(newRow);
-    totalInput.value = String(currentCount + 1);
+  const addBtn = document.getElementById('add-kainos-partijai');
+  const body = document.getElementById('kainos-partijai-body');
+
+  const totalFormsInput = wrapper.querySelector('[name$="-TOTAL_FORMS"]');
+  const emptyInputsDiv = document.getElementById('kainos-partijai-empty-inputs');
+  const template = document.getElementById('kainos-partijai-empty-form');
+
+  function nextIndex() {
+    return parseInt(totalFormsInput.value, 10);
+  }
+  function incrementTotalForms() {
+    totalFormsInput.value = String(nextIndex() + 1);
+  }
+
+  function createRowFromEmpty() {
+    const idx = nextIndex();
+
+    // Sukuriam eilutės HTML iš <template>
+    const rowTpl = template.innerHTML
+      .replace(/__prefix__-partijos_kiekis_vnt/g, emptyInputsDiv.children[0].outerHTML.replace(/__prefix__/g, idx))
+      .replace(/__prefix__-kaina_bendra/g, emptyInputsDiv.children[1].outerHTML.replace(/__prefix__/g, idx));
+
+    const tempContainer = document.createElement('tbody');
+    tempContainer.innerHTML = rowTpl.trim();
+    return tempContainer.firstElementChild;
+  }
+
+  addBtn.addEventListener('click', function() {
+    const newRow = createRowFromEmpty();
+    body.appendChild(newRow);
+    incrementTotalForms();
   });
+
+  window.removeRow = function(btn) {
+    const tr = btn.closest('tr');
+    if (tr) tr.remove();
+    // sumažinti TOTAL_FORMS nesiūlau — nes tai supainioja indeksus.
+    // Pateiktose naujose eilutėse nėra DELETE checkbox'ų — ištrynimas tik prieš POST (pašalinant eilutę iš DOM).
+  };
 })();
 </script>
+
+<style>
+/* Minimalūs klasės kabliukai, remiasi tavo esamu CSS */
+.container { max-width: 1100px; margin: 0 auto; }
+.page-title { margin: 12px 0 16px; }
+.form-section { margin: 12px 0; padding: 8px 0; }
+.form-section > summary { cursor: pointer; font-size: 1.05rem; padding: 6px 0; }
+.form-errors, .field-error { color: #b00020; font-size: .9rem; margin-top: 4px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-field { display: flex; flex-direction: column; }
+.col-span-2 { grid-column: span 2 / span 2; }
+.table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.table th, .table td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+.section-subtitle { margin: 12px 0 6px; }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.btn { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: pointer; }
+.btn-primary { background: #2563eb; color: white; border-color: #2563eb; }
+.btn-secondary { background: #f3f4f6; color: #111827; text-decoration: none; }
+.btn.btn-link { border: none; background: transparent; color: #374151; padding: 0; cursor: pointer; }
+</style>
 {% endblock %}
