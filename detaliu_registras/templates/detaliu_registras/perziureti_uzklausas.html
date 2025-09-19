@@ -1,172 +1,250 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Užklausos{% endblock %}
 
 {% block content %}
-<div class="uzklausos-page">
+<div class="container">
 
-  {% include "snippets/messages.html" %}
+  <!-- Antraštė + donut -->
+  <header class="list-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin:16px 0 12px;">
+    <h1 style="margin:0">Užklausos</h1>
 
-  <!-- Antraštė -->
-  <header class="list-header">
-    <h1>Užklausos</h1>
-    <a class="btn btn-primary" href="{% url 'detaliu_registras:ivesti_uzklausa' %}">+ Nauja užklausa</a>
+    <div class="donut" id="donut" data-total="{{ chart_total|default:0 }}" style="position:relative;display:flex;align-items:center;gap:14px;">
+      <svg viewBox="0 0 120 120" class="donut-svg" aria-hidden="true" style="width:120px;height:120px;display:block">
+        <circle class="ring-bg" cx="60" cy="60" r="54"
+                style="fill:none;stroke:#e5e7eb;stroke-width:12;stroke-linecap:round;" />
+        <g class="segments"></g>
+      </svg>
+
+      <div class="donut-center" style="position:absolute;left:0;top:0;width:120px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+        <div class="donut-total" style="font-size:22px;font-weight:700;line-height:1">{{ chart_total|default:0 }}</div>
+        <div class="donut-label" style="font-size:12px;color:#6b7280">įrašų</div>
+      </div>
+
+      <div class="donut-legend" id="donut-legend" style="display:flex;flex-direction:column;gap:4px;min-width:160px"></div>
+    </div>
+    {{ chart_segments|json_script:"segments-data" }}
   </header>
 
+  <!-- Stulpelių konfigūracija -->
+  <div class="cols-config" id="cols-config" style="display:flex;align-items:center;gap:12px;margin:8px 0 10px">
+    <button type="button" class="btn" id="cols-toggle">⚙️ Stulpeliai</button>
+    <div class="cols-panel" id="cols-panel"
+         style="display:none;gap:12px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff">
+      <label><input type="checkbox" data-col="id" checked> ID</label>
+      <label><input type="checkbox" data-col="klientas" checked> Klientas</label>
+      <label><input type="checkbox" data-col="projektas" checked> Projektas</label>
+      <label><input type="checkbox" data-col="detale" checked> Detalė</label>
+      <label><input type="checkbox" data-col="brezinys" checked> Brėžinio nr.</label>
+      <label><input type="checkbox" data-col="metalas" checked> Metalas</label>
+      <label><input type="checkbox" data-col="padengimas" checked> KTL/Milt.</label>
+      <label><input type="checkbox" data-col="sukurta" checked> Sukurta</label>
+      <label><input type="checkbox" data-col="veiksmai" checked> Veiksmai</label>
+    </div>
+  </div>
+
   <!-- Filtrai -->
-  <section class="filters-wrap">
-    <form method="get" class="filters-form">
-      <div class="filters-grid">
-        <label class="f">
-          <span>Paieška</span>
-          {{ filter_form.q }}
-        </label>
-        <label class="f">
-          <span>Klientas</span>
-          {{ filter_form.klientas }}
-        </label>
-        <label class="f">
-          <span>Projektas</span>
-          {{ filter_form.projektas }}
-        </label>
-        <label class="f">
-          <span>Brėžinio nr.</span>
-          {{ filter_form.brezinio_nr }}
-        </label>
-        <label class="f">
-          <span>Metalas</span>
-          {{ filter_form.metalas }}
-        </label>
-        <label class="f">
-          <span>Padengimas</span>
-          {{ filter_form.padengimas }}
-        </label>
+  <section class="filters-wrap" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px">
+    <form method="get" class="filters-form" style="display:flex;flex-direction:column;gap:12px">
+      <div class="filters-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Paieška</span>{{ filter_form.q }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Klientas</span>{{ filter_form.klientas }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Projektas</span>{{ filter_form.projektas }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Detalė</span>{{ filter_form.detale }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Brėžinio nr.</span>{{ filter_form.brezinio_nr }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Metalas</span>{{ filter_form.metalas }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Padengimas</span>{{ filter_form.padengimas }}</label>
       </div>
-      <div class="filters-actions">
+      <div class="filters-actions" style="display:flex;align-items:center;gap:8px">
+        <a class="btn" href="{% url 'detaliu_registras:ivesti_uzklausa' %}">+ Nauja užklausa</a>
+        <span style="flex:1"></span>
         <button class="btn" type="submit">Filtruoti</button>
-        <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">Išvalyti</a>
+        <a class="btn" href="{% url 'detaliu_registras:uzklausa_list' %}">Išvalyti</a>
       </div>
     </form>
   </section>
 
   <!-- Lentelė -->
-  <section class="table-wrap">
-    <table class="table">
+  <section class="table-wrap" style="overflow-x:auto">
+    <table class="table" style="width:100%;border-collapse:collapse">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Klientas</th>
-          <th>Projektas</th>
-          <th>Detalė</th>
-          <th>Brėžinio nr.</th>
-          <th>Metalas</th>
-          <th>Sukurta</th>
-          <th class="text-right">Veiksmai</th>
+          <th data-col="id">ID</th>
+          <th data-col="klientas">Klientas</th>
+          <th data-col="projektas">Projektas</th>
+          <th data-col="detale">Detalė</th>
+          <th data-col="brezinys">Brėžinio nr.</th>
+          <th data-col="metalas">Metalas</th>
+          <th data-col="padengimas">KTL/Milt.</th>
+          <th data-col="sukurta">Sukurta</th>
+          <th data-col="veiksmai" style="text-align:right">Veiksmai</th>
         </tr>
       </thead>
       <tbody>
         {% for u in uzklausos %}
           <tr>
-            <td><a href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">#{{ u.pk }}</a></td>
-            <td>{{ u.klientas|default:"—" }}</td>
-            <td>{{ u.projektas|default:"—" }}</td>
-            <td>{{ u.detale.pavadinimas|default:"—" }}</td>
-            <td class="mono">{{ u.detale.brezinio_nr|default:"—" }}</td>
-            <td>{% if u.detale.specifikacija %}{{ u.detale.specifikacija.metalas|default:"—" }}{% else %}—{% endif %}</td>
-            <td>{{ u.data|date:"Y-m-d" }}</td>
-            <td class="text-right">
-              <a class="btn btn-sm" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Peržiūrėti</a>
-              <a class="btn btn-sm btn-secondary" href="{% url 'detaliu_registras:redaguoti_uzklausa' u.pk %}">Redaguoti</a>
+            <td data-col="id"><a href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">#{{ u.pk }}</a></td>
+            <td data-col="klientas">{{ u.klientas|default:"—" }}</td>
+            <td data-col="projektas">{{ u.projektas|default:"—" }}</td>
+            <td data-col="detale">{{ u.detale.pavadinimas|default:"—" }}</td>
+            <td data-col="brezinys" style="font-family:ui-monospace,Menlo,monospace">{{ u.detale.brezinio_nr|default:"—" }}</td>
+            <td data-col="metalas">
+              {% if u.detale.specifikacija %}{{ u.detale.specifikacija.metalas|default:"—" }}{% else %}—{% endif %}
+            </td>
+            <td data-col="padengimas">
+              {% if u.detale.pavirsiu_dangos %}
+                {{ u.detale.pavirsiu_dangos.ktl_ec_name|default_if_none:"" }}{% if u.detale.pavirsiu_dangos.ktl_ec_name and u.detale.pavirsiu_dangos.miltelinis_name %} / {% endif %}{{ u.detale.pavirsiu_dangos.miltelinis_name|default_if_none:"" }}
+              {% else %}—{% endif %}
+            </td>
+            <td data-col="sukurta">{{ u.data|date:"Y-m-d" }}</td>
+            <td data-col="veiksmai" style="text-align:right">
+              <a class="btn" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Peržiūrėti</a>
+              <a class="btn btn-secondary" href="{% url 'detaliu_registras:redaguoti_uzklausa' u.pk %}">Redaguoti</a>
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="8" class="empty">Įrašų nėra.</td></tr>
+          <tr><td colspan="9" style="color:#6b7280;font-style:italic;text-align:center;padding:8px">Įrašų nėra.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </section>
 
-  <!-- Puslapiavimas -->
   {% if is_paginated %}
-    <nav class="pagination">
+    <nav class="pagination" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:12px 0 18px">
       {% if page_obj.has_previous %}
-        <a class="page" href="?page={{ page_obj.previous_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">‹</a>
-      {% else %}<span class="page disabled">‹</span>{% endif %}
-
-      <span class="page current">Puslapis {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}</span>
-
+        <a class="page btn btn-secondary" href="?page={{ page_obj.previous_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">‹</a>
+      {% else %}<span class="page btn btn-secondary" style="opacity:.5;pointer-events:none">‹</span>{% endif %}
+      <span class="page" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;background:#f3f4f6">Puslapis {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-        <a class="page" href="?page={{ page_obj.next_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">›</a>
-      {% else %}<span class="page disabled">›</span>{% endif %}
+        <a class="page btn btn-secondary" href="?page={{ page_obj.next_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">›</a>
+      {% else %}<span class="page btn btn-secondary" style="opacity:.5;pointer-events:none">›</span>{% endif %}
     </nav>
   {% endif %}
 </div>
 
-<style>
-/* ===== Izoliacija nuo base.html ===== */
-.uzklausos-page {
-  box-sizing: border-box;
-  max-width: 1200px; margin: 0 auto; padding: 16px;
-  display: block !important;        /* atšaukiam galimą grid/flex iš base */
-}
-.uzklausos-page * { box-sizing: border-box; }
+<script>
+/* ===== Donut su spalvomis ir click ===== */
+(function() {
+  const donut = document.getElementById("donut");
+  if (!donut) return;
 
-/* ===== Antraštė ===== */
-.list-header {
-  display:flex; align-items:center; justify-content:space-between;
-  gap: 12px; margin: 8px 0 12px;
-}
-.list-header h1 { margin: 0; }
+  const total = parseInt(donut.dataset.total || "0", 10);
+  const dataEl = document.getElementById("segments-data");
+  let segments = [];
+  try { segments = JSON.parse(dataEl?.textContent || "[]"); } catch(e) { segments = []; }
 
-/* ===== Mygtukai ===== */
-.btn { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; background:#f9fafb; text-decoration:none; color:#111827; }
-.btn-primary { background:#2563eb; color:#fff; border-color:#2563eb; }
-.btn-secondary { background:#f3f4f6; color:#111827; }
-.btn-sm { padding:4px 8px; font-size:.875rem; }
+  const svg = donut.querySelector(".donut-svg");
+  const g = svg.querySelector(".segments");
+  const r = 54, C = 2 * Math.PI * r;
 
-/* ===== Filtrai ===== */
-.filters-wrap {
-  background:#fff; border:1px solid #e5e7eb; border-radius:8px;
-  padding:12px; margin-bottom:12px;
-}
-.filters-form { display:flex; flex-direction:column; gap:12px; }
-.filters-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
-.f { display:flex; flex-direction:column; gap:4px; }
-.filters-actions { display:flex; gap:8px; justify-content:flex-end; }
+  const COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6","#06B6D4","#22C55E","#D946EF"];
 
-/* ===== Lentelė (aiški ir ne „suspausta“) ===== */
-.table-wrap { overflow-x:auto; }
-.table { width:100%; border-collapse: collapse; table-layout: auto; }  /* jokio fixed */
-.table th, .table td {
-  padding:10px 8px; border-bottom:1px solid #e5e7eb;
-  vertical-align: middle;
-  white-space: normal;              /* leidžiam laužyti eilutes */
-  word-break: break-word;           /* kad ilgi žodžiai nesugriautų pločio */
-}
-.table thead th { background:#fff; position:static; } /* be sticky */
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  function goToSeg(slug) {
+    const url = new URL(window.location.href);
+    const current = url.searchParams.get("seg") || "";
+    if (current === slug) url.searchParams.delete("seg");
+    else url.searchParams.set("seg", slug);
+    window.location.href = url.toString();
+  }
 
-/* stulpelių minimalūs pločiai aiškumui */
-.table th:nth-child(1), .table td:nth-child(1) { width: 72px; white-space:nowrap; }
-.table th:nth-child(8), .table td:nth-child(8) { width: 150px; white-space:nowrap; }
+  if (!total || !segments || !segments.length) {
+    const legend = document.getElementById("donut-legend");
+    if (legend) legend.innerHTML = '<div style="color:#6b7280">Nėra duomenų grafikai.</div>';
+    return;
+  }
 
-/* veiksmai */
-.text-right { text-align:right; }
-.text-right .btn { display:inline-block; margin-left:6px; }
+  let offset = 0;
+  segments.forEach((s, i) => {
+    const val = Number(s.value || 0);
+    if (val <= 0) return;
 
-/* tuščia būsena */
-.empty { color:#6b7280; font-style:italic; text-align:center; padding:8px; }
+    const dash = Math.max(0.0001, (val / total) * C);
+    const gap  = C - dash;
 
-/* puslapiavimas */
-.pagination { display:flex; gap:8px; align-items:center; justify-content:flex-end; margin: 12px 0 18px; }
-.page { padding:4px 8px; border:1px solid #d1d5db; border-radius:6px; }
-.page.current { background:#f3f4f6; }
-.page.disabled { opacity:.5; pointer-events:none; }
+    const arc = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    arc.setAttribute("cx","60");
+    arc.setAttribute("cy","60");
+    arc.setAttribute("r", String(r));
+    arc.setAttribute("fill","none");
+    arc.setAttribute("stroke-linecap","round");
+    arc.setAttribute("stroke-width","12");
+    arc.setAttribute("stroke", COLORS[i % COLORS.length]);
+    arc.setAttribute("stroke-dasharray", `${dash} ${gap}`);
+    arc.setAttribute("stroke-dashoffset", String(offset));
+    arc.style.transform = "rotate(-90deg)";
+    arc.style.transformOrigin = "50% 50%";
+    arc.style.cursor = "pointer";
+    arc.addEventListener("click", () => goToSeg(s.slug || ""));
+    g.appendChild(arc);
 
-/* responsive */
-@media (max-width: 900px) {
-  .filters-grid { grid-template-columns: 1fr; }
-}
-</style>
+    offset -= dash;
+  });
+
+  const legend = document.getElementById("donut-legend");
+  legend.innerHTML = "";
+  segments.forEach((s, i) => {
+    const li = document.createElement("div");
+    li.className = "legend-item";
+    li.style.cssText = "display:flex;align-items:center;gap:8px;padding:2px 4px;border-radius:6px;cursor:pointer";
+    li.innerHTML = `
+      <span class="legend-dot" style="background:${COLORS[i % COLORS.length]};width:10px;height:10px;border-radius:999px;display:inline-block"></span>
+      <span class="legend-text" style="font-size:13px;color:#374151">${s.label || "—"}: <b>${s.value || 0}</b></span>
+    `;
+    li.addEventListener("click", () => goToSeg(s.slug || ""));
+    legend.appendChild(li);
+  });
+})();
+
+/* ===== Stulpelių panelė – 100% patikimas toggle ===== */
+(function() {
+  const STORAGE_KEY = "uzklausos_cols_v1";
+  const PANEL_OPEN_KEY = "uzklausos_cols_panel_open";
+
+  function init() {
+    const wrap  = document.getElementById("cols-config");
+    if (!wrap) return;
+
+    const btn   = wrap.querySelector("#cols-toggle");
+    const panel = wrap.querySelector("#cols-panel");
+    if (!btn || !panel) return;
+
+    // Atstatom būseną iš localStorage
+    const savedOpen = localStorage.getItem(PANEL_OPEN_KEY);
+    const isOpen = savedOpen === "1";
+    panel.style.display = isOpen ? "flex" : "none";
+
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      const nowOpen = panel.style.display === "none";
+      panel.style.display = nowOpen ? "flex" : "none";
+      try { localStorage.setItem(PANEL_OPEN_KEY, nowOpen ? "1" : "0"); } catch {}
+    });
+
+    // Stulpelių checkbox'ų logika
+    const checks = panel.querySelectorAll('input[type="checkbox"][data-col]');
+    const allCells = document.querySelectorAll('th[data-col], td[data-col]');
+
+    function loadPrefs() {
+      try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    }
+    function savePrefs(map) { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); }
+    function currentMap() { const m = {}; checks.forEach(ch => m[ch.dataset.col] = ch.checked); return m; }
+    function apply(map) {
+      allCells.forEach(el => {
+        const key = el.dataset.col;
+        el.style.display = (map[key] !== false) ? "" : "none";
+      });
+    }
+
+    const saved = loadPrefs();
+    if (saved) { checks.forEach(ch => { if (saved.hasOwnProperty(ch.dataset.col)) ch.checked = !!saved[ch.dataset.col]; }); apply(saved); }
+    else { apply(currentMap()); }
+
+    checks.forEach(ch => ch.addEventListener("change", () => { const m = currentMap(); savePrefs(m); apply(m); }));
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
 {% endblock %}

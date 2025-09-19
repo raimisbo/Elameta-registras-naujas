@@ -1,294 +1,213 @@
 {% extends "base.html" %}
-{% load static %}
-
 {% block title %}Užklausa #{{ uzklausa.pk }}{% endblock %}
 
 {% block content %}
 <div class="container">
-  {% include "snippets/messages.html" %}
-
-  <header class="view-header">
-    <h1>Užklausa #{{ uzklausa.pk }}</h1>
-    <div class="actions">
-      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Atgal į sąrašą</a>
-      <a class="btn btn-primary" href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}">Redaguoti</a>
+  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
+    <h1 style="margin:0">Užklausa #{{ uzklausa.pk }}</h1>
+    <div style="display:flex;gap:8px">
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Į sąrašą</a>
+      <a class="btn" href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}">Redaguoti</a>
     </div>
   </header>
 
-  <!-- Pagrindinė informacija (visada atverta) -->
-  <details class="section" open>
-    <summary><strong>Užklausa</strong></summary>
-    <div class="kv-grid">
-      <div class="kv"><span>Klientas</span><b>{{ uzklausa.klientas|default:"—" }}</b></div>
-      <div class="kv"><span>Projektas</span><b>{{ uzklausa.projektas|default:"—" }}</b></div>
-      <div class="kv"><span>Detalė</span><b>{{ uzklausa.detale|default:"—" }}</b></div>
-      <div class="kv"><span>Sukurta</span><b>{{ uzklausa.data|date:"Y-m-d"|default:"—" }}</b></div>
+  <!-- Valdiklis blokams rodyti/slėpti (įsimena būseną) -->
+  <div class="cols-config" id="cols-config" style="display:flex;align-items:center;gap:12px;margin:8px 0 10px">
+    <button type="button" class="btn" id="cols-toggle">⚙️ Stulpeliai</button>
+    <div class="cols-panel" id="cols-panel"
+         style="display:none;gap:12px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff">
+      <label><input type="checkbox" data-block="main" checked> Pagrindinė</label>
+      <label><input type="checkbox" data-block="spec" checked> Specifikacija</label>
+      <label><input type="checkbox" data-block="coats" checked> Paviršių dangos</label>
+      <label><input type="checkbox" data-block="qty" checked> Kiekiai</label>
+      <label><input type="checkbox" data-block="dims" checked> Matmenys</label>
+      <label><input type="checkbox" data-block="hang" checked> Kabinimas</label>
+      <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
+      <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
+      <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
     </div>
-  </details>
-
-  <!-- 1) Projekto duomenys -->
-  <details class="section" open>
-    <summary><strong>1) Projekto duomenys</strong></summary>
-    {% with p=uzklausa.projekto_duomenys %}
-    {% if p %}
-      <div class="kv-grid">
-        <div class="kv"><span>Užklausos Nr.</span><b>{{ p.uzklausos_nr|default:"—" }}</b></div>
-        <div class="kv"><span>Užklausos data</span><b>{{ p.uzklausos_data|date:"Y-m-d"|default:"—" }}</b></div>
-        <div class="kv"><span>Pasiūlymo data</span><b>{{ p.pasiulymo_data|date:"Y-m-d"|default:"—" }}</b></div>
-        <div class="kv"><span>Projekto pradžia</span><b>{{ p.projekto_pradzia_metai|default:"—" }}</b></div>
-        <div class="kv"><span>Projekto pabaiga</span><b>{{ p.projekto_pabaiga_metai|default:"—" }}</b></div>
-        <div class="kv"><span>Kaina vnt.</span><b>{{ p.kaina_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Kaina galioja iki</span><b>{{ p.kaina_galioja_iki|date:"Y-m-d"|default:"—" }}</b></div>
-        <div class="kv"><span>Apmokėjimo sąlygos</span><b>{{ p.apmokejimo_salygos|default:"—" }}</b></div>
-        <div class="kv"><span>Transportavimo sąlygos</span><b>{{ p.transportavimo_salygos|default:"—" }}</b></div>
-        <div class="kv"><span>Atsakingas</span><b>{{ p.atsakingas|default:"—" }}</b></div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 2) Detalės identifikacija -->
-  <details class="section">
-    <summary><strong>2) Detalės identifikacija</strong></summary>
-    {% with d=uzklausa.detale.identifikacija %}
-    {% if d %}
-      <div class="kv-grid">
-        <div class="kv"><span>Pavadinimas</span><b>{{ d.pavadinimas|default:"—" }}</b></div>
-        <div class="kv"><span>Brėžinio numeris</span><b>{{ d.brezinio_numeris|default:"—" }}</b></div>
-      </div>
-      <div class="block">
-        <div class="label">Paruošimas</div>
-        <div class="mono">{{ d.paruosimas|linebreaksbr|default:"—" }}</div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 3) Paviršiai / dangos -->
-  <details class="section">
-    <summary><strong>3) Paviršiai / dangos</strong></summary>
-    {% with s=uzklausa.detale.pavirsiu_dangos %}
-    {% if s %}
-      <div class="kv-grid">
-        <div class="kv"><span>KTL / e-coating</span><b>{{ s.ktl_ec_name|default:"—" }}</b></div>
-        <div class="kv"><span>Miltelinis</span><b>{{ s.miltelinis_name|default:"—" }}</b></div>
-        <div class="kv"><span>Storis KTL (μm)</span><b>{{ s.storis_ktl_mkm|default:"—" }}</b></div>
-        <div class="kv"><span>Storis KTL + miltai (μm)</span><b>{{ s.storis_ktl_plus_miltai_mkm|default:"—" }}</b></div>
-        <div class="kv"><span>Standartas</span><b>{{ s.padengimo_standartas|default:"—" }}</b></div>
-      </div>
-      <div class="block">
-        <div class="label">Testai</div>
-        <div class="mono">{{ s.testai|linebreaksbr|default:"—" }}</div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 4) Matmenys & medžiaga -->
-  <details class="section">
-    <summary><strong>4) Matmenys & medžiaga</strong></summary>
-    {% with m=uzklausa.detale.specifikacija %}
-    {% if m %}
-      <div class="kv-grid">
-        <div class="kv"><span>Aukštis X (cm)</span><b>{{ m.aukstis_x_cm|default:"—" }}</b></div>
-        <div class="kv"><span>Plotis Y (cm)</span><b>{{ m.plotis_y_cm|default:"—" }}</b></div>
-        <div class="kv"><span>Ilgis Z (cm)</span><b>{{ m.ilgis_z_cm|default:"—" }}</b></div>
-        <div class="kv"><span>Metalo storis (mm)</span><b>{{ m.metalo_storis_mm|default:"—" }}</b></div>
-        <div class="kv"><span>Svoris (kg)</span><b>{{ m.svoris_kg|default:"—" }}</b></div>
-        <div class="kv"><span>Plotas (m²)</span><b>{{ m.plotas_m2|default:"—" }}</b></div>
-        <div class="kv col-span-2"><span>Metalas</span><b>{{ m.metalas|default:"—" }}</b></div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 5) Kiekiai & terminai -->
-  <details class="section">
-    <summary><strong>5) Kiekiai & terminai</strong></summary>
-    {% with k=uzklausa.kiekiai_terminai %}
-    {% if k %}
-      <div class="kv-grid">
-        <div class="kv"><span>Metinis kiekis (vnt)</span><b>{{ k.metinis_kiekis_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Partijos dydis (vnt)</span><b>{{ k.partijos_dydis_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Minimalus kiekis (vnt)</span><b>{{ k.minimalus_kiekis_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Terminai (d. d.)</span><b>{{ k.terminai_darbo_dienomis|default:"—" }}</b></div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 6) Kabinimas / rėmai -->
-  <details class="section">
-    <summary><strong>6) Kabinimas / rėmai</strong></summary>
-    {% with r=uzhlausa.kabinimas_remai %}{% endwith %}
-    {% with r=uzklausa.kabinimas_remai %}
-    {% if r %}
-      <div class="kv-grid">
-        <div class="kv"><span>Kabinimo būdas</span><b>{{ r.get_kabinimo_budas_display|default:"—" }}</b></div>
-        <div class="kv"><span>Kiekis rėme (planuotas)</span><b>{{ r.kiekis_reme_planuotas|default:"—" }}</b></div>
-        <div class="kv"><span>Kiekis rėme (faktinis)</span><b>{{ r.kiekis_reme_faktinis|default:"—" }}</b></div>
-        <div class="kv"><span>Kabliukai</span><b>{{ r.kabliukai|default:"—" }}</b></div>
-        <div class="kv"><span>Spyruokė</span><b>{{ r.spyruoke|default:"—" }}</b></div>
-        <div class="kv"><span>Nepilnas rėmas</span><b>{% if r.nepilnas_remas %}Taip{% else %}Ne{% endif %}</b></div>
-        <div class="kv"><span>Sukabinimo dienos norma (vnt)</span><b>{{ r.sukabinimo_dienos_norma_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Pakavimo dienos norma (vnt)</span><b>{{ r.pakavimo_dienos_norma_vnt|default:"—" }}</b></div>
-      </div>
-      <div class="block">
-        <div class="label">Kontaktinės vietos (KTL)</div>
-        <div class="mono">{{ r.kontaktines_vietos_ktl|linebreaksbr|default:"—" }}</div>
-      </div>
-      <div class="block">
-        <div class="label">Kontaktinės vietos (miltelinis)</div>
-        <div class="mono">{{ r.kontaktines_vietos_miltelinis|linebreaksbr|default:"—" }}</div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 7) Pakavimas -->
-  <details class="section">
-    <summary><strong>7) Pakavimas</strong></summary>
-    {% with p=uzklausa.pakavimas %}
-    {% if p %}
-      <div class="kv-grid">
-        <div class="kv"><span>Tara</span><b>{{ p.tara|default:"—" }}</b></div>
-      </div>
-      <div class="block">
-        <div class="label">Pakavimo instrukcija</div>
-        <div class="mono">{{ p.pakavimo_instrukcija|linebreaksbr|default:"—" }}</div>
-      </div>
-      <div class="block">
-        <div class="label">Pakavimas po KTL</div>
-        <div class="mono">{{ p.pakavimas_po_ktl|linebreaksbr|default:"—" }}</div>
-      </div>
-      <div class="block">
-        <div class="label">Pakavimas po miltelinio</div>
-        <div class="mono">{{ p.pakavimas_po_miltelinio|linebreaksbr|default:"—" }}</div>
-      </div>
-      <div class="block">
-        <div class="label">Papildomos paslaugos</div>
-        <div class="mono">{{ p.papildomos_paslaugos|linebreaksbr|default:"—" }}</div>
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 8) Kainodara -->
-  <details class="section">
-    <summary><strong>8) Kainodara</strong></summary>
-    {% with k=uzklausa.kainodara %}
-    {% if k %}
-      <div class="kv-grid">
-        <div class="kv"><span>Kabliukų kaina (vnt)</span><b>{{ k.kabliuku_kaina_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Pakavimo medžiagų kaina (vnt)</span><b>{{ k.pakavimo_medziagu_kaina_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Miltelinių dažų kaina (kg)</span><b>{{ k.milteliniu_dazu_kaina_kg|default:"—" }}</b></div>
-        <div class="kv"><span>Darbo kaina</span><b>{{ k.darbo_kaina|default:"—" }}</b></div>
-        <div class="kv"><span>Viso savikaina</span><b>{{ k.viso_savikaina|default:"—" }}</b></div>
-        <div class="kv"><span>Fiksuota kaina (vnt)</span><b>{{ k.fiksuota_kaina_vnt|default:"—" }}</b></div>
-        <div class="kv"><span>Rėmo kaina</span><b>{{ k.remo_kaina|default:"—" }}</b></div>
-        <div class="kv"><span>Faktinė kaina</span><b>{{ k.faktine_kaina|default:"—" }}</b></div>
-        <div class="kv"><span>Sukabinimas pagal faktą</span><b>{{ k.sukabinimas_pagal_fakta|default:"—" }}</b></div>
-        <div class="kv"><span>Valiuta</span><b>{{ k.valiuta|default:"EUR" }}</b></div>
-      </div>
-
-      <h3 class="section-subtitle">Kainos partijai</h3>
-      {% if k.kainos_partijoms.all %}
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Partijos kiekis (vnt)</th>
-              <th>Kaina bendra</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in k.kainos_partijoms.all|dictsort:"partijos_kiekis_vnt" %}
-              <tr>
-                <td>{{ row.partijos_kiekis_vnt }}</td>
-                <td>{{ row.kaina_bendra }} {{ k.valiuta }}</td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="2" class="empty">Nėra įrašų.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <div class="empty">Nėra įrašų.</div>
-      {% endif %}
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-    {% endwith %}
-  </details>
-
-  <!-- 9) Pastabos (jei naudoji) -->
-  <details class="section">
-    <summary><strong>9) Pastabos</strong></summary>
-    {% if uzklausa.pastabos.all %}
-      <div class="notes">
-        {% for p in uzklausa.pastabos.all %}
-          <div class="note">
-            <div class="note-head">
-              <span class="tag">{{ p.get_kategorija_display|default:"Kita" }}</span>
-              <span class="ts">{{ p.created_at|date:"Y-m-d H:i" }}</span>
-              {% if p.created_by %}<span class="by">• {{ p.created_by }}</span>{% endif %}
-            </div>
-            <div class="note-body">{{ p.tekstas|linebreaksbr }}</div>
-          </div>
-        {% empty %}
-          <div class="empty">Nėra pastabų.</div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty">Nėra duomenų.</div>
-    {% endif %}
-  </details>
-
-  <div class="footer-actions">
-    <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Atgal į sąrašą</a>
-    <a class="btn btn-primary" href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}">Redaguoti</a>
   </div>
+
+  {# 1) PAGRINDINĖ #}
+  <section class="box block" data-block="main">
+    <h3>Pagrindinė informacija</h3>
+    <div class="grid">
+      <div><strong>Klientas:</strong> {{ uzklausa.klientas|default:"—" }}</div>
+      <div><strong>Projektas:</strong> {{ uzklausa.projektas|default:"—" }}</div>
+      <div><strong>Detalė:</strong> {{ uzklausa.detale.pavadinimas|default:"—" }}</div>
+      <div><strong>Brėžinio nr.:</strong> {{ uzklausa.detale.brezinio_nr|default:"—" }}</div>
+      {# DATA greičiausiai DateField → be H:i #}
+      <div><strong>Sukurta:</strong> {{ uzklausa.data|date:"Y-m-d" }}</div>
+    </div>
+  </section>
+
+  {# 2) SPECIFIKACIJA #}
+  <section class="box block" data-block="spec">
+    <h3>Specifikacija</h3>
+    {% if uzklausa.detale.specifikacija %}
+      <div class="grid">
+        <div><strong>Metalas:</strong> {{ uzklausa.detale.specifikacija.metalas|default:"—" }}</div>
+        <div><strong>Plotas m²:</strong> {{ uzklausa.detale.specifikacija.plotas_m2|default:"—" }}</div>
+        <div><strong>Svoris kg:</strong> {{ uzklausa.detale.specifikacija.svoris_kg|default:"—" }}</div>
+        <div><strong>Medžiagos kodas:</strong> {{ uzklausa.detale.specifikacija.medziagos_kodas|default:"—" }}</div>
+      </div>
+    {% else %}
+      <p>—</p>
+    {% endif %}
+  </section>
+
+  {# 3) PAVIRŠIŲ DANGOS #}
+  <section class="box block" data-block="coats">
+    <h3>Paviršių dangos</h3>
+    {% if uzklausa.detale.pavirsiu_dangos %}
+      <div class="grid">
+        <div><strong>KTL / e-coating:</strong> {{ uzklausa.detale.pavirsiu_dangos.ktl_ec_name|default:"—" }}</div>
+        <div><strong>Miltelinis padengimas:</strong> {{ uzklausa.detale.pavirsiu_dangos.miltelinis_name|default:"—" }}</div>
+        <div><strong>RAL / spalva:</strong> {{ uzklausa.detale.pavirsiu_dangos.spalva_ral|default:"—" }}</div>
+        <div><strong>Blizgumas / tekstūra:</strong> {{ uzklausa.detale.pavirsiu_dangos.blizgumas|default:"—" }}</div>
+      </div>
+    {% else %}
+      <p>—</p>
+    {% endif %}
+  </section>
+
+  {# 4) KIEKIAI #}
+  <section class="box block" data-block="qty">
+    <h3>Kiekiai</h3>
+    <div class="grid">
+      <div><strong>Kiekis per metus:</strong> {{ uzklausa.detale.kiekis_metinis|default:"—" }}</div>
+      <div><strong>Kiekis per mėnesį:</strong> {{ uzklausa.detale.kiekis_menesis|default:"—" }}</div>
+      <div><strong>Kiekis partijai:</strong> {{ uzklausa.detale.kiekis_partijai|default:"—" }}</div>
+      <div><strong>Gaminių/val. (jei nurodyta):</strong> {{ uzklausa.detale.kiekis_per_val|default:"—" }}</div>
+    </div>
+  </section>
+
+  {# 5) MATMENYS #}
+  <section class="box block" data-block="dims">
+    <h3>Matmenys</h3>
+    <div class="grid">
+      <div><strong>Ilgis (mm):</strong> {{ uzklausa.detale.ilgis_mm|default:"—" }}</div>
+      <div><strong>Plotis (mm):</strong> {{ uzklausa.detale.plotis_mm|default:"—" }}</div>
+      <div><strong>Aukštis (mm):</strong> {{ uzklausa.detale.aukstis_mm|default:"—" }}</div>
+      <div><strong>Skersmuo (mm):</strong> {{ uzklausa.detale.skersmuo_mm|default:"—" }}</div>
+      <div><strong>Storis (mm):</strong> {{ uzklausa.detale.storis_mm|default:"—" }}</div>
+      <div><strong>Paviršiaus plotas (m²):</strong> {{ uzklausa.detale.specifikacija.plotas_m2|default:"—" }}</div>
+    </div>
+  </section>
+
+  {# 6) KABINIMAS #}
+  <section class="box block" data-block="hang">
+    <h3>Kabinimas</h3>
+    <div class="grid">
+      <div><strong>Kabinimo būdas:</strong> {{ uzklausa.detale.kabinimo_budas|default:"—" }}</div>
+      <div><strong>Kabliukų kiekis:</strong> {{ uzklausa.detale.kabliuku_kiekis|default:"—" }}</div>
+      <div><strong>Kabinimo anga (mm):</strong> {{ uzklausa.detale.kabinimo_anga_mm|default:"—" }}</div>
+      <div><strong>Kabinti per:</strong> {{ uzklausa.detale.kabinti_per|default:"—" }}</div>
+    </div>
+  </section>
+
+  {# 7) PAKUOTĖ #}
+  <section class="box block" data-block="pack">
+    <h3>Pakuotė</h3>
+    <div class="grid">
+      <div><strong>Pakuotės tipas:</strong> {{ uzklausa.detale.pakuotes_tipas|default:"—" }}</div>
+      <div><strong>Vnt/dėžėje:</strong> {{ uzklausa.detale.vienetai_dezeje|default:"—" }}</div>
+      <div><strong>Vnt/palėje:</strong> {{ uzklausa.detale.vienetai_paleje|default:"—" }}</div>
+      <div><strong>Spec. žymėjimas:</strong> {{ uzklausa.detale.pakuotes_pastabos|default:"—" }}</div>
+    </div>
+  </section>
+
+  {# 8) TESTAI / KOKYBĖ #}
+  <section class="box block" data-block="qa">
+    <h3>Testai / Kokybė</h3>
+    <div class="grid">
+      <div><strong>Druskos rūkas (val.):</strong> {{ uzklausa.detale.testai_druskos_rukas_val|default:"—" }}</div>
+      <div><strong>Adhezijos testas:</strong> {{ uzklausa.detale.testas_adhezija|default:"—" }}</div>
+      <div><strong>Storis (µm):</strong> {{ uzklausa.detale.testas_storis_mikronai|default:"—" }}</div>
+      <div><strong>Kiti reikalavimai:</strong> {{ uzklausa.detale.testai_kita|default:"—" }}</div>
+    </div>
+  </section>
+
+  {# 9) DOKUMENTAI / PASTABOS #}
+  <section class="box block" data-block="docs">
+    <h3>Dokumentai / Pastabos</h3>
+    <div class="grid">
+      <div><strong>PPAP dokumentai:</strong> {{ uzklausa.detale.ppap_dokumentai|default:"—" }}</div>
+      <div><strong>Brėžiniai / priedai:</strong> {{ uzklausa.detale.priedai_info|default:"—" }}</div>
+      <div><strong>Projekto aprašymas:</strong> {{ uzklausa.projektas.aprasymas|default:"—" }}</div>
+      <div><strong>Užklausos pastabos:</strong> {{ uzklausa.pastabos|default:"—" }}</div>
+    </div>
+  </section>
 </div>
 
 <style>
-.container { max-width: 1100px; margin: 0 auto; }
-.view-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin: 8px 0 16px; }
-.actions { display:flex; gap:8px; }
-.section { margin: 12px 0; padding: 6px 0; }
-.section > summary { cursor:pointer; padding:6px 0; font-size:1.05rem; }
-.kv-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
-.kv { display:flex; flex-direction:column; padding:6px 8px; background:#fafafa; border:1px solid #eee; border-radius:6px; }
-.kv > span { font-size:.85rem; color:#6b7280; }
-.kv > b { font-weight:600; }
-.col-span-2 { grid-column: span 2 / span 2; }
-.block { margin:8px 0; }
-.block .label { font-size:.9rem; color:#374151; margin-bottom:2px; }
-.mono { white-space:pre-wrap; }
-.table { width:100%; border-collapse: collapse; margin-top: 6px; }
-.table th, .table td { border-bottom:1px solid #e5e7eb; padding:8px; text-align:left; }
-.section-subtitle { margin:10px 0 4px; }
-.notes { display:flex; flex-direction:column; gap:8px; }
-.note { border:1px solid #e5e7eb; border-radius:8px; padding:8px; background:#fff; }
-.note-head { font-size:.85rem; color:#4b5563; display:flex; gap:6px; flex-wrap:wrap; }
-.tag { background:#eef2ff; color:#3730a3; padding:2px 6px; border-radius:999px; font-weight:600; }
-.ts, .by { color:#6b7280; }
-.empty { color:#6b7280; font-style:italic; padding:4px 0; }
-.footer-actions { display:flex; justify-content:flex-end; gap:8px; margin: 12px 0 24px; }
-.btn { padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; background:#f9fafb; text-decoration:none; color:#111827; }
-.btn-primary { background:#2563eb; color:#fff; border-color:#2563eb; }
-.btn-secondary { background:#f3f4f6; color:#111827; }
+.container{max-width:960px;margin:0 auto;padding:0 16px}
+.box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
 </style>
+
+<script>
+/* ===== Blokų panelė – toks pat patikimas toggle kaip sąraše ===== */
+(function() {
+  const STORAGE_KEY = "uzklausa_blocks_v1";       // kuriuos blokus rodyti
+  const PANEL_OPEN_KEY = "uzklausa_blocks_panel";  // ar panelė atidaryta
+
+  function init() {
+    const wrap  = document.getElementById("cols-config");
+    if (!wrap) return;
+
+    const btn   = wrap.querySelector("#cols-toggle");
+    const panel = wrap.querySelector("#cols-panel");
+    const checks = panel ? panel.querySelectorAll('input[type="checkbox"][data-block]') : [];
+
+    // panelė (įsimenama būsena)
+    if (btn && panel) {
+      const savedOpen = localStorage.getItem(PANEL_OPEN_KEY);
+      panel.style.display = savedOpen === "1" ? "flex" : "none";
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        const openNow = panel.style.display === "none";
+        panel.style.display = openNow ? "flex" : "none";
+        try { localStorage.setItem(PANEL_OPEN_KEY, openNow ? "1" : "0"); } catch {}
+      });
+    }
+
+    const blocks = document.querySelectorAll(".block[data-block]");
+
+    function apply(map) {
+      blocks.forEach(b => {
+        const key = b.dataset.block;
+        b.style.display = (map[key] !== false) ? "" : "none";
+      });
+      checks.forEach(ch => {
+        if (map.hasOwnProperty(ch.dataset.block)) ch.checked = map[ch.dataset.block] !== false;
+        else ch.checked = true;
+      });
+    }
+    function currentFromChecks() {
+      const m = {};
+      checks.forEach(ch => m[ch.dataset.block] = ch.checked);
+      return m;
+    }
+    function loadPrefs() {
+      try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    }
+    function savePrefs(map) { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); }
+
+    const saved = loadPrefs();
+    if (saved) apply(saved);
+    if (!saved) apply(currentFromChecks());
+
+    checks.forEach(ch => ch.addEventListener("change", () => {
+      const m = currentFromChecks();
+      apply(m);
+      savePrefs(m);
+    }));
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
 {% endblock %}
