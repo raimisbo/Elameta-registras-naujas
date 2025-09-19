@@ -3,13 +3,15 @@ from urllib.parse import unquote as urlunquote
 from django.contrib import messages
 from django.db.models import Q, Count, Value
 from django.db.models.functions import Coalesce
-from django.urls import reverse_lazy
+from django.shortcuts import redirect
+from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
 
 from .models import Uzklausa
 from .forms import (
     UzklausaFilterForm,
     UzklausaCreateOrSelectForm,
+    UzklausaEditForm,
     ImportUzklausosCSVForm,
 )
 
@@ -128,28 +130,28 @@ class UzklausaDetailView(DetailView):
     context_object_name = "uzklausa"
 
 
-# === Nauja užklausa ===
+# === Nauja užklausa: po sukūrimo – į peržiūrą ===
 class UzklausaCreateView(CreateView):
     template_name = "detaliu_registras/ivesti_uzklausa.html"
     form_class = UzklausaCreateOrSelectForm
-    success_url = reverse_lazy("detaliu_registras:uzklausa_list")
 
     def form_valid(self, form):
-        form.save()
+        uzklausa = form.save()
         messages.success(self.request, "Užklausa sukurta.")
-        return super().form_valid(form)
+        return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
 
-# === Redagavimas (paprastas) ===
+# === Redagavimas: po išsaugojimo – į peržiūrą ===
 class UzklausaUpdateView(UpdateView):
     model = Uzklausa
-    template_name = "detaliu_registras/ivesti_uzklausa.html"
-    fields = ["klientas", "projektas", "detale"]
-    success_url = reverse_lazy("detaliu_registras:uzklausa_list")
+    template_name = "detaliu_registras/redaguoti_uzklausa.html"
+    form_class = UzklausaEditForm
+    # success_url = reverse_lazy("detaliu_registras:uzklausa_list")  # nebereikia
 
     def form_valid(self, form):
+        uzklausa = form.save()
         messages.success(self.request, "Užklausa atnaujinta.")
-        return super().form_valid(form)
+        return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
 
 # === CSV importas (stub) ===

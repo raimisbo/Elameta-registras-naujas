@@ -3,70 +3,194 @@
 
 {% block content %}
 <div class="container">
-  <h1>Nauja užklausa</h1>
+  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
+    <h1 style="margin:0">Įvesti naują užklausą</h1>
+    <div style="display:flex;gap:8px">
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Į sąrašą</a>
+    </div>
+  </header>
 
   {% if form.non_field_errors %}
     <div class="flash flash-error">{{ form.non_field_errors }}</div>
   {% endif %}
 
+  <!-- Blokų valdymas -->
+  <div class="cols-config" id="cols-config" style="display:flex;align-items:center;gap:12px;margin:8px 0 10px">
+    <button type="button" class="btn" id="cols-toggle">⚙️ Stulpeliai</button>
+    <div class="cols-panel" id="cols-panel"
+         style="display:none;gap:12px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff">
+      <label><input type="checkbox" data-block="main" checked> Pagrindinė</label>
+      <label><input type="checkbox" data-block="spec" checked> Specifikacija</label>
+      <label><input type="checkbox" data-block="coats" checked> Paviršių dangos</label>
+      <label><input type="checkbox" data-block="qty" checked> Kiekiai</label>
+      <label><input type="checkbox" data-block="dims" checked> Matmenys</label>
+      <label><input type="checkbox" data-block="hang" checked> Kabinimas</label>
+      <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
+      <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
+      <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
+    </div>
+  </div>
+
   <form method="post" novalidate>
     {% csrf_token %}
 
-    <fieldset class="box">
-      <legend>Klientas</legend>
+    <!-- 1) Pagrindinė -->
+    <section class="box block" data-block="main">
+      <h3>Pagrindinė</h3>
       <div class="grid">
-        <div class="field"><label>Pasirinkti esamą</label>{{ form.klientas }}</div>
-        <div class="field"><label>Arba įrašyti naują</label>{{ form.naujas_klientas }}</div>
-      </div>
-    </fieldset>
+        <label class="field"><span>Pasirinkti klientą</span>{{ form.klientas }}</label>
+        <label class="field"><span>Naujas klientas</span>{{ form.naujas_klientas }}</label>
 
-    <fieldset class="box">
-      <legend>Projektas</legend>
-      <div class="grid">
-        <div class="field"><label>Pasirinkti esamą</label>{{ form.projektas }}</div>
-        <div class="field"><label>Arba įrašyti naują</label>{{ form.naujas_projektas }}</div>
-      </div>
-    </fieldset>
+        <label class="field"><span>Pasirinkti projektą</span>{{ form.projektas }}</label>
+        <label class="field"><span>Naujas projektas</span>{{ form.naujas_projektas }}</label>
 
-    <fieldset class="box">
-      <legend>Detalė</legend>
-      <div class="grid">
-        <div class="field"><label>Pasirinkti esamą</label>{{ form.detale }}</div>
-        <div class="field"><label>Naujos detalės pavadinimas</label>{{ form.detales_pavadinimas }}</div>
-        <div class="field"><label>Brėžinio nr.</label>{{ form.brezinio_nr }}</div>
+        <label class="field"><span>Pasirinkti detalę</span>{{ form.detale }}</label>
+        <label class="field"><span>Nauja detalė – pavadinimas</span>{{ form.detales_pavadinimas }}</label>
+        <label class="field"><span>Brėžinio nr.</span>{{ form.brezinio_nr }}</label>
       </div>
-    </fieldset>
+    </section>
 
-    <fieldset class="box">
-      <legend>Specifikacija (nebūtina)</legend>
+    <!-- 2) Specifikacija -->
+    <section class="box block" data-block="spec">
+      <h3>Specifikacija</h3>
       <div class="grid">
-        <div class="field"><label>Metalas</label>{{ form.metalas }}</div>
-        <div class="field"><label>Plotas m²</label>{{ form.plotas_m2 }}</div>
-        <div class="field"><label>Svoris kg</label>{{ form.svoris_kg }}</div>
+        <label class="field"><span>Metalas</span>{{ form.metalas }}</label>
+        <label class="field"><span>Plotas m²</span>{{ form.plotas_m2 }}</label>
+        <label class="field"><span>Svoris kg</span>{{ form.svoris_kg }}</label>
+        <label class="field"><span>Medžiagos kodas</span>{{ form.medziagos_kodas }}</label>
       </div>
-    </fieldset>
+    </section>
 
-    <fieldset class="box">
-      <legend>Paviršių dangos (nebūtina)</legend>
+    <!-- 3) Paviršių dangos -->
+    <section class="box block" data-block="coats">
+      <h3>Paviršių dangos</h3>
       <div class="grid">
-        <div class="field"><label>KTL / e-coating</label>{{ form.ktl_ec_name }}</div>
-        <div class="field"><label>Miltelinis padengimas</label>{{ form.miltelinis_name }}</div>
+        <label class="field"><span>KTL / e-coating</span>{{ form.ktl_ec_name }}</label>
+        <label class="field"><span>Miltelinis padengimas</span>{{ form.miltelinis_name }}</label>
+        <label class="field"><span>RAL / spalva</span>{{ form.spalva_ral }}</label>
+        <label class="field"><span>Blizgumas / tekstūra</span>{{ form.blizgumas }}</label>
       </div>
-    </fieldset>
+    </section>
+
+    <!-- 4) Kiekiai -->
+    <section class="box block" data-block="qty">
+      <h3>Kiekiai</h3>
+      <div class="grid">
+        <label class="field"><span>Kiekis per metus</span>{{ form.kiekis_metinis }}</label>
+        <label class="field"><span>Kiekis per mėnesį</span>{{ form.kiekis_menesis }}</label>
+        <label class="field"><span>Kiekis partijai</span>{{ form.kiekis_partijai }}</label>
+        <label class="field"><span>Gaminių/val.</span>{{ form.kiekis_per_val }}</label>
+      </div>
+    </section>
+
+    <!-- 5) Matmenys -->
+    <section class="box block" data-block="dims">
+      <h3>Matmenys</h3>
+      <div class="grid">
+        <label class="field"><span>Ilgis (mm)</span>{{ form.ilgis_mm }}</label>
+        <label class="field"><span>Plotis (mm)</span>{{ form.plotis_mm }}</label>
+        <label class="field"><span>Aukštis (mm)</span>{{ form.aukstis_mm }}</label>
+        <label class="field"><span>Skersmuo (mm)</span>{{ form.skersmuo_mm }}</label>
+        <label class="field"><span>Storis (mm)</span>{{ form.storis_mm }}</label>
+      </div>
+    </section>
+
+    <!-- 6) Kabinimas -->
+    <section class="box block" data-block="hang">
+      <h3>Kabinimas</h3>
+      <div class="grid">
+        <label class="field"><span>Kabinimo būdas</span>{{ form.kabinimo_budas }}</label>
+        <label class="field"><span>Kabliukų kiekis</span>{{ form.kabliuku_kiekis }}</label>
+        <label class="field"><span>Kabinimo anga (mm)</span>{{ form.kabinimo_anga_mm }}</label>
+        <label class="field"><span>Kabinti per</span>{{ form.kabinti_per }}</label>
+      </div>
+    </section>
+
+    <!-- 7) Pakuotė -->
+    <section class="box block" data-block="pack">
+      <h3>Pakuotė</h3>
+      <div class="grid">
+        <label class="field"><span>Pakuotės tipas</span>{{ form.pakuotes_tipas }}</label>
+        <label class="field"><span>Vnt/dėžėje</span>{{ form.vienetai_dezeje }}</label>
+        <label class="field"><span>Vnt/palėje</span>{{ form.vienetai_paleje }}</label>
+        <label class="field"><span>Spec. žymėjimas</span>{{ form.pakuotes_pastabos }}</label>
+      </div>
+    </section>
+
+    <!-- 8) Testai / Kokybė -->
+    <section class="box block" data-block="qa">
+      <h3>Testai / Kokybė</h3>
+      <div class="grid">
+        <label class="field"><span>Druskos rūkas (val.)</span>{{ form.testai_druskos_rukas_val }}</label>
+        <label class="field"><span>Adhezijos testas</span>{{ form.testas_adhezija }}</label>
+        <label class="field"><span>Storis (µm)</span>{{ form.testas_storis_mikronai }}</label>
+        <label class="field"><span>Kiti reikalavimai</span>{{ form.testai_kita }}</label>
+      </div>
+    </section>
+
+    <!-- 9) Dokumentai / Pastabos -->
+    <section class="box block" data-block="docs">
+      <h3>Dokumentai / Pastabos</h3>
+      <div class="grid">
+        <label class="field"><span>PPAP dokumentai</span>{{ form.ppap_dokumentai }}</label>
+        <label class="field"><span>Brėžiniai / priedai</span>{{ form.priedai_info }}</label>
+        <label class="field"><span>Projekto aprašymas</span>{{ form.projekto_aprasymas }}</label>
+        <label class="field"><span>Užklausos pastabos</span>{{ form.uzklausos_pastabos }}</label>
+      </div>
+    </section>
 
     <div class="actions" style="margin-top:12px;display:flex;gap:8px">
       <button class="btn" type="submit">Sukurti</button>
-      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">Atgal į sąrašą</a>
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">Atšaukti</a>
     </div>
   </form>
 </div>
 
 <style>
 .container{max-width:960px;margin:0 auto;padding:0 16px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-@media(max-width:640px){.grid{grid-template-columns:1fr}}
 .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
 .field{display:flex;flex-direction:column;gap:6px}
-.field input,.field select{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px}
+.field input,.field select,.field textarea{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px}
 </style>
+
+<script>
+(function() {
+  const STORAGE_KEY = "uzklausa_create_blocks_v1";
+  const PANEL_OPEN_KEY = "uzklausa_create_blocks_panel";
+  function init() {
+    const btn=document.getElementById("cols-toggle");
+    const panel=document.getElementById("cols-panel");
+    const checks=panel?panel.querySelectorAll("input[data-block]"):[];
+    const blocks=document.querySelectorAll(".block[data-block]");
+    if(btn&&panel){
+      const savedOpen=localStorage.getItem(PANEL_OPEN_KEY);
+      panel.style.display=savedOpen==="1"?"flex":"none";
+      btn.addEventListener("click",function(e){
+        e.preventDefault();
+        const openNow=panel.style.display==="none";
+        panel.style.display=openNow?"flex":"none";
+        localStorage.setItem(PANEL_OPEN_KEY,openNow?"1":"0");
+      });
+    }
+    function apply(map){
+      blocks.forEach(b=>{b.style.display=map[b.dataset.block]!==false?"":"none";});
+      checks.forEach(ch=>{
+        if(map.hasOwnProperty(ch.dataset.block)) ch.checked=map[ch.dataset.block]!==false;
+        else ch.checked=true;
+      });
+    }
+    function currentFromChecks(){
+      const m={}; checks.forEach(ch=>m[ch.dataset.block]=ch.checked); return m;
+    }
+    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
+    if(saved) apply(saved); else apply(currentFromChecks());
+    checks.forEach(ch=>ch.addEventListener("change",()=>{
+      const m=currentFromChecks(); apply(m); localStorage.setItem(STORAGE_KEY,JSON.stringify(m));
+    }));
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+})();
+</script>
 {% endblock %}
