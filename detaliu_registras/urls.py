@@ -5,10 +5,30 @@ from . import views
 app_name = "detaliu_registras"
 
 urlpatterns = [
-    path("", RedirectView.as_view(pattern_name="detaliu_registras:uzklausa_list", permanent=False), name="index"),
+# Sąrašas + filtrai + donut
     path("uzklausos/", views.UzklausaListView.as_view(), name="uzklausa_list"),
+
+    # Kurti / redaguoti užklausą
     path("ivesti_uzklausa/", views.UzklausaCreateView.as_view(), name="ivesti_uzklausa"),
     path("ivesti_uzklausa/<int:pk>/", views.UzklausaUpdateView.as_view(), name="redaguoti_uzklausa"),
+
+    # Peržiūra
     path("perziureti_uzklausa/<int:pk>/", views.UzklausaDetailView.as_view(), name="perziureti_uzklausa"),
+
+    # Kainos: redagavimas (viena vieta visoms kainoms)
+    path(
+        "perziureti_uzklausa/<int:pk>/kainos/",
+        views.KainosRedagavimasView.as_view(),
+        name="redaguoti_kaina",
+    ),
+
+    # ALIAS tas pats vaizdas naujos kainos pridėjimui (kad veiktų {% url 'prideti_kaina' %})
+    path(
+        "perziureti_uzklausa/<int:pk>/kainos/nauja/",
+        views.KainosRedagavimasView.as_view(),
+        name="prideti_kaina",
+    ),
+
+    # CSV importas (jeigu naudojamas)
     path("importas/", views.ImportUzklausosCSVView.as_view(), name="import_uzklausos"),
 ]

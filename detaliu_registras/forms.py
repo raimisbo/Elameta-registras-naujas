@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.apps import apps
 from django.db.models.manager import BaseManager
 
-from .models import Uzklausa, Klientas, Projektas, Detale
+from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
 
 
 # === Filtrų forma (sąrašui) ===
@@ -110,7 +110,7 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
                 brezinio_nr=c.get("brezinio_nr") or "",
             )
 
-        # Specifikacija (jei yra duomenų ir modelis egzistuoja)
+        # Specifikacija
         if any([c.get("metalas"), c.get("plotas_m2") is not None, c.get("svoris_kg") is not None, c.get("medziagos_kodas")]):
             DetaleSpecifikacija = apps.get_model("detaliu_registras", "DetaleSpecifikacija")
             if DetaleSpecifikacija:
@@ -121,7 +121,7 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
                 if c.get("medziagos_kodas"): spec.medziagos_kodas = c["medziagos_kodas"].strip()
                 spec.save()
 
-        # Dangos (jei yra duomenų ir modelis egzistuoja)
+        # Dangos
         if any([c.get("ktl_ec_name"), c.get("miltelinis_name"), c.get("spalva_ral"), c.get("blizgumas")]):
             PavirsiuDangos = apps.get_model("detaliu_registras", "PavirsiuDangos")
             if PavirsiuDangos:
@@ -138,7 +138,7 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
         return uzk
 
 
-# === REDAGAVIMAS: visų 9 blokų forma ===
+# === REDAGAVIMAS: 9 blokų forma ===
 class UzklausaEditForm(forms.ModelForm):
     # Pagrindinė
     klientas = forms.ModelChoiceField(
@@ -258,18 +258,17 @@ class UzklausaEditForm(forms.ModelForm):
                     if fname in self.fields and hasattr(coats, fname):
                         self.fields[fname].initial = getattr(coats, fname)
 
-        # projekto aprašymas (tik jei yra modelyje ir laukas formoje)
+        # projekto aprašymas
         p = getattr(u, "projektas", None)
         if p and hasattr(p, "aprasymas") and "projekto_aprasymas" in self.fields:
             self.fields["projekto_aprasymas"].initial = getattr(p, "aprasymas")
 
-        # užklausos pastabos (tik jei tai konkretus laukas ir laukas formoje)
+        # užklausos pastabos (tik jei modelyje yra konkretus laukas)
         if "uzklausos_pastabos" in self.fields and self._has_concrete_field(u, "pastabos"):
             val = getattr(u, "pastabos", None)
             if not isinstance(val, BaseManager):
                 self.fields["uzklausos_pastabos"].initial = val
         else:
-            # jei modelyje nėra konkretaus `pastabos` lauko – pašalinam iš formos
             self.fields.pop("uzklausos_pastabos", None)
 
     def save(self, commit=True):
@@ -340,7 +339,7 @@ class UzklausaEditForm(forms.ModelForm):
                 if commit:
                     p.save()
 
-        # užklausos pastabos – tik jei konkretus laukas egzistuoja
+        # užklausos pastabos
         if "uzklausos_pastabos" in c and self._has_concrete_field(u, "pastabos"):
             val = getattr(u, "pastabos", None)
             if not isinstance(val, BaseManager):
@@ -349,3 +348,46 @@ class UzklausaEditForm(forms.ModelForm):
         if commit:
             u.save()
         return u
+
+
+# --- KAINA: pažangios kainodaros forma ---
+class KainaForm(forms.ModelForm):
+    class Meta:
+        model = Kaina
+        fields = [
+            "busena",
+            "suma",
+            "valiuta",
+            "yra_fiksuota",
+            "kiekis_nuo",
+            "kiekis_iki",
+            "fiksuotas_kiekis",
+            "kainos_matas",
+        ]
+        widgets = {
+            "suma": forms.NumberInput(attrs={"step": "0.01"}),
+        }
+
+    def clean(self):
+        c = super().clean()
+        yra_fiksuota = c.get("yra_fiksuota") is True
+        kiekis_nuo = c.get("kiekis_nuo")
+        kiekis_iki = c.get("kiekis_iki")
+        fiksuotas_kiekis = c.get("fiksuotas_kiekis")
+        matas = c.get("kainos_matas")
+
+        if yra_fiksuota:
+            if not fiksuotas_kiekis:
+                raise ValidationError("Pažymėjus 'Yra fiksuota', privalomas 'Fiksuotas kiekis'.")
+            if not matas:
+                raise ValidationError("Pažymėjus 'Yra fiksuota', privalomas 'Kainos matas'.")
+            c["kiekis_nuo"] = None
+            c["kiekis_iki"] = None
+        else:
+            if kiekis_nuo is None and kiekis_iki is None and fiksuotas_kiekis is None:
+                raise ValidationError("Nurodykite kiekio intervalą (bent 'Kiekis nuo') arba pažymėkite 'Yra fiksuota'.")
+            if kiekis_nuo is not None and kiekis_iki is not None and kiekis_nuo > kiekis_iki:
+                raise ValidationError("'Kiekis nuo' negali būti didesnis už 'Kiekis iki'.")
+            c["fiksuotas_kiekis"] = None  # intervalinei kainai netaikoma
+
+        return c

@@ -1,23 +1,24 @@
 from django.db import models
-from django.core.validators import MinValueValidator
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 
-# ====================
-# SENI MODELLIAI (palikti kaip buvo)
-# ====================
+# --- Bazinė laiko žymų klasė: BŪTINAI abstract ---
+class Timestamped(models.Model):
+    created = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated = models.DateTimeField(auto_now=True, null=True, blank=True)
 
-class Klientas(models.Model):
+    class Meta:
+        abstract = True
+
+
+# --- Pagrindiniai katalogai ---
+class Klientas(Timestamped):
     vardas = models.CharField(max_length=255)
-    el_pastas = models.EmailField(blank=True, null=True)
 
     def __str__(self):
         return self.vardas
 
 
-class Projektas(models.Model):
+class Projektas(Timestamped):
     klientas = models.ForeignKey(Klientas, on_delete=models.CASCADE, related_name="projektai")
     pavadinimas = models.CharField(max_length=255)
     aprasymas = models.TextField(blank=True, null=True)
@@ -26,291 +27,146 @@ class Projektas(models.Model):
         return self.pavadinimas
 
 
-class Detale(models.Model):
-    projektas = models.ForeignKey(Projektas, on_delete=models.CASCADE, related_name="detales")
+class Detale(Timestamped):
     pavadinimas = models.CharField(max_length=255)
     brezinio_nr = models.CharField(max_length=255, blank=True, null=True)
-    kiekis = models.PositiveIntegerField(default=1)
+
+    # kiekiai
+    kiekis_metinis = models.IntegerField(blank=True, null=True)
+    kiekis_menesis = models.IntegerField(blank=True, null=True)
+    kiekis_partijai = models.IntegerField(blank=True, null=True)
+    kiekis_per_val = models.IntegerField(blank=True, null=True)
+
+    # matmenys
+    ilgis_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    plotis_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    aukstis_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    skersmuo_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    storis_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    # kabinimas
+    kabinimo_budas = models.CharField(max_length=255, blank=True, null=True)
+    kabliuku_kiekis = models.IntegerField(blank=True, null=True)
+    kabinimo_anga_mm = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    kabinti_per = models.CharField(max_length=255, blank=True, null=True)
+
+    # pakuotė
+    pakuotes_tipas = models.CharField(max_length=255, blank=True, null=True)
+    vienetai_dezeje = models.IntegerField(blank=True, null=True)
+    vienetai_paleje = models.IntegerField(blank=True, null=True)
+    pakuotes_pastabos = models.CharField(max_length=255, blank=True, null=True)
+
+    # testai
+    testai_druskos_rukas_val = models.IntegerField(blank=True, null=True)
+    testas_adhezija = models.CharField(max_length=255, blank=True, null=True)
+    testas_storis_mikronai = models.IntegerField(blank=True, null=True)
+    testai_kita = models.CharField(max_length=255, blank=True, null=True)
+
+    # dokumentai/pastabos
+    ppap_dokumentai = models.CharField(max_length=255, blank=True, null=True)
+    priedai_info = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.pavadinimas} ({self.brezinio_nr})"
+        return f"{self.pavadinimas} ({self.brezinio_nr or '—'})"
 
 
-class Uzklausa(models.Model):
-    klientas = models.ForeignKey(Klientas, on_delete=models.CASCADE, related_name="uzklausos")
-    projektas = models.ForeignKey(Projektas, on_delete=models.CASCADE, related_name="uzklausos")
-    detale = models.ForeignKey(Detale, on_delete=models.CASCADE, related_name="uzklausos")
-    data = models.DateField(auto_now_add=True)
+class DetaleSpecifikacija(Timestamped):
+    detale = models.OneToOneField(Detale, on_delete=models.CASCADE, related_name="specifikacija")
+    metalas = models.CharField(max_length=255, blank=True, null=True)
+    plotas_m2 = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
+    svoris_kg = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
+    medziagos_kodas = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"Užklausa {self.id} ({self.klientas})"
+        return f"Specifikacija: {self.detale}"
 
 
-class Kaina(models.Model):
-    uzklausa = models.ForeignKey(
-        Uzklausa,
-        on_delete=models.CASCADE,
-        related_name="kainos",
-        null=True, blank=True
-    )
+class PavirsiuDangos(Timestamped):
+    detale = models.OneToOneField(Detale, on_delete=models.CASCADE, related_name="pavirsiu_dangos")
+    ktl_ec_name = models.CharField(max_length=255, blank=True, null=True)
+    miltelinis_name = models.CharField(max_length=255, blank=True, null=True)
+    spalva_ral = models.CharField(max_length=64, blank=True, null=True)
+    blizgumas = models.CharField(max_length=128, blank=True, null=True)
+
+    def __str__(self):
+        return f"Dangos: {self.detale}"
+
+
+# --- Užklausa ---
+class Uzklausa(Timestamped):
+    klientas = models.ForeignKey(Klientas, on_delete=models.SET_NULL, null=True, blank=True, related_name="uzklausos")
+    projektas = models.ForeignKey(Projektas, on_delete=models.SET_NULL, null=True, blank=True, related_name="uzklausos")
+    detale = models.ForeignKey(Detale, on_delete=models.SET_NULL, null=True, blank=True, related_name="uzklausos")
+    pastabos = models.TextField(blank=True, null=True)
+
+    # data auto_now_add buvo minėta – laikomės jos
+    data = models.DateField(auto_now_add=True, null=True, blank=True)
+
+    def __str__(self):
+        return f"Užklausa #{self.pk}"
+
+
+# --- KAINA (pažangioji) ---
+class Kaina(Timestamped):
+    MATAS_CHOICES = [
+        ("vnt", "Vnt"),
+        ("m2", "m²"),
+        ("kg", "kg"),
+        ("val", "val."),
+    ]
+
+    uzklausa = models.ForeignKey(Uzklausa, on_delete=models.CASCADE, related_name="kainos")
     suma = models.DecimalField(max_digits=12, decimal_places=2)
     valiuta = models.CharField(max_length=10, default="EUR")
     busena = models.CharField(
         max_length=10,
         choices=[("aktuali", "Aktuali"), ("sena", "Sena")],
-        default="aktuali"
+        default="aktuali",
     )
 
-    def __str__(self):
-        return f"{self.suma} {self.valiuta} ({self.busena})"
-
-
-# ====================
-# NAUJI MODELLIAI (pagal screenshot'us, 9 blokai)
-# ====================
-
-class TimeStamped(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    # pažangioji kainodara
+    yra_fiksuota = models.BooleanField(default=False)
+    kiekis_nuo = models.PositiveIntegerField(null=True, blank=True)
+    kiekis_iki = models.PositiveIntegerField(null=True, blank=True)
+    fiksuotas_kiekis = models.PositiveIntegerField(null=True, blank=True)
+    kainos_matas = models.CharField(max_length=8, choices=MATAS_CHOICES, null=True, blank=True)
 
     class Meta:
-        abstract = True
-
-
-# 1) PROJEKTO DUOMENYS
-class UzklausosProjektoDuomenys(TimeStamped):
-    uzklausa = models.OneToOneField(
-        "Uzklausa", on_delete=models.CASCADE, related_name="projekto_duomenys"
-    )
-
-    uzklausos_nr = models.CharField(max_length=64, blank=True, null=True, db_index=True)
-    uzklausos_data = models.DateField(blank=True, null=True)
-    pasiulymo_data = models.DateField(blank=True, null=True)
-    projekto_pradzia_metai = models.PositiveIntegerField(blank=True, null=True)
-    projekto_pabaiga_metai = models.PositiveIntegerField(blank=True, null=True)
-
-    kaina_vnt = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True,
-        validators=[MinValueValidator(0)]
-    )
-    kaina_galioja_iki = models.DateField(blank=True, null=True)
-
-    apmokejimo_salygos = models.CharField(max_length=128, blank=True, null=True)
-    transportavimo_salygos = models.CharField(max_length=64, blank=True, null=True)
-
-    atsakingas = models.ForeignKey(
-        User, on_delete=models.SET_NULL, blank=True, null=True, related_name="uzklausos_atsakingas"
-    )
+        ordering = ["-id"]
 
     def __str__(self):
-        return f"Projekto duomenys #{self.uzklausos_nr or self.pk}"
+        base = f"{self.suma} {self.valiuta}"
+        if self.yra_fiksuota and self.fiksuotas_kiekis:
+            return f"{base} ({self.fiksuotas_kiekis} {self.kainos_matas or ''}, {self.busena})"
+        if self.kiekis_nuo or self.kiekis_iki:
+            r1 = self.kiekis_nuo or 0
+            r2 = self.kiekis_iki or "∞"
+            return f"{base} [{r1}–{r2}] ({self.busena})"
+        return f"{base} ({self.busena})"
 
 
-# 2) DETALĖS IDENTIFIKACIJA
-class DetalesIdentifikacija(TimeStamped):
-    detale = models.OneToOneField(
-        "Detale", on_delete=models.CASCADE, related_name="identifikacija"
-    )
-    pavadinimas = models.CharField(max_length=128, blank=True, null=True)
-    brezinio_numeris = models.CharField(max_length=128, blank=True, null=True, db_index=True)
-    paruosimas = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return self.pavadinimas or self.brezinio_numeris or f"Detale #{self.detale_id}"
-
-
-# 3) PAVIRŠIAI / DANGOS
-class PavirsiaiDangos(TimeStamped):
-    detale = models.OneToOneField(
-        "Detale", on_delete=models.CASCADE, related_name="pavirsiu_dangos"
-    )
-
-    ktl_ec_name = models.CharField("Padengimas KTL / e-coating", max_length=128, blank=True, null=True)
-    miltelinis_name = models.CharField("Padengimas milteliniu būdu", max_length=128, blank=True, null=True)
-
-    storis_ktl_mkm = models.DecimalField(
-        "Padengimas, storis μm KTL", max_digits=8, decimal_places=2, blank=True, null=True,
-        validators=[MinValueValidator(0)]
-    )
-    storis_ktl_plus_miltai_mkm = models.DecimalField(
-        "Padengimo storis: KTL + miltai, μm", max_digits=8, decimal_places=2, blank=True, null=True,
-        validators=[MinValueValidator(0)]
-    )
-
-    padengimo_standartas = models.CharField(max_length=128, blank=True, null=True)
-    testai = models.TextField(blank=True, null=True)
+# --- Kainodaros lentelės (jei buvo naudotos admin Inline) ---
+class Kainodara(Timestamped):
+    """Bendresnė kainodaros „antraštė“. Jei nenaudoji – palik, nes admin gali ją referencinti."""
+    uzklausa = models.ForeignKey(Uzklausa, on_delete=models.CASCADE, related_name="kainodaros")
+    pavadinimas = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"Paviršiai detalei #{self.detale_id}"
+        return f"Kainodara #{self.pk} ({self.pavadinimas or 'be pavadinimo'})"
 
 
-# 4) MATMENYS & MEDŽIAGA
-class DetalesSpecifikacija(TimeStamped):
-    detale = models.OneToOneField(
-        "Detale", on_delete=models.CASCADE, related_name="specifikacija"
-    )
+class KainosPartijai(Timestamped):
+    """Eilutės priklausančios konkrečiai Kainodarai (vienas FK).
+       Jei tau realiai reikia dviejų FK į Kainodara – pasakyk, paruošiu alternatyvą ir admin fk_name atitinkamai."""
+    kainodara = models.ForeignKey(Kainodara, on_delete=models.CASCADE, related_name="partijos")
 
-    aukstis_x_cm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,
-                                       validators=[MinValueValidator(0)])
-    plotis_y_cm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,
-                                      validators=[MinValueValidator(0)])
-    ilgis_z_cm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,
-                                     validators=[MinValueValidator(0)])
-    metalo_storis_mm = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True,
-                                           validators=[MinValueValidator(0)])
-
-    svoris_kg = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True,
-                                    validators=[MinValueValidator(0)])
-    plotas_m2 = models.DecimalField(max_digits=12, decimal_places=6, blank=True, null=True,
-                                    validators=[MinValueValidator(0)])
-
-    metalas = models.CharField(max_length=256, blank=True, null=True)
+    # laukai (palieku minimaliai; gali praplėsti pagal poreikį)
+    kiekis_nuo = models.PositiveIntegerField(null=True, blank=True)
+    kiekis_iki = models.PositiveIntegerField(null=True, blank=True)
+    suma = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    valiuta = models.CharField(max_length=10, default="EUR")
 
     def __str__(self):
-        return f"Specifikacija detalei #{self.detale_id}"
-
-
-# 5) KIEKIAI & TERMINAI
-class KiekiaiTerminai(TimeStamped):
-    uzklausa = models.OneToOneField(
-        "Uzklausa", on_delete=models.CASCADE, related_name="kiekiai_terminai"
-    )
-    metinis_kiekis_vnt = models.PositiveIntegerField(blank=True, null=True)
-    partijos_dydis_vnt = models.PositiveIntegerField(blank=True, null=True)
-    minimalus_kiekis_vnt = models.PositiveIntegerField(blank=True, null=True)
-    terminai_darbo_dienomis = models.PositiveIntegerField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Kiekiai/terminai #{self.uzklausa_id}"
-
-
-# 6) KABINIMAS / RĖMAI
-class KabinimasRemai(TimeStamped):
-    KABINIMO_BUDAS_CHOICES = [
-        ("girliandos", "Girliandos"),
-        ("kablys", "Kablys"),
-        ("kita", "Kita"),
-    ]
-
-    uzklausa = models.OneToOneField(
-        "Uzklausa", on_delete=models.CASCADE, related_name="kabinimas_remai"
-    )
-    kabinimo_budas = models.CharField(max_length=64, choices=KABINIMO_BUDAS_CHOICES,
-                                      blank=True, null=True)
-
-    kiekis_reme_planuotas = models.PositiveIntegerField(blank=True, null=True)
-    kiekis_reme_faktinis = models.PositiveIntegerField(blank=True, null=True)
-
-    kabliukai = models.CharField(max_length=128, blank=True, null=True)
-    spyruoke = models.CharField(max_length=128, blank=True, null=True)
-
-    kontaktines_vietos_ktl = models.TextField(blank=True, null=True)
-    kontaktines_vietos_miltelinis = models.TextField(blank=True, null=True)
-
-    nepilnas_remas = models.BooleanField(blank=True, null=True)
-
-    sukabinimo_dienos_norma_vnt = models.PositiveIntegerField(blank=True, null=True)
-    pakavimo_dienos_norma_vnt = models.PositiveIntegerField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Kabinimas/rėmai #{self.uzklausa_id}"
-
-
-# 7) PAKAVIMAS
-class Pakavimas(TimeStamped):
-    uzklausa = models.OneToOneField(
-        "Uzklausa", on_delete=models.CASCADE, related_name="pakavimas"
-    )
-
-    tara = models.CharField(max_length=128, blank=True, null=True)
-    pakavimo_instrukcija = models.TextField(blank=True, null=True)
-
-    pakavimas_po_ktl = models.TextField(blank=True, null=True)
-    pakavimas_po_miltelinio = models.TextField(blank=True, null=True)
-
-    papildomos_paslaugos = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Pakavimas #{self.uzklausa_id}"
-
-
-# 8) KAINODARA + KAINOS PARTIJAI
-class Kainodara(TimeStamped):
-    uzklausa = models.OneToOneField(
-        "Uzklausa", on_delete=models.CASCADE, related_name="kainodara"
-    )
-
-    kabliuku_kaina_vnt = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    pakavimo_medziagu_kaina_vnt = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    milteliniu_dazu_kaina_kg = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    darbo_kaina = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    viso_savikaina = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    fiksuota_kaina_vnt = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    remo_kaina = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-    faktine_kaina = models.DecimalField(
-        max_digits=12, decimal_places=4, blank=True, null=True, validators=[MinValueValidator(0)]
-    )
-
-    sukabinimas_pagal_fakta = models.PositiveIntegerField(blank=True, null=True)
-    valiuta = models.CharField(max_length=8, blank=True, null=True, default="EUR")
-
-    def __str__(self):
-        return f"Kainodara #{self.uzklausa_id}"
-
-
-class KainosPartijai(TimeStamped):
-    kainodara = models.ForeignKey(
-        Kainodara, on_delete=models.CASCADE, related_name="kainos_partijoms"
-    )
-    partijos_kiekis_vnt = models.PositiveIntegerField(db_index=True)
-    kaina_bendra = models.DecimalField(
-        max_digits=14, decimal_places=4, validators=[MinValueValidator(0)]
-    )
-
-    class Meta:
-        unique_together = [("kainodara", "partijos_kiekis_vnt")]
-        indexes = [models.Index(fields=["partijos_kiekis_vnt"])]
-
-    def __str__(self):
-        return f"{self.partijos_kiekis_vnt} vnt – {self.kaina_bendra} {self.kainodara.valiuta or ''}"
-
-
-# 9) PASTABOS
-class Pastaba(TimeStamped):
-    KATEGORIJOS = [
-        ("projektas", "Projektas"),
-        ("identifikacija", "Identifikacija"),
-        ("paviršiai", "Paviršiai"),
-        ("matmenys", "Matmenys/medžiaga"),
-        ("kiekiai", "Kiekiai/terminai"),
-        ("kabinimas", "Kabinimas/rėmai"),
-        ("pakavimas", "Pakavimas"),
-        ("kainodara", "Kainodara"),
-        ("kita", "Kita"),
-    ]
-
-    uzklausa = models.ForeignKey("Uzklausa", on_delete=models.CASCADE, related_name="pastabos")
-    kategorija = models.CharField(max_length=32, choices=KATEGORIJOS, blank=True, null=True, db_index=True)
-    tekstas = models.TextField()
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name="pastabos_autoriai")
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.kategorija or 'kita'}: {self.tekstas[:40]}"
+        r1 = self.kiekis_nuo or 0
+        r2 = self.kiekis_iki or "∞"
+        return f"{self.kainodara} [{r1}–{r2}] = {self.suma or '—'} {self.valiuta}"
