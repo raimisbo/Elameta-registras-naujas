@@ -1,0 +1,42 @@
+<section class="form-section">
+  <h3>Kaina</h3>
+
+  {% if dabartine_kaina %}
+    <p><strong>Dabartinė:</strong> {{ dabartine_kaina.suma }} {{ dabartine_kaina.valiuta }}
+      <small>(nuo {{ dabartine_kaina.galioja_nuo }})</small>
+    </p>
+  {% else %}
+    <p><em>Kaina nenustatyta.</em></p>
+  {% endif %}
+
+  <p style="margin-top:10px;">
+    <a class="btn btn-primary" href="{% url 'detaliu_registras:prideti_kaina' uzklausa.id %}">Keisti/Pridėti kainą</a>
+  </p>
+
+  <details style="margin-top:15px;">
+    <summary><strong>Kainų istorija</strong></summary>
+    <div style="overflow:auto; margin-top:10px;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Suma</th><th>Valiuta</th><th>Nuo</th><th>Iki</th><th>Statusas</th><th>Priežastis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in kainu_istorija %}
+          <tr>
+            <td>{{ k.suma }}</td>
+            <td>{{ k.valiuta }}</td>
+            <td>{{ k.galioja_nuo }}</td>
+            <td>{{ k.galioja_iki|default:"—" }}</td>
+            <td>{% if k.yra_aktuali %}<strong>AKTUALI</strong>{% else %}sena{% endif %}</td>
+            <td>{{ k.keitimo_priezastis|default:"" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6"><em>Istorijos nėra.</em></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>

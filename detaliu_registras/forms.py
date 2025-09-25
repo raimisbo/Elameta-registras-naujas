@@ -2,6 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.apps import apps
 from django.db.models.manager import BaseManager
+from django.utils import timezone
 
 from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
 
@@ -108,6 +109,7 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
             detale = Detale.objects.create(
                 pavadinimas=c.get("detales_pavadinimas") or "Be pavadinimo",
                 brezinio_nr=c.get("brezinio_nr") or "",
+                projektas=projektas,  # ⬅ svarbu: pririšti prie projekto
             )
 
         # Specifikacija
@@ -350,12 +352,17 @@ class UzklausaEditForm(forms.ModelForm):
         return u
 
 
-# --- KAINA: pažangios kainodaros forma ---
+class KainaRedagavimoForm(forms.Form):
+    suma = forms.DecimalField(label="Kaina", max_digits=12, decimal_places=2, min_value=0)
+    valiuta = forms.CharField(label="Valiuta", max_length=3, initial="EUR")
+    keitimo_priezastis = forms.CharField(label="Keitimo priežastis", widget=forms.Textarea, required=False)
+
+
+# --- KAINA: pažangios kainodaros forma (be 'busena') ---
 class KainaForm(forms.ModelForm):
     class Meta:
         model = Kaina
         fields = [
-            "busena",
             "suma",
             "valiuta",
             "yra_fiksuota",
@@ -363,6 +370,7 @@ class KainaForm(forms.ModelForm):
             "kiekis_iki",
             "fiksuotas_kiekis",
             "kainos_matas",
+            "keitimo_priezastis",
         ]
         widgets = {
             "suma": forms.NumberInput(attrs={"step": "0.01"}),
@@ -391,3 +399,13 @@ class KainaForm(forms.ModelForm):
             c["fiksuotas_kiekis"] = None  # intervalinei kainai netaikoma
 
         return c
+
+    def save(self, commit=True):
+        inst: Kaina = super().save(commit=False)
+        # žymim kaip aktualią; senoji „aktuali“ bus uždaroma per service/unikalų constraint
+        inst.yra_aktuali = True
+        if not inst.galioja_nuo:
+            inst.galioja_nuo = timezone.now().date()
+        if commit:
+            inst.save()
+        return inst

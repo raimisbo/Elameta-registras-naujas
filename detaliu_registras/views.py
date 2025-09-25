@@ -4,17 +4,17 @@ from django.contrib import messages
 from django.db.models import Q, Count, Value
 from django.db.models.functions import Coalesce
 from django.forms import inlineformset_factory
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
-
+from .services import KainosService
 from .models import Uzklausa, Kaina
 from .forms import (
     UzklausaFilterForm,
     UzklausaCreateOrSelectForm,
     UzklausaEditForm,
     ImportUzklausosCSVForm,
-    KainaForm,
+    KainaForm, KainaRedagavimoForm
 )
 
 # CSV importo helperis (nebūtinas)
@@ -133,11 +133,9 @@ class UzklausaDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        uzk = self.object
-        kainos = uzk.kainos.all().order_by("-id")
-        current = kainos.filter(busena="aktuali").first()
-        ctx["kainos"] = kainos
-        ctx["kaina_aktuali"] = current
+        uzklausa = self.object
+        ctx["dabartine_kaina"] = Kaina.objects.filter(uzklausa=uzklausa, yra_aktuali=True).first()
+        ctx["kainu_istorija"] = Kaina.objects.filter(uzklausa=uzklausa).istorija()
         return ctx
 
 
@@ -167,15 +165,23 @@ class UzklausaUpdateView(UpdateView):
 # === KAINOS: redagavimas per formset'ą ===
 class KainosRedagavimasView(FormView):
     template_name = "detaliu_registras/redaguoti_kaina.html"
-    form_class = KainaForm  # nenaudojama tiesiogiai; reikalinga FormView struktūrai
+    form_class = KainaRedagavimoForm
 
     def dispatch(self, request, *args, **kwargs):
-        self.uzklausa = (
-            Uzklausa.objects
-            .select_related("detale", "projektas")
-            .get(pk=kwargs["pk"])
-        )
+        self.uzklausa = get_object_or_404(Uzklausa, pk=kwargs["pk"])
+        self.detale_id = kwargs.get("detale_id")  # jei norėsi kainas detalių lygiu
         return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        KainosService.nustatyti_nauja_kaina(
+            uzklausa_id=self.uzklausa.id,
+            detale_id=self.detale_id,
+            suma=form.cleaned_data["suma"],
+            valiuta=form.cleaned_data["valiuta"],
+            priezastis=form.cleaned_data.get("keitimo_priezastis") or "",
+            user=self.request.user,
+        )
+        return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[self.uzklausa.id]))
 
     def get_formset(self, data=None):
         FormSet = inlineformset_factory(

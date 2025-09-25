@@ -1,0 +1,29 @@
+{% extends "detaliu_registras/base.html" %}
+{% block title %}Keisti kainą{% endblock %}
+
+{% block content %}
+<div class="form-container">
+  <div class="form-section">
+    <h3>Keisti / pridėti kainą</h3>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-field">
+        <label for="id_suma">Kaina</label>
+        {{ form.suma }}
+      </div>
+      <div class="form-field">
+        <label for="id_valiuta">Valiuta</label>
+        {{ form.valiuta }}
+      </div>
+      <div class="form-field">
+        <label for="id_keitimo_priezastis">Keitimo priežastis</label>
+        {{ form.keitimo_priezastis }}
+      </div>
+      <div style="margin-top: 10px;">
+        <button type="submit" class="btn btn-primary">Išsaugoti</button>
+        <a href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.id %}" class="btn btn-secondary">Atšaukti</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

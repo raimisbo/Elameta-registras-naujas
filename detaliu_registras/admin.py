@@ -1,6 +1,5 @@
 # detaliu_registras/admin.py
 from django.contrib import admin
-
 from .models import (
     Klientas,
     Projektas,
@@ -13,120 +12,94 @@ from .models import (
     KainosPartijai,
 )
 
-# ---- Klientas
+# --- Bendri utility ---
+class ReadonlyTimestampsMixin:
+    readonly_fields = ("created", "updated")
+
+
+# --- Pagrindiniai katalogai ---
 @admin.register(Klientas)
-class KlientasAdmin(admin.ModelAdmin):
-    list_display = ("vardas", "created", "updated")
+class KlientasAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
+    list_display = ("id", "vardas", "created", "updated")
     search_fields = ("vardas",)
-    ordering = ("vardas",)
 
 
-# ---- Projektas
 @admin.register(Projektas)
-class ProjektasAdmin(admin.ModelAdmin):
-    list_display = ("pavadinimas", "klientas", "created", "updated")
+class ProjektasAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
+    list_display = ("id", "pavadinimas", "klientas", "uzklausos_data", "pasiulymo_data", "created", "updated")
+    list_filter = ("uzklausos_data", "pasiulymo_data", "klientas")
     search_fields = ("pavadinimas", "klientas__vardas")
-    list_filter = ("klientas",)
-    autocomplete_fields = ("klientas",)
-    ordering = ("pavadinimas",)
 
 
-# ---- Detalė / jos papildomi 1-1 duomenys kaip Inline
+# Inline’ai detalei (nebūtina, bet patogu)
 class DetaleSpecifikacijaInline(admin.StackedInline):
     model = DetaleSpecifikacija
-    can_delete = True
     extra = 0
 
 
 class PavirsiuDangosInline(admin.StackedInline):
     model = PavirsiuDangos
-    can_delete = True
     extra = 0
 
 
 @admin.register(Detale)
-class DetaleAdmin(admin.ModelAdmin):
-    list_display = ("pavadinimas", "brezinio_nr", "created", "updated")
-    search_fields = ("pavadinimas", "brezinio_nr")
+class DetaleAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
+    list_display = ("id", "pavadinimas", "brezinio_nr", "projektas", "created", "updated")
+    list_filter = ("projektas",)
+    search_fields = ("pavadinimas", "brezinio_nr", "projektas__pavadinimas")
     inlines = [DetaleSpecifikacijaInline, PavirsiuDangosInline]
-    ordering = ("pavadinimas",)
 
 
-# ---- Kaina: rodoma Užklausos inline ir atskirai
-class KainaInline(admin.TabularInline):
-    model = Kaina
-    extra = 0
-    fields = (
-        "busena",
-        "suma",
-        "valiuta",
-        "yra_fiksuota",
-        "kiekis_nuo",
-        "kiekis_iki",
-        "fiksuotas_kiekis",
-        "kainos_matas",
-    )
+@admin.register(Uzklausa)
+class UzklausaAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
+    list_display = ("id", "klientas", "projektas", "detale", "data", "created", "updated")
+    list_filter = ("klientas", "projektas", "data")
+    search_fields = ("id", "klientas__vardas", "projektas__pavadinimas", "detale__pavadinimas", "detale__brezinio_nr")
+
+
+# --- Kainos ---
+def make_selected_active(modeladmin, request, queryset):
+    # žymim kaip aktualias; senas uždarysit per savo servisą/operaciją, šis action tik greitam „rankiniam“ pažymėjimui
+    queryset.update(yra_aktuali=True, galioja_iki=None)
+make_selected_active.short_description = "Pažymėti kaip AKTUALIAS"
+
+
+def make_selected_inactive(modeladmin, request, queryset):
+    from django.utils.timezone import localdate
+    queryset.update(yra_aktuali=False, galioja_iki=localdate())
+make_selected_inactive.short_description = "Pažymėti kaip SENAS"
 
 
 @admin.register(Kaina)
-class KainaAdmin(admin.ModelAdmin):
+class KainaAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
     list_display = (
-        "uzklausa",
-        "suma",
-        "valiuta",
-        "busena",
-        "yra_fiksuota",
-        "kiekis_nuo",
-        "kiekis_iki",
-        "fiksuotas_kiekis",
-        "kainos_matas",
-        "created",
+        "id", "uzklausa", "detale",
+        "suma", "valiuta",
+        "yra_aktuali", "galioja_nuo", "galioja_iki",
+        "pakeite", "created", "updated",
     )
-    list_filter = ("busena", "valiuta", "yra_fiksuota", "kainos_matas")
-    search_fields = ("uzklausa__id", "uzklausa__detale__pavadinimas", "uzklausa__projektas__pavadinimas")
-    autocomplete_fields = ("uzklausa",)
-    ordering = ("-id",)
+    # ⬇️ čia buvo 'busena' – pakeista į 'yra_aktuali' ir kiti realūs laukai
+    list_filter = ("yra_aktuali", "valiuta", "galioja_nuo", "uzklausa", "detale")
+    search_fields = ("uzklausa__id", "detale__pavadinimas", "detale__brezinio_nr")
+    date_hierarchy = "galioja_nuo"
+    actions = [make_selected_active, make_selected_inactive]
 
 
-# ---- Užklausa su Kaina inline
-@admin.register(Uzklausa)
-class UzklausaAdmin(admin.ModelAdmin):
-    list_display = ("id", "klientas", "projektas", "detale", "data", "created", "updated")
-    search_fields = (
-        "id",
-        "klientas__vardas",
-        "projektas__pavadinimas",
-        "detale__pavadinimas",
-        "detale__brezinio_nr",
-    )
-    list_filter = ("data",)
-    autocomplete_fields = ("klientas", "projektas", "detale")
-    inlines = [KainaInline]
-    ordering = ("-id",)
-
-
-# ---- Kainodaros „antraštė“ + eilutės
+# --- Kainodara (jei naudoji) ---
 class KainosPartijaiInline(admin.TabularInline):
     model = KainosPartijai
-    # JEI KainosPartijai turėtų daugiau nei vieną FK į Kainodara, privaloma fk_name.
-    # Mūsų dabartinėje schemoje yra vienas FK: "kainodara".
-    fk_name = "kainodara"
-    extra = 0
-    fields = ("kiekis_nuo", "kiekis_iki", "suma", "valiuta")
+    extra = 1
 
 
 @admin.register(Kainodara)
-class KainodaraAdmin(admin.ModelAdmin):
+class KainodaraAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
     list_display = ("id", "uzklausa", "pavadinimas", "created", "updated")
-    search_fields = ("pavadinimas", "uzklausa__id", "uzklausa__detale__pavadinimas")
-    autocomplete_fields = ("uzklausa",)
+    list_filter = ("uzklausa",)
     inlines = [KainosPartijaiInline]
-    ordering = ("-id",)
 
 
 @admin.register(KainosPartijai)
-class KainosPartijaiAdmin(admin.ModelAdmin):
+class KainosPartijaiAdmin(ReadonlyTimestampsMixin, admin.ModelAdmin):
     list_display = ("id", "kainodara", "kiekis_nuo", "kiekis_iki", "suma", "valiuta", "created", "updated")
+    list_filter = ("kainodara", "valiuta")
     search_fields = ("kainodara__pavadinimas", "kainodara__uzklausa__id")
-    autocomplete_fields = ("kainodara",)
-    ordering = ("-id",)

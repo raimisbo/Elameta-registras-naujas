@@ -19,6 +19,7 @@ db.sqlite3
 /media/
 /staticfiles/
 /logs/
+backup_detaliu_registras.json
 
 # --- IDE / Editor ---
 .idea/
