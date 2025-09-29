@@ -221,7 +221,7 @@ class KainosRedagavimasView(FormView):
             inst.save()
 
         # užtikrinti, kad liktų tik viena "aktuali"
-        aktualios = Kaina.objects.filter(uzklausa=self.uzklausa, busena="aktuali").order_by("id")
+        aktualios = Kaina.objects.aktualios().filter(uzklausa=self.uzklausa).order_by("id")
         if aktualios.count() > 1:
             palikti = aktualios.last()
             (Kaina.objects

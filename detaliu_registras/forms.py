@@ -5,6 +5,7 @@ from django.db.models.manager import BaseManager
 from django.utils import timezone
 
 from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
+from .services import KainosService
 
 
 # === Filtrų forma (sąrašui) ===
@@ -32,7 +33,7 @@ class ImportUzklausosCSVForm(forms.Form):
     file = forms.FileField(label="Pasirinkite CSV failą")
 
 
-# === Nauja užklausa: pasirink arba sukurk vietoje ===
+# === Nauja užklausa: pasirink arba sukurk vietoje + MINI KAINA ===
 class UzklausaCreateOrSelectForm(forms.ModelForm):
     # Klientas
     klientas = forms.ModelChoiceField(
@@ -71,9 +72,18 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
     spalva_ral = forms.CharField(label="RAL / spalva", required=False)
     blizgumas = forms.CharField(label="Blizgumas / tekstūra", required=False)
 
+    # --- MINI KAINOS BLOKAS (neprivalomas) ---
+    kaina_suma = forms.DecimalField(label="Pradinė kaina", required=False, max_digits=12, decimal_places=2, min_value=0)
+    kaina_valiuta = forms.CharField(label="Valiuta", required=False, max_length=3, initial="EUR")
+    kaina_priezastis = forms.CharField(label="Kainos priežastis", required=False)
+
     class Meta:
         model = Uzklausa
         fields = []  # viską kuriame save() metu
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
 
     def clean(self):
         cleaned = super().clean()
@@ -85,6 +95,10 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
         turi_naujos_detales_duomenis = cleaned.get("detales_pavadinimas") or cleaned.get("brezinio_nr")
         if not turi_detale and not turi_naujos_detales_duomenis:
             raise ValidationError("Pasirinkite detalę arba įveskite naujos detalės duomenis.")
+
+        # Mini kaina: jei pildai ką nors iš blokelio, turi būti bent suma
+        if any(cleaned.get(k) not in [None, ""] for k in ("kaina_valiuta", "kaina_priezastis")) and cleaned.get("kaina_suma") in [None, ""]:
+            raise ValidationError("Jei pildai kainos laukus, nurodyk bent sumą.")
         return cleaned
 
     def save(self, commit=True):
@@ -109,7 +123,7 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
             detale = Detale.objects.create(
                 pavadinimas=c.get("detales_pavadinimas") or "Be pavadinimo",
                 brezinio_nr=c.get("brezinio_nr") or "",
-                projektas=projektas,  # ⬅ svarbu: pririšti prie projekto
+                projektas=projektas,  # svarbu: pririšti prie projekto
             )
 
         # Specifikacija
@@ -137,10 +151,26 @@ class UzklausaCreateOrSelectForm(forms.ModelForm):
         uzk = Uzklausa(klientas=klientas, projektas=projektas, detale=detale)
         if commit:
             uzk.save()
+
+        # --- MINI KAINA: jei nurodyta suma, nustatome pradinę kainą ---
+        if c.get("kaina_suma") is not None:
+            try:
+                KainosService.nustatyti_nauja_kaina(
+                    uzklausa_id=uzk.id,
+                    detale_id=getattr(detale, "id", None),
+                    suma=c["kaina_suma"],
+                    valiuta=(c.get("kaina_valiuta") or "EUR").upper(),
+                    priezastis=c.get("kaina_priezastis") or "",
+                    user=getattr(self, "user", None),
+                )
+            except Exception as e:
+                # neblokavus viso išsaugojimo – tik pranešame formos klaidą
+                raise ValidationError(f"Kainos nustatyti nepavyko: {e}")
+
         return uzk
 
 
-# === REDAGAVIMAS: 9 blokų forma ===
+# === REDAGAVIMAS: 9 blokų forma + MINI KAINA ===
 class UzklausaEditForm(forms.ModelForm):
     # Pagrindinė
     klientas = forms.ModelChoiceField(
@@ -204,15 +234,17 @@ class UzklausaEditForm(forms.ModelForm):
     projekto_aprasymas = forms.CharField(label="Projekto aprašymas", required=False)
     uzklausos_pastabos = forms.CharField(label="Užklausos pastabos", required=False)
 
+    # --- MINI KAINOS BLOKAS (neprivalomas) ---
+    kaina_suma = forms.DecimalField(label="Nauja kaina", required=False, max_digits=12, decimal_places=2, min_value=0)
+    kaina_valiuta = forms.CharField(label="Valiuta", required=False, max_length=3, initial="EUR")
+    kaina_priezastis = forms.CharField(label="Keitimo priežastis", required=False)
+
     class Meta:
         model = Uzklausa
         fields = []  # valdome ranka
 
-    def _has_concrete_field(self, instance, field_name: str) -> bool:
-        names = [f.name for f in instance._meta.get_fields() if getattr(f, "concrete", False)]
-        return field_name in names
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
         u: Uzklausa = kwargs.get("instance")
         if not u:
@@ -266,12 +298,29 @@ class UzklausaEditForm(forms.ModelForm):
             self.fields["projekto_aprasymas"].initial = getattr(p, "aprasymas")
 
         # užklausos pastabos (tik jei modelyje yra konkretus laukas)
-        if "uzklausos_pastabos" in self.fields and self._has_concrete_field(u, "pastabos"):
+        if "uzklausos_pastabos" in self.fields:
             val = getattr(u, "pastabos", None)
             if not isinstance(val, BaseManager):
                 self.fields["uzklausos_pastabos"].initial = val
         else:
             self.fields.pop("uzklausos_pastabos", None)
+
+        # MINI kaina – pre-fill iš dabartinės
+        cur = Kaina.objects.filter(uzklausa=u, yra_aktuali=True).first()
+        if cur:
+            self.fields["kaina_suma"].initial = cur.suma
+            self.fields["kaina_valiuta"].initial = cur.valiuta
+
+    def _has_concrete_field(self, instance, field_name: str) -> bool:
+        names = [f.name for f in instance._meta.get_fields() if getattr(f, "concrete", False)]
+        return field_name in names
+
+    def clean(self):
+        c = super().clean()
+        # Mini kaina: jeigu pildai valiutą ar priežastį – turi būti ir suma
+        if any(c.get(k) not in [None, ""] for k in ("kaina_valiuta", "kaina_priezastis")) and c.get("kaina_suma") in [None, ""]:
+            raise ValidationError("Jei pildai kainos laukus, nurodyk bent sumą.")
+        return c
 
     def save(self, commit=True):
         u: Uzklausa = self.instance
@@ -342,13 +391,35 @@ class UzklausaEditForm(forms.ModelForm):
                     p.save()
 
         # užklausos pastabos
-        if "uzklausos_pastabos" in c and self._has_concrete_field(u, "pastabos"):
+        if "uzklausos_pastabos" in c:
             val = getattr(u, "pastabos", None)
             if not isinstance(val, BaseManager):
                 setattr(u, "pastabos", c["uzklausos_pastabos"])
 
         if commit:
             u.save()
+
+        # --- MINI KAINA: nustatyti naują, jei pasikeitė arba jei nėra buvusios ---
+        if c.get("kaina_suma") is not None:
+            cur = Kaina.objects.filter(uzklausa=u, yra_aktuali=True).first()
+            suma = c["kaina_suma"]
+            valiuta = (c.get("kaina_valiuta") or "EUR").upper()
+            priez = c.get("kaina_priezastis") or ""
+
+            need_update = (not cur) or (str(cur.suma) != str(suma)) or (cur.valiuta != valiuta) or bool(priez)
+            if need_update:
+                try:
+                    KainosService.nustatyti_nauja_kaina(
+                        uzklausa_id=u.id,
+                        detale_id=getattr(u.detale, "id", None),
+                        suma=suma,
+                        valiuta=valiuta,
+                        priezastis=priez,
+                        user=getattr(self, "user", None),
+                    )
+                except Exception as e:
+                    raise ValidationError(f"Kainos atnaujinti nepavyko: {e}")
+
         return u
 
 
@@ -358,7 +429,7 @@ class KainaRedagavimoForm(forms.Form):
     keitimo_priezastis = forms.CharField(label="Keitimo priežastis", widget=forms.Textarea, required=False)
 
 
-# --- KAINA: pažangios kainodaros forma (be 'busena') ---
+# --- KAINA: pažangios kainodaros forma (atskiram vaizdui) ---
 class KainaForm(forms.ModelForm):
     class Meta:
         model = Kaina
@@ -402,7 +473,6 @@ class KainaForm(forms.ModelForm):
 
     def save(self, commit=True):
         inst: Kaina = super().save(commit=False)
-        # žymim kaip aktualią; senoji „aktuali“ bus uždaroma per service/unikalų constraint
         inst.yra_aktuali = True
         if not inst.galioja_nuo:
             inst.galioja_nuo = timezone.now().date()

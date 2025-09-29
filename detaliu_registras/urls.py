@@ -1,11 +1,10 @@
 from django.urls import path
-from django.views.generic import RedirectView
 from . import views
 
 app_name = "detaliu_registras"
 
 urlpatterns = [
-# Sąrašas + filtrai + donut
+    # Sąrašas + filtrai + donut
     path("uzklausos/", views.UzklausaListView.as_view(), name="uzklausa_list"),
 
     # Kurti / redaguoti užklausą
@@ -22,7 +21,7 @@ urlpatterns = [
         name="redaguoti_kaina",
     ),
 
-    # ALIAS tas pats vaizdas naujos kainos pridėjimui (kad veiktų {% url 'prideti_kaina' %})
+    # Alias į tą patį view naujai kainai (kad veiktų {% url 'detaliu_registras:prideti_kaina' %})
     path(
         "perziureti_uzklausa/<int:pk>/kainos/nauja/",
         views.KainosRedagavimasView.as_view(),
