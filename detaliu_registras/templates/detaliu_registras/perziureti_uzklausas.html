@@ -46,6 +46,11 @@
   <!-- Filtrai -->
   <section class="filters-wrap" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px">
     <form method="get" class="filters-form" style="display:flex;flex-direction:column;gap:12px">
+      <!-- NAUJA: išsaugom aktyvų donut segmentą -->
+      {% if active_seg %}
+        <input type="hidden" name="seg" value="{{ active_seg }}">
+      {% endif %}
+
       <div class="filters-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
         <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Paieška</span>{{ filter_form.q }}</label>
         <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Klientas</span>{{ filter_form.klientas }}</label>
@@ -54,6 +59,9 @@
         <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Brėžinio nr.</span>{{ filter_form.brezinio_nr }}</label>
         <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Metalas</span>{{ filter_form.metalas }}</label>
         <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Padengimas</span>{{ filter_form.padengimas }}</label>
+        <!-- NAUJA: kainos filtrai (EUR) – be jokių stiliaus pokyčių -->
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Kaina nuo (€)</span>{{ filter_form.kaina_nuo }}</label>
+        <label class="f" style="display:flex;flex-direction:column;gap:4px"><span>Kaina iki (€)</span>{{ filter_form.kaina_iki }}</label>
       </div>
       <div class="filters-actions" style="display:flex;align-items:center;gap:8px">
         <a class="btn" href="{% url 'detaliu_registras:ivesti_uzklausa' %}">+ Nauja užklausa</a>

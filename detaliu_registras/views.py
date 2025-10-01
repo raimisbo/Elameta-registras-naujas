@@ -1,12 +1,13 @@
 from urllib.parse import unquote as urlunquote
 
 from django.contrib import messages
-from django.db.models import Q, Count, Value
+from django.db.models import Q, Count, Value, Subquery, OuterRef
 from django.db.models.functions import Coalesce
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
+
 from .services import KainosService
 from .models import Uzklausa, Kaina
 from .forms import (
@@ -53,6 +54,8 @@ class UzklausaListView(ListView):
             brezinio_nr = form.cleaned_data.get("brezinio_nr")
             metalas = form.cleaned_data.get("metalas")
             padengimas = form.cleaned_data.get("padengimas")
+            kaina_nuo = form.cleaned_data.get("kaina_nuo")
+            kaina_iki = form.cleaned_data.get("kaina_iki")
 
             if q:
                 qs = qs.filter(
@@ -76,6 +79,35 @@ class UzklausaListView(ListView):
                     Q(detale__pavirsiu_dangos__ktl_ec_name__icontains=padengimas) |
                     Q(detale__pavirsiu_dangos__miltelinis_name__icontains=padengimas)
                 )
+
+            # === Anotuojame aktualią kainą (suma, EUR) kiekvienai užklausai ===
+            # Remiamės tik egzistuojančiais laukais: yra_aktuali, galioja_iki, galioja_nuo
+            sub_flag = Kaina.objects.filter(
+                uzklausa=OuterRef("pk"),
+                yra_aktuali=True,
+            ).order_by("-galioja_nuo", "-id").values("suma")[:1]
+
+            sub_open = Kaina.objects.filter(
+                uzklausa=OuterRef("pk"),
+                galioja_iki__isnull=True,
+            ).order_by("-galioja_nuo", "-id").values("suma")[:1]
+
+            sub_latest = Kaina.objects.filter(
+                uzklausa=OuterRef("pk"),
+            ).order_by("-galioja_nuo", "-id").values("suma")[:1]
+
+            qs = qs.annotate(
+                aktuali_suma=Coalesce(
+                    Subquery(sub_flag),
+                    Coalesce(Subquery(sub_open), Subquery(sub_latest))
+                )
+            )
+
+            # === Filtravimas pagal kainą (Decimal arba None) ===
+            if kaina_nuo is not None and kaina_nuo != "":
+                qs = qs.filter(aktuali_suma__gte=kaina_nuo)
+            if kaina_iki is not None and kaina_iki != "":
+                qs = qs.filter(aktuali_suma__lte=kaina_iki)
 
         return form, qs
 
@@ -135,7 +167,15 @@ class UzklausaDetailView(DetailView):
         ctx = super().get_context_data(**kwargs)
         uzklausa = self.object
         ctx["dabartine_kaina"] = Kaina.objects.filter(uzklausa=uzklausa, yra_aktuali=True).first()
-        ctx["kainu_istorija"] = Kaina.objects.filter(uzklausa=uzklausa).istorija()
+        try:
+            ctx["kainu_istorija"] = Kaina.objects.filter(uzklausa=uzklausa).istorija()
+            if ctx["dabartine_kaina"]:
+                ctx["kainu_istorija"] = ctx["kainu_istorija"].exclude(pk=ctx["dabartine_kaina"].pk)
+        except Exception:
+            qs = Kaina.objects.filter(uzklausa=uzklausa)
+            if ctx["dabartine_kaina"]:
+                qs = qs.exclude(pk=ctx["dabartine_kaina"].pk)
+            ctx["kainu_istorija"] = qs
         return ctx
 
 
@@ -177,7 +217,7 @@ class KainosRedagavimasView(FormView):
             uzklausa_id=self.uzklausa.id,
             detale_id=self.detale_id,
             suma=form.cleaned_data["suma"],
-            valiuta=form.cleaned_data["valiuta"],
+            valiuta=form.cleaned_data["valiuta"],  # formoje visada 'EUR'
             priezastis=form.cleaned_data.get("keitimo_priezastis") or "",
             user=self.request.user,
         )
@@ -206,7 +246,7 @@ class KainosRedagavimasView(FormView):
     def post(self, request, *args, **kwargs):
         formset = self.get_formset(data=request.POST)
         if not formset.is_valid():
-            messages.error(request, "Patikrinkite kainų formą.")
+            messages.error(self.request, "Patikrinkite kainų formą.")
             return self.render_to_response(self.get_context_data(formset=formset))
 
         instances = formset.save(commit=False)
@@ -225,9 +265,9 @@ class KainosRedagavimasView(FormView):
         if aktualios.count() > 1:
             palikti = aktualios.last()
             (Kaina.objects
-                .filter(uzklausa=self.uzklausa, busena="aktuali")
+                .filter(uzklausa=self.uzklausa, yra_aktuali=True)
                 .exclude(pk=palikti.pk)
-                .update(busena="sena"))
+                .update(yra_aktuali=False))
 
         messages.success(request, "Kainos išsaugotos.")
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[self.uzklausa.pk]))

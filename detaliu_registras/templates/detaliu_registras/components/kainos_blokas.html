@@ -2,9 +2,16 @@
   <h3>Kaina</h3>
 
   {% if dabartine_kaina %}
-    <p><strong>Dabartinė:</strong> {{ dabartine_kaina.suma }} {{ dabartine_kaina.valiuta }}
-      <small>(nuo {{ dabartine_kaina.galioja_nuo }})</small>
-    </p>
+    <div class="kaina-aktuali-card">
+      <div class="kaina-label">Aktuali kaina</div>
+      <div class="kaina-suma">
+        {{ dabartine_kaina.suma|floatformat:"2" }} €
+      </div>
+      <div class="kaina-meta">
+        {% if dabartine_kaina.galioja_nuo %}Nuo: {{ dabartine_kaina.galioja_nuo|date:"Y-m-d" }}{% endif %}
+        {% if dabartine_kaina.keitimo_priezastis %} · {{ dabartine_kaina.keitimo_priezastis }}{% endif %}
+      </div>
+    </div>
   {% else %}
     <p><em>Kaina nenustatyta.</em></p>
   {% endif %}
@@ -13,30 +20,41 @@
     <a class="btn btn-primary" href="{% url 'detaliu_registras:prideti_kaina' uzklausa.id %}">Keisti/Pridėti kainą</a>
   </p>
 
-  <details style="margin-top:15px;">
-    <summary><strong>Kainų istorija</strong></summary>
-    <div style="overflow:auto; margin-top:10px;">
-      <table class="table">
-        <thead>
+  <!-- VISADA matoma istorija (be išskleidimo), be valiutos stulpelio -->
+  <div style="overflow:auto; margin-top:10px;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Suma</th>
+          <th>Nuo</th>
+          <th>Iki</th>
+          <th>Statusas</th>
+          <th>Priežastis</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kainu_istorija %}
           <tr>
-            <th>Suma</th><th>Valiuta</th><th>Nuo</th><th>Iki</th><th>Statusas</th><th>Priežastis</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for k in kainu_istorija %}
-          <tr>
-            <td>{{ k.suma }}</td>
-            <td>{{ k.valiuta }}</td>
-            <td>{{ k.galioja_nuo }}</td>
-            <td>{{ k.galioja_iki|default:"—" }}</td>
+            <td>{{ k.suma|floatformat:"2" }} €</td>
+            <td>{% if k.galioja_nuo %}{{ k.galioja_nuo|date:"Y-m-d" }}{% endif %}</td>
+            <td>{{ k.galioja_iki|date:"Y-m-d"|default:"—" }}</td>
             <td>{% if k.yra_aktuali %}<strong>AKTUALI</strong>{% else %}sena{% endif %}</td>
             <td>{{ k.keitimo_priezastis|default:"" }}</td>
           </tr>
-          {% empty %}
-          <tr><td colspan="6"><em>Istorijos nėra.</em></td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </details>
+        {% empty %}
+          <tr><td colspan="5"><em>Istorijos nėra.</em></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
+
+<style>
+/* Minimalus, izoliuotas stilius tik šiam blokui */
+.kaina-aktuali-card{
+  border:1px solid #e5e7eb; border-radius:8px; padding:12px; background:#fff; margin-bottom:12px;
+}
+.kaina-label{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; opacity:.7 }
+.kaina-suma{ font-size:24px; font-weight:700; line-height:1.1 }
+.kaina-meta{ font-size:12px; opacity:.8 }
+</style>

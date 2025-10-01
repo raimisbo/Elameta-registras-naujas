@@ -25,6 +25,7 @@
       <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
       <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
       <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
+      <label><input type="checkbox" data-block="price" checked> Kaina</label>
     </div>
   </div>
 
@@ -139,38 +140,11 @@
     </div>
   </section>
 
-  {# --- KAINA --- #}
-{% include "detaliu_registras/components/kainos_blokas.html" %}
-<section class="box">
-  <h3>Kaina</h3>
-  <div class="grid">
-    <div>
-      <strong>Aktuali kaina:</strong>
-      {% if kaina_aktuali %}
-        {{ kaina_aktuali.suma }} {{ kaina_aktuali.valiuta }} ({{ kaina_aktuali.busena }})
-      {% else %}
-        — nėra
-      {% endif %}
-    </div>
-    <div>
-      <a class="btn" href="{% url 'detaliu_registras:prideti_kaina' uzklausa.pk %}">➕ Nauja kaina</a>
-    </div>
+  {# --- KAINA (vienintelis blokas) --- #}
+<section class="box block" data-block="price">
+  {% include "detaliu_registras/components/kainos_blokas.html" %}
   </div>
-
-  {% if kainos %}
-    <div style="margin-top:10px">
-      <strong>Istorija:</strong>
-      <ul style="margin:6px 0 0 18px">
-        {% for k in kainos %}
-          <li>
-            {{ k.suma }} {{ k.valiuta }} — {{ k.busena }} (ID: {{ k.id }})
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
 </section>
-</div>
 
 <style>
 .container{max-width:960px;margin:0 auto;padding:0 16px}
