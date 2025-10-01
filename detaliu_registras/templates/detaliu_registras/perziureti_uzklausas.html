@@ -107,7 +107,7 @@
             <td data-col="sukurta">{{ u.data|date:"Y-m-d" }}</td>
             <td data-col="veiksmai" style="text-align:right">
               <a class="btn" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Peržiūrėti</a>
-              <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Redaguoti</a>
+              <a class="btn btn-secondary" href="{% url 'detaliu_registras:redaguoti_uzklausa' u.pk %}">Redaguoti</a>
             </td>
           </tr>
         {% empty %}

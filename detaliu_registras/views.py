@@ -197,10 +197,17 @@ class UzklausaUpdateView(UpdateView):
     form_class = UzklausaEditForm
 
     def form_valid(self, form):
+        form.user = self.request.user
         uzklausa = form.save()
         messages.success(self.request, "Užklausa atnaujinta.")
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        uzk = self.object
+        ctx["dabartine_kaina"] = Kaina.objects.filter(uzklausa=uzk, yra_aktuali=True).first()
+        ctx["kainu_istorija_trumpa"] = Kaina.objects.filter(uzklausa=uzk).order_by("-galioja_nuo", "-id")[:5]
+        return ctx
 
 # === KAINOS: redagavimas per formset'ą ===
 class KainosRedagavimasView(FormView):
