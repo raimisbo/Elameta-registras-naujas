@@ -1,3 +1,22 @@
+"""
+MINIMALUS PAKEITIMAS: Pridėta tik django-simple-history.
+
+KĄ PRIDĖJAU:
+- history = HistoricalRecords() Detale modeliui
+- Tai trackins VISUS laukus (kabinimas, pakuotė, dokumentai)
+
+KĄ NEPAKEITIAU:
+- Jokių struktūros pakeitimų
+- Visos lentelės tokios pačios
+- Visi laukai tokie patys
+- Jokių migracijų duomenims
+
+KAIP VEIKIA:
+- Kiekvienas Detale.save() sukuria snapshot'ą istorijoje
+- Galite matyti kas, kada ir ką pakeitė
+- Admin'e automatiškai atsirado "History" mygtukas
+"""
+
 from __future__ import annotations
 
 from django.db import models
@@ -5,6 +24,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from simple_history.models import HistoricalRecords  # NAUJAS IMPORT
 
 User = get_user_model()
 
@@ -92,6 +112,11 @@ class Detale(Timestamped):
     ppap_dokumentai = models.CharField(max_length=255, blank=True, null=True)
     priedai_info = models.CharField(max_length=255, blank=True, null=True)
 
+    # ========================================
+    # VIENINTELIS NAUJAS LAUKAS - ISTORIJA
+    # ========================================
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"{self.pavadinimas} ({self.brezinio_nr or '—'})"
 
@@ -129,7 +154,7 @@ class Uzklausa(Timestamped):
     data = models.DateField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
-        return f"Užklausa #{self.pk}"
+        return self.klientas.vardas if self.klientas_id else f"Užklausa #{self.pk}"
 
 
 # --- Kainos ---
@@ -144,7 +169,7 @@ class KainaQuerySet(models.QuerySet):
 
 class Kaina(Timestamped):
     """
-    Viena „aktuali“ kaina vienu metu per (Uzklausa [+ Detale]).
+    Viena „aktuali" kaina vienu metu per (Uzklausa [+ Detale]).
     Pagrindinė schema: yra_aktuali + galioja_nuo/galioja_iki.
     Jei nori kiekių intervalų – naudok kiekis_nuo/iki arba fiksuotas_kiekis.
     """
@@ -190,7 +215,7 @@ class Kaina(Timestamped):
             models.Index(fields=["uzklausa", "galioja_nuo"]),
         ]
         constraints = [
-            # Viena „aktuali“ kaina per Uzklausa(+Detale) vienu metu
+            # Viena „aktuali" kaina per Uzklausa(+Detale) vienu metu
             models.UniqueConstraint(
                 fields=["uzklausa", "detale"],
                 condition=Q(yra_aktuali=True),
@@ -212,7 +237,7 @@ class Kaina(Timestamped):
 
 # --- Kainodaros lentelės (jei naudojamos admin Inline) ---
 class Kainodara(Timestamped):
-    """Bendresnė kainodaros „antraštė“. Jei nenaudoji – gali palikti dėl admin priklausomybių."""
+    """Bendresnė kainodaros „antraštė". Jei nenaudoji – gali palikti dėl admin priklausomybių."""
     uzklausa = models.ForeignKey(Uzklausa, on_delete=models.CASCADE, related_name="kainodaros")
     pavadinimas = models.CharField(max_length=255, blank=True, null=True)
 

@@ -163,6 +163,11 @@ class UzklausaDetailView(DetailView):
     template_name = "detaliu_registras/perziureti_uzklausa.html"
     context_object_name = "uzklausa"
 
+    def get_queryset(self):
+        return (super().get_queryset()
+                .select_related("klientas", "projektas", "detale",
+                                "detale__specifikacija", "detale__pavirsiu_dangos"))
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         uzklausa = self.object
@@ -176,6 +181,25 @@ class UzklausaDetailView(DetailView):
             if ctx["dabartine_kaina"]:
                 qs = qs.exclude(pk=ctx["dabartine_kaina"].pk)
             ctx["kainu_istorija"] = qs
+
+        detale = uzklausa.detale
+        ctx["detale_obj"] = detale
+        ctx["detale_istorija"] = []
+        if detale:
+            ctx["detale_istorija"] = list(
+                detale.history.select_related("history_user")
+                .order_by("-history_date")
+                .values(
+                    "history_id", "history_date", "history_type",
+                    "history_user__username",
+                    # kabinimas
+                    "kabinimo_budas", "kabliuku_kiekis", "kabinimo_anga_mm", "kabinti_per",
+                    # pakuotė
+                    "pakuotes_tipas", "vienetai_dezeje", "vienetai_paleje", "pakuotes_pastabos",
+                    # dokumentai/pastabos
+                    "ppap_dokumentai", "priedai_info",
+                )[:50]  # saugiai apribojam
+            )
         return ctx
 
 
