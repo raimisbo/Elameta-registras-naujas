@@ -1,11 +1,43 @@
 {# templates/detaliu_registras/perziureti_uzklausa.html #}
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}{{ uzklausa.klientas.vardas|default:"Užklausa" }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  .text-muted{color:#64748b}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left}
+  .table thead th{font-weight:600;color:#111827;background:#f3f4f6}
+  .table-responsive{overflow:auto}
+  details>summary{cursor:pointer}
+</style>
+{% endblock %}
+
 {% block content %}
-<h1>{{ uzklausa.klientas.vardas|default:"Užklausa" }}</h1>
+<h1 style="margin:0">{{ uzklausa.klientas.vardas|default:"Užklausa" }}</h1>
+<p class="text-muted" style="margin:.25rem 0 1rem 0;">Užklausa #{{ uzklausa.id }}</p>
+
+{# Viršuje: stulpelių valdymas abiems lentelėms #}
+<div id="columns-toolbar" class="toolbar">
+  <button id="columns-toggle" type="button" class="btn btn-secondary" title="Stulpelių valdymas">☰ Stulpeliai</button>
+  <div id="columns-panel" style="display:none;gap:18px;flex-wrap:wrap;align-items:center;">
+    <div>
+      <strong>Detalės istorija:</strong>
+      <label><input type="checkbox" data-table="#tbl-detale-istorija" data-col="3" checked> Vartotojas</label>
+      <label><input type="checkbox" data-table="#tbl-detale-istorija" data-col="4" checked> Kabinimas</label>
+      <label><input type="checkbox" data-table="#tbl-detale-istorija" data-col="5" checked> Pakuotė</label>
+      <label><input type="checkbox" data-table="#tbl-detale-istorija" data-col="6" checked> Dok./Pastabos</label>
+    </div>
+    <div>
+      <strong>Kainų istorija:</strong>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="2" checked> Iki</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="4" checked> Valiuta</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="5" checked> Statusas</label>
+    </div>
+  </div>
+</div>
 
 <section>
   <h2>Pagrindiniai duomenys</h2>
@@ -16,8 +48,7 @@
     <dt>Projektas</dt>
     <dd>
       {% if uzklausa.projektas %}
-        {{ uzklausa.projektas.pavadinimas }}
-        {% if uzklausa.projektas.aprasymas %} — {{ uzklausa.projektas.aprasymas }}{% endif %}
+        {{ uzklausa.projektas.pavadinimas }}{% if uzklausa.projektas.aprasymas %} — {{ uzklausa.projektas.aprasymas }}{% endif %}
       {% else %}—{% endif %}
     </dd>
 
@@ -73,11 +104,12 @@
         {% if detale_obj.ppap_dokumentai %}PPAP: {{ detale_obj.ppap_dokumentai }}{% else %}—{% endif %}
         {% if detale_obj.priedai_info %} • {{ detale_obj.priedai_info }}{% endif %}
       </dd>
+    </dl>
 
-      {# --- ISTORIJA: tame pačiame bloke kaip ir kiti duomenys --- #}
-      <details open>
-        <summary><strong>Detalės pakeitimų istorija</strong></summary>
-        <table>
+    <details open>
+      <summary><strong>Detalės pakeitimų istorija</strong></summary>
+      <div class="table-responsive">
+        <table id="tbl-detale-istorija" class="table">
           <thead>
             <tr>
               <th>Data</th>
@@ -118,8 +150,8 @@
             {% endfor %}
           </tbody>
         </table>
-      </details>
-    </dl>
+      </div>
+    </details>
   {% else %}
     <p>Šiai užklausai detalė nepriskirta.</p>
   {% endif %}
@@ -139,30 +171,70 @@
 
   <details>
     <summary><strong>Kainų istorija</strong></summary>
-    <table>
-      <thead>
-        <tr>
-          <th>Nuo</th>
-          <th>Iki</th>
-          <th>Suma</th>
-          <th>Valiuta</th>
-          <th>Statusas</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for k in kainu_istorija %}
+    <div class="table-responsive">
+      <table id="tbl-kainu-istorija" class="table">
+        <thead>
           <tr>
-            <td>{{ k.galioja_nuo|date:"Y-m-d" }}</td>
-            <td>{{ k.galioja_iki|date:"Y-m-d"|default:"—" }}</td>
-            <td>{{ k.suma }}</td>
-            <td>{{ k.valiuta }}</td>
-            <td>{% if k.yra_aktuali %}AKTUALI{% else %}sena{% endif %}</td>
+            <th>Nuo</th>
+            <th>Iki</th>
+            <th>Suma</th>
+            <th>Valiuta</th>
+            <th>Statusas</th>
           </tr>
-        {% empty %}
-          <tr><td colspan="5">Istorijos nėra.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for k in kainu_istorija %}
+            <tr>
+              <td>{{ k.galioja_nuo|date:"Y-m-d" }}</td>
+              <td>{{ k.galioja_iki|date:"Y-m-d"|default:"—" }}</td>
+              <td>{{ k.suma }}</td>
+              <td>{{ k.valiuta }}</td>
+              <td>{% if k.yra_aktuali %}AKTUALI{% else %}sena{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">Istorijos nėra.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </details>
 </section>
+
+{# Mygtukai apačioje #}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0 0;">
+  {% url 'detaliu_registras:uzklausa_list' as list_url %}
+  <a href="{{ list_url|default:'javascript:history.back()' }}" class="btn btn-secondary">← Grįžti</a>
+  <a href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}" class="btn">✏️ Redaguoti</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const toggleBtn = document.getElementById('columns-toggle');
+  const panel = document.getElementById('columns-panel');
+  if (toggleBtn && panel){
+    toggleBtn.addEventListener('click', ()=> {
+      panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'flex' : 'none';
+    });
+  }
+  function setCol(table, col1Based, visible){
+    if(!table) return;
+    const disp = visible ? '' : 'none';
+    const th = table.querySelector(`thead th:nth-child(${col1Based})`);
+    if(th) th.style.display = disp;
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      const td = tr.querySelector(`td:nth-child(${col1Based})`);
+      if(td) td.style.display = disp;
+    });
+  }
+  document.querySelectorAll('#columns-panel input[type="checkbox"][data-table][data-col]')
+    .forEach(cb=>{
+      const table = document.querySelector(cb.dataset.table);
+      const col = parseInt(cb.dataset.col, 10);
+      setCol(table, col, cb.checked);
+      cb.addEventListener('change', ()=> setCol(table, col, cb.checked));
+    });
+})();
+</script>
 {% endblock %}
