@@ -1,124 +1,105 @@
+{# templates/detaliu_registras/redaguoti_kaina.html #}
 {% extends "base.html" %}
-{% load static %}
-
 {% block title %}Kainų redagavimas{% endblock %}
 
 {% block content %}
-<div class="container">
-  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
-    <h1 style="margin:0">Kainų redagavimas</h1>
-    <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.id %}">← Atgal</a>
-  </header>
+<h1>Kainų redagavimas</h1>
+<p style="color:#6b7280">
+  Užklausa #{{ uzklausa.id }} —
+  <strong>Detalė</strong>: {{ uzklausa.detale.pavadinimas|default:"—" }}
+  | Projektas: {{ uzklausa.projektas.pavadinimas|default:"—" }}
+</p>
 
-  <div class="info" style="margin-bottom:8px">
-    Užklausa #{{ uzklausa.id }} — <strong>{{ uzklausa.detale.pavadinimas }}</strong>
-    <span class="small-note">| Projektas: {{ uzklausa.projektas.pavadinimas }}</span>
-  </div>
+<form method="post" novalidate>
+  {% csrf_token %}
+  {{ formset.management_form }}
 
-  <form method="post" class="box" novalidate>
-    {% csrf_token %}
-    {{ formset.non_form_errors }}
-    {{ formset.management_form }}
-
-    <table id="kainos-table" style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Būsena</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kaina</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Valiuta</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Yra fiksuota?</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kiekis nuo</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kiekis iki</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Fiksuotas kiekis</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kainos matas</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Trinti</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for form in formset %}
-          {{ form.id }}
-          <tr class="kaina-row">
-            <td style="padding:6px 8px">{{ form.busena.errors }}{{ form.busena }}</td>
-            <td style="padding:6px 8px">{{ form.suma.errors }}{{ form.suma }}</td>
-            <td style="padding:6px 8px">{{ form.valiuta.errors }}{{ form.valiuta }}</td>
-            <td style="padding:6px 8px">{{ form.yra_fiksuota.errors }}{{ form.yra_fiksuota }}</td>
-            <td style="padding:6px 8px">{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
-            <td style="padding:6px 8px">{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
-            <td style="padding:6px 8px">{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
-            <td style="padding:6px 8px">{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
-            <td style="padding:6px 8px">{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
+  <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#fff">
+    <div class="table-responsive" style="overflow:auto">
+      <table class="table" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            {% with f0=formset.forms.0|default:formset.empty_form %}
+              {% for f in f0.visible_fields %}
+                {% if f.name != 'DELETE' %}
+                  <th scope="col" style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">{{ f.label }}</th>
+                {% endif %}
+              {% endfor %}
+            {% endwith %}
+            <th scope="col" style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">Trinti</th>
           </tr>
-        {% empty %}
-          {# tuščia – pridėkite per „Pridėti eilutę“ #}
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
 
-    <div class="actions" style="margin-top:12px;display:flex;gap:8px">
-      <button type="button" class="btn" id="add-row">Pridėti eilutę</button>
-      <button type="submit" class="btn">Išsaugoti</button>
-      <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.id %}">Atgal</a>
+        <tbody id="kainos-tbody">
+          {% for f in formset.forms %}
+            <tr>
+              {# paslėpti laukeliai (id, valiuta ir kt.) #}
+              {% for h in f.hidden_fields %}{{ h }}{% endfor %}
+
+              {% for field in f.visible_fields %}
+                {% if field.name != 'DELETE' %}
+                  <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6">
+                    {{ field.errors }}{{ field }}
+                  </td>
+                {% endif %}
+              {% endfor %}
+
+              <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6">
+                {# tik pats checkbox be „Ištrinti“ teksto #}
+                {{ f.DELETE.as_widget }}
+              </td>
+            </tr>
+          {% empty %}
+            {# jei view nepaduoda extra=1, čia nieko nebus; mygtukas „Pridėti eilutę“ vis tiek veiks #}
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
 
-    <template id="empty-row">
-      {{ formset.empty_form.id }}
-      <tr class="kaina-row">
-        <td>{{ formset.empty_form.busena }}</td>
-        <td>{{ formset.empty_form.suma }}</td>
-        <td>{{ formset.empty_form.valiuta }}</td>
-        <td>{{ formset.empty_form.yra_fiksuota }}</td>
-        <td>{{ formset.empty_form.kiekis_nuo }}</td>
-        <td>{{ formset.empty_form.kiekis_iki }}</td>
-        <td>{{ formset.empty_form.fiksuotas_kiekis }}</td>
-        <td>{{ formset.empty_form.kainos_matas }}</td>
-        <td>{% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}</td>
-      </tr>
-    </template>
-  </form>
-</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" type="button" id="add-row">Pridėti eilutę</button>
+      <button class="btn" type="submit">Išsaugoti</button>
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.pk %}">Atgal</a>
+    </div>
+  </div>
+</form>
 
-<style>
-.container{max-width:960px;margin:0 auto;padding:0 16px}
-.box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;cursor:pointer;text-decoration:none}
-.btn-secondary{background:#fff}
-.small-note{color:#6b7280}
-</style>
+{# šablonas naujai eilutei – naudoja empty_form su __prefix__ #}
+<template id="row-template">
+  <tr>
+    {% with ef=formset.empty_form %}
+      {% for h in ef.hidden_fields %}{{ h.as_widget }}{% endfor %}
+      {% for field in ef.visible_fields %}
+        {% if field.name != 'DELETE' %}
+          <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6">{{ field.as_widget }}</td>
+        {% endif %}
+      {% endfor %}
+      <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6">
+        {{ ef.DELETE.as_widget }}
+      </td>
+    {% endwith %}
+  </tr>
+</template>
 
 <script>
 (function(){
-  const addBtn=document.getElementById('add-row');
-  if(!addBtn) return;
-  addBtn.addEventListener('click',function(){
-    const total=document.querySelector('input[name$="-TOTAL_FORMS"]');
-    if(!total) return;
-    const count=parseInt(total.value,10)||0;
-    const tpl=document.getElementById('empty-row');
-    if(!tpl) return;
-    const html=tpl.innerHTML.replace(/__prefix__/g,String(count));
-    const tbody=document.querySelector('#kainos-table tbody');
-    const container=document.createElement('tbody');
-    container.innerHTML=html.trim();
-    while(container.firstChild){tbody.appendChild(container.firstChild);}
-    total.value=String(count+1);
-  });
+  const tbody   = document.getElementById('kainos-tbody');
+  const tmpl    = document.getElementById('row-template');
+  const addBtn  = document.getElementById('add-row');
+  const totalEl = document.querySelector('[name="{{ formset.prefix }}-TOTAL_FORMS"]');
 
-  // UX: jei pažymėta "Yra fiksuota", išjungiame intervalo laukus toje eilutėje
-  document.addEventListener('change', function(e){
-    if(e.target && e.target.matches('input[type="checkbox"][name$="-yra_fiksuota"]')){
-      const row = e.target.closest('tr');
-      if(!row) return;
-      const fixed = e.target.checked;
-      const nuo = row.querySelector('input[name$="-kiekis_nuo"]');
-      const iki = row.querySelector('input[name$="-kiekis_iki"]');
-      const fiks = row.querySelector('input[name$="-fiksuotas_kiekis"]');
-      const matas = row.querySelector('select[name$="-kainos_matas"]');
-      if(nuo) nuo.disabled = fixed;
-      if(iki) iki.disabled = fixed;
-      if(fiks) fiks.disabled = !fixed;
-      if(matas) matas.disabled = !fixed;
-    }
-  });
+  if(!tbody || !tmpl || !addBtn || !totalEl) return;
+
+  function addRow(){
+    const idx = parseInt(totalEl.value || "0", 10);
+    let html = tmpl.innerHTML.replaceAll('__prefix__', String(idx));
+    const wrap = document.createElement('tbody');
+    wrap.innerHTML = html.trim();
+    tbody.appendChild(wrap.firstElementChild);
+    totalEl.value = String(idx + 1);
+  }
+
+  addBtn.addEventListener('click', addRow);
 })();
 </script>
 {% endblock %}

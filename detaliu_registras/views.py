@@ -7,7 +7,7 @@ from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
-
+from django.forms.models import BaseInlineFormSet
 from .services import KainosService
 from .models import Uzklausa, Kaina
 from .forms import (
@@ -80,8 +80,7 @@ class UzklausaListView(ListView):
                     Q(detale__pavirsiu_dangos__miltelinis_name__icontains=padengimas)
                 )
 
-            # === Anotuojame aktualią kainą (suma, EUR) kiekvienai užklausai ===
-            # Remiamės tik egzistuojančiais laukais: yra_aktuali, galioja_iki, galioja_nuo
+            # aktuali kaina
             sub_flag = Kaina.objects.filter(
                 uzklausa=OuterRef("pk"),
                 yra_aktuali=True,
@@ -103,10 +102,9 @@ class UzklausaListView(ListView):
                 )
             )
 
-            # === Filtravimas pagal kainą (Decimal arba None) ===
-            if kaina_nuo is not None and kaina_nuo != "":
+            if kaina_nuo not in (None, ""):
                 qs = qs.filter(aktuali_suma__gte=kaina_nuo)
-            if kaina_iki is not None and kaina_iki != "":
+            if kaina_iki not in (None, ""):
                 qs = qs.filter(aktuali_suma__lte=kaina_iki)
 
         return form, qs
@@ -114,7 +112,6 @@ class UzklausaListView(ListView):
     def get_queryset(self):
         form, qs = self.build_filters()
 
-        # papildomas donut filtras ?seg=client:<vardas> / ?seg=others
         seg = self.request.GET.get("seg")
         if seg:
             top_names = list(
@@ -192,13 +189,10 @@ class UzklausaDetailView(DetailView):
                 .values(
                     "history_id", "history_date", "history_type",
                     "history_user__username",
-                    # kabinimas
                     "kabinimo_budas", "kabliuku_kiekis", "kabinimo_anga_mm", "kabinti_per",
-                    # pakuotė
                     "pakuotes_tipas", "vienetai_dezeje", "vienetai_paleje", "pakuotes_pastabos",
-                    # dokumentai/pastabos
                     "ppap_dokumentai", "priedai_info",
-                )[:50]  # saugiai apribojam
+                )[:50]
             )
         return ctx
 
@@ -233,6 +227,7 @@ class UzklausaUpdateView(UpdateView):
         ctx["kainu_istorija_trumpa"] = Kaina.objects.filter(uzklausa=uzk).order_by("-galioja_nuo", "-id")[:5]
         return ctx
 
+
 # === KAINOS: redagavimas per formset'ą ===
 class KainosRedagavimasView(FormView):
     template_name = "detaliu_registras/redaguoti_kaina.html"
@@ -240,26 +235,31 @@ class KainosRedagavimasView(FormView):
 
     def dispatch(self, request, *args, **kwargs):
         self.uzklausa = get_object_or_404(Uzklausa, pk=kwargs["pk"])
-        self.detale_id = kwargs.get("detale_id")  # jei norėsi kainas detalių lygiu
+        self.detale_id = kwargs.get("detale_id")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # „mini“ forma naujai kainai (jei naudojama)
         KainosService.nustatyti_nauja_kaina(
             uzklausa_id=self.uzklausa.id,
             detale_id=self.detale_id,
             suma=form.cleaned_data["suma"],
-            valiuta=form.cleaned_data["valiuta"],  # formoje visada 'EUR'
+            valiuta=form.cleaned_data["valiuta"],
             priezastis=form.cleaned_data.get("keitimo_priezastis") or "",
             user=self.request.user,
         )
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[self.uzklausa.id]))
 
     def get_formset(self, data=None):
+        # duodam 1 tuščią eilutę, kai nėra įrašų (GET režime)
+        extra = 0
+        if data is None and not Kaina.objects.filter(uzklausa=self.uzklausa).exists():
+            extra = 1
         FormSet = inlineformset_factory(
             parent_model=Uzklausa,
             model=Kaina,
             form=KainaForm,
-            extra=0,
+            extra=extra,
             can_delete=True,
         )
         return FormSet(data=data, instance=self.uzklausa)

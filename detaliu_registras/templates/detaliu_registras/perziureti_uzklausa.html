@@ -32,9 +32,11 @@
     </div>
     <div>
       <strong>Kainų istorija:</strong>
-      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="2" checked> Iki</label>
-      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="4" checked> Valiuta</label>
-      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="5" checked> Statusas</label>
+      <input type="checkbox" data-table="#tbl-kainu-istorija" data-col="1" checked> Suma</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="2" checked> Nuo</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="3" checked> Iki</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="4" checked> Statusas</label>
+      <label><input type="checkbox" data-table="#tbl-kainu-istorija" data-col="5" checked> Priežastis</label>
     </div>
   </div>
 </div>
@@ -162,42 +164,8 @@
 <section>
   <h2>Kainos</h2>
 
-  <h3>Dabartinė kaina</h3>
-  {% if dabartine_kaina %}
-    <p>{{ dabartine_kaina }}</p>
-  {% else %}
-    <p>—</p>
-  {% endif %}
+ {% include "detaliu_registras/components/kainos_blokas.html" with uzklausa=uzklausa dabartine_kaina=dabartine_kaina kainu_istorija=kainu_istorija %}
 
-  <details>
-    <summary><strong>Kainų istorija</strong></summary>
-    <div class="table-responsive">
-      <table id="tbl-kainu-istorija" class="table">
-        <thead>
-          <tr>
-            <th>Nuo</th>
-            <th>Iki</th>
-            <th>Suma</th>
-            <th>Valiuta</th>
-            <th>Statusas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for k in kainu_istorija %}
-            <tr>
-              <td>{{ k.galioja_nuo|date:"Y-m-d" }}</td>
-              <td>{{ k.galioja_iki|date:"Y-m-d"|default:"—" }}</td>
-              <td>{{ k.suma }}</td>
-              <td>{{ k.valiuta }}</td>
-              <td>{% if k.yra_aktuali %}AKTUALI{% else %}sena{% endif %}</td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="5">Istorijos nėra.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </details>
 </section>
 
 {# Mygtukai apačioje #}
