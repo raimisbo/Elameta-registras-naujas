@@ -1,194 +1,84 @@
-/* ====== Bendri stiliai ====== */
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* static/detaliu_registras/css/style.css */
+
+/* ===== Lentelių „sticky“ antraštės ===== */
+.table-wrap { max-height: 75vh; overflow: auto; position: relative; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.table thead th {
+  position: sticky; top: 0; z-index: 3;
+  background: #f3f4f6; border-bottom: 1px solid #e5e7eb;
+}
+.table th, .table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+.table-responsive { overflow: auto; }
+
+/* ===== Formos / įvestys ===== */
+.filter-input, .filters-wrap input[type="text"], .filters-wrap input[type="number"] { width: 100%; }
+.form-section { margin: 12px 0; }
+
+/* ===== Kainos blokas (naudojamas kainos_blokas.html) ===== */
+.kaina-aktuali-card {
+  border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fff; margin-bottom: 12px;
+}
+.kaina-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+.kaina-suma { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.kaina-meta { font-size: 12px; opacity: .8; }
+
+/* ===== Specialūs stulpeliai ===== */
+.notes-cell, .detale-pavadinimas-cell {
+  max-width: 300px; overflow-wrap: anywhere; word-break: break-word;
 }
 
-header.header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 20%;
-  padding: 10px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
+/* ===== Mygtukai/nuorodos (lengvas stilius; neperrašo base.html) ===== */
+.view-button { cursor: pointer; color: #2563eb; text-decoration: underline; }
+.view-button:hover { color: #1d4ed8; }
 
-.header-links {
-  display: flex;
-  flex-direction: column;
-}
+/* ===== Žinučių (messages) blokas ===== */
+.messages { margin: 1em 0; padding: 0; list-style: none; }
+.messages li { padding: .6em 1em; border-radius: 4px; margin-bottom: .5em; }
+.messages li.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.messages li.error   { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
+.messages li.warning { background: #fff7ed; color: #7c2d12; border: 1px solid #fed7aa; }
+.messages li.info    { background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }
 
-.header-links a {
-  margin-bottom: 10px;
-}
+/* ===== Paieškos forma ===== */
+.search-form { margin-bottom: 20px; }
+.search-form input[type="text"] { padding: 5px; font-size: 16px; }
+.search-form input[type="submit"] { padding: 5px 10px; font-size: 16px; cursor: pointer; }
 
-/* ====== Pagrindinis turinys ====== */
-.main-content {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-}
+/* ===== Kainų statuso paryškinimas ===== */
+.sena   { background-color: #fff3cd; padding: 10px; border-radius: 5px; }
+.aktualu{ background-color: #d4edda; padding: 10px; border-radius: 5px; }
 
-/* ====== Lentelės ====== */
-.table-container {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
+/* ===== Mirksintis tekstas ===== */
+.mirksintis { color: #d32f2f; font-weight: 600; animation: mirksintis 1s step-start infinite; }
+@keyframes mirksintis { 50% { visibility: hidden; } }
 
-.scrollable-table {
-  display: block;
-  height: 100%;
-  overflow-y: scroll;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-th, td {
-  padding: 8px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-th {
-  position: sticky;
-  top: 0;
-  background-color: #f4f4f4;
-  z-index: 2;
-}
-
-.filter-input {
-  width: 100%;
-}
-
-/* ====== Specialūs stulpeliai ====== */
-.notes-cell {
-  max-width: 300px;
-  word-wrap: break-word;
-}
-
-.detale-pavadinimas-cell {
-  max-width: 300px;
-  word-wrap: break-word;
-}
-
-/* ====== Mygtukai ====== */
-.view-button {
-  cursor: pointer;
-  color: #007BFF;
-  text-decoration: underline;
-}
-
-.view-button:hover {
-  color: #0056b3;
-}
-
-/* ====== Chart konteineris ====== */
-.chart-container {
-  width: 300px;
-  height: 100%;
-  padding: 10px;
-}
-
-.chart-container canvas {
-  width: 100%;
-  height: 100%;
-}
-
-/* ====== Užklausų blokai ====== */
-.container {
+/* ===== (Nebegal perrašo bazinio .container) vietoj to naudok grido konteinerį: .uzklausos-grid ===== */
+.uzklausos-grid {
   display: grid;
   grid-template-areas:
     "blokas-1 blokas-2 blokas-3"
     "blokas-4 blokas-5 blokas-5";
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: auto auto;
-  gap: 20px;
-  padding: 20px;
-  box-sizing: border-box;
+  gap: 20px; padding: 20px; box-sizing: border-box;
+}
+.uzklausos-grid .blokas-1 { grid-area: blokas-1; }
+.uzklausos-grid .blokas-2 { grid-area: blokas-2; }
+.uzklausos-grid .blokas-3 { grid-area: blokas-3; }
+.uzklausos-grid .blokas-4 { grid-area: blokas-4; }
+.uzklausos-grid .blokas-5 { grid-area: blokas-5; }
+.uzklausos-grid .blokas-1,
+.uzklausos-grid .blokas-2,
+.uzklausos-grid .blokas-3,
+.uzklausos-grid .blokas-4,
+.uzklausos-grid .blokas-5 {
+  border: 1px solid #ddd; padding: 10px; border-radius: 5px; background-color: #f9f9f9;
 }
 
-.blokas-1 { grid-area: blokas-1; }
-.blokas-2 { grid-area: blokas-2; }
-.blokas-3 { grid-area: blokas-3; }
-.blokas-4 { grid-area: blokas-4; }
-.blokas-5 { grid-area: blokas-5; }
+/* ===== Smulkūs utilitai ===== */
+.text-muted { color: #64748b; }
 
-.blokas-1,
-.blokas-2,
-.blokas-3,
-.blokas-4,
-.blokas-5 {
-  border: 1px solid #ddd;
-  padding: 10px;
-  border-radius: 5px;
-  background-color: #f9f9f9;
-}
-
-/* ====== Kainų spalvos ====== */
-.sena {
-  background-color: #fff3cd;
-  padding: 10px;
-}
-
-.aktualu {
-  background-color: #d4edda;
-  padding: 10px;
-  border-radius: 5px;
-}
-
-/* ====== Mirksintis tekstas ====== */
-.mirksintis {
-  color: #d32f2f;
-  font-weight: 600;
-  animation: mirksintis 1s step-start infinite;
-}
-
-@keyframes mirksintis {
-  50% { visibility: hidden; }
-}
-
-/* ====== Žinutės ====== */
-.messages {
-  margin: 1em 0;
-  padding: 0;
-  list-style: none;
-}
-
-.messages li {
-  padding: .6em 1em;
-  border-radius: 4px;
-  margin-bottom: .5em;
-}
-
-.messages li.success { background: #d4edda; color: #155724; }
-.messages li.error   { background: #f8d7da; color: #721c24; }
-.messages li.warning { background: #fff3cd; color: #856404; }
-.messages li.info    { background: #d1ecf1; color: #0c5460; }
-
-/* ====== Paieškos forma ====== */
-.search-form {
-  margin-bottom: 20px;
-}
-
-.search-form input[type="text"] {
-  padding: 5px;
-  font-size: 16px;
-}
-
-.search-form input[type="submit"] {
-  padding: 5px 10px;
-  font-size: 16px;
-  cursor: pointer;
-}
+/* Pastaba:
+- Netyčia NEperrašo body/header/.container – jų neliečiam, kad nesulaužytų base.html maketo.
+- Sticky head veikia, jei aplink lentelę yra .table-wrap su overflow:auto (kaip tavo šablone).
+*/

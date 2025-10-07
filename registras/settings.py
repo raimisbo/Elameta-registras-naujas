@@ -87,7 +87,7 @@ DATE_INPUT_FORMATS = ['%Y-%m-%d']
 
 # --- Static & Media ---
 STATIC_URL = '/static/'
-# STATICFILES_DIRS = [BASE_DIR / "static"]       # papildomi projektiniai statiniai
+STATICFILES_DIRS = [BASE_DIR / "static"]       # papildomi projektiniai statiniai
 STATIC_ROOT = BASE_DIR / "staticfiles"         # gamybos collectstatic
 
 MEDIA_URL = 'media/'

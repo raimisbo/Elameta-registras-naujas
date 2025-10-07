@@ -1,3 +1,7 @@
+{% load static %}
+
+
+
 <!doctype html>
 <html lang="lt">
 <head>
@@ -5,6 +9,7 @@
   <title>{% block title %}Registras{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    <link rel="stylesheet" href="{% static 'detaliu_registras/css/style.css' %}">
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;background:#f8fafc;color:#0f172a}
     header.site{background:#111827;color:#fff;padding:12px 16px}
     header.site a{color:#fff;text-decoration:none;margin-right:14px}
