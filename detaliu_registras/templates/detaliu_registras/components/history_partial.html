@@ -1,0 +1,55 @@
+{# detaliu_registras/templates/detaliu_registras/components/history_partial.html #}
+
+<!--  Dalinis HTML istorijai. Įkeliamas AJAX'u į bloką.-->
+<!--  Be JS gali būti atverstas kaip pilnas turinys (jei atidarytas tiesiogiai).-->
+
+
+{% if error %}
+  <div class="flash flash-error">{{ error }}</div>
+{% endif %}
+
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Vartotojas</th>
+      <th>Tipas</th>
+      <th>Pokyčiai</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in history_diffs %}
+      <tr>
+        <td>{{ row.h.history_date|date:"Y-m-d H:i" }}</td>
+        <td>{{ row.h.history_user|default:"—" }}</td>
+        <td>
+          {% if row.h.history_type == '+' %}Sukurta
+          {% elif row.h.history_type == '~' %}Atnaujinta
+          {% elif row.h.history_type == '-' %}Ištrinta
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if row.changes %}
+            <ul style="margin:0; padding-left: 1rem;">
+              {% for c in row.changes %}
+                <li>
+                  <strong>{{ c.field }}</strong>:
+                  {{ c.old|default:"—" }} → {{ c.new|default:"—" }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4">Istorijos nėra.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div style="margin-top: 6px;">
+  {# Paprastas "Daugiau" mygtukas – be JS atidaro platesnę versiją #}
+  <a href="?limit={{ limit|add:20 }}">Rodyti daugiau</a>
+</div>

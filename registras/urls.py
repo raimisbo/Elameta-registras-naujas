@@ -13,6 +13,7 @@ urlpatterns = [
         "detaliu_registras/",
         include(("detaliu_registras.urls", "detaliu_registras"), namespace="detaliu_registras"),
     ),
+    path('detaliu_registras/', include('detaliu_registras.urls_history')),
 ]
 
 # Vystymo režime patiekiam media failus (pvz. įkeltus brėžinius, dokumentus)

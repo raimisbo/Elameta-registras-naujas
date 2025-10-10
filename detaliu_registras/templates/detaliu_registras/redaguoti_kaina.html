@@ -20,7 +20,7 @@
     {{ formset.non_form_errors }}
     {{ formset.management_form }}
 
-    <table id="kainos-table" style="width:100%;border-collapse:collapse">
+    <table id="kainos-table" class="kainos-table" style="width:100%;border-collapse:collapse;table-layout:fixed">
       <thead>
         <tr>
           <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Būsena</th>
@@ -36,9 +36,12 @@
       </thead>
       <tbody>
         {% for form in formset %}
-          {{ form.id }}
           <tr class="kaina-row">
-            <td style="padding:6px 8px">{{ form.busena.errors }}{{ form.busena }}</td>
+            <td style="padding:6px 8px">
+              {# ↓ HIDDEN FIELDS ĮDĖTI Į ŠĮ TD, NE Į TBODY #}
+              {% for h in form.hidden_fields %}{{ h }}{% endfor %}
+              {{ form.busena.errors }}{{ form.busena }}
+            </td>
             <td style="padding:6px 8px">{{ form.suma.errors }}{{ form.suma }}</td>
             <td style="padding:6px 8px">{{ form.valiuta.errors }}{{ form.valiuta }}</td>
             <td style="padding:6px 8px">{{ form.yra_fiksuota.errors }}{{ form.yra_fiksuota }}</td>
@@ -61,9 +64,12 @@
     </div>
 
     <template id="empty-row">
-      {{ formset.empty_form.id }}
       <tr class="kaina-row">
-        <td>{{ formset.empty_form.busena }}</td>
+        <td>
+          {# ↓ HIDDEN FIELDS IŠ EMPTY_FORM – TAIP PAT Į PIRMĄ TD #}
+          {% for h in formset.empty_form.hidden_fields %}{{ h }}{% endfor %}
+          {{ formset.empty_form.busena }}
+        </td>
         <td>{{ formset.empty_form.suma }}</td>
         <td>{{ formset.empty_form.valiuta }}</td>
         <td>{{ formset.empty_form.yra_fiksuota }}</td>
@@ -83,6 +89,15 @@
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;cursor:pointer;text-decoration:none}
 .btn-secondary{background:#fff}
 .small-note{color:#6b7280}
+
+/* Kad kontrolės gražiai tilptų į langelius */
+.kainos-table input[type="text"],
+.kainos-table input[type="number"],
+.kainos-table input[type="date"],
+.kainos-table input[type="time"],
+.kainos-table input[type="datetime-local"],
+.kainos-table select,
+.kainos-table textarea{width:100%;box-sizing:border-box}
 </style>
 
 <script>
@@ -97,13 +112,13 @@
     if(!tpl) return;
     const html=tpl.innerHTML.replace(/__prefix__/g,String(count));
     const tbody=document.querySelector('#kainos-table tbody');
-    const container=document.createElement('tbody');
-    container.innerHTML=html.trim();
-    while(container.firstChild){tbody.appendChild(container.firstChild);}
+    const wrapper=document.createElement('tbody');  // tik naud. kaip parserį
+    wrapper.innerHTML=html.trim();
+    while(wrapper.firstChild){tbody.appendChild(wrapper.firstChild);}
     total.value=String(count+1);
   });
 
-  // UX: jei pažymėta "Yra fiksuota", išjungiame intervalo laukus toje eilutėje
+  // UX: "Yra fiksuota" – perjungiam susijusius laukus toje pačioje eilutėje
   document.addEventListener('change', function(e){
     if(e.target && e.target.matches('input[type="checkbox"][name$="-yra_fiksuota"]')){
       const row = e.target.closest('tr');

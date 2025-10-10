@@ -1,4 +1,5 @@
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 # --- Bazinė laiko žymų klasė: BŪTINAI abstract ---
@@ -14,6 +15,9 @@ class Timestamped(models.Model):
 class Klientas(Timestamped):
     vardas = models.CharField(max_length=255)
 
+    # istorija
+    history = HistoricalRecords()
+
     def __str__(self):
         return self.vardas
 
@@ -22,6 +26,9 @@ class Projektas(Timestamped):
     klientas = models.ForeignKey(Klientas, on_delete=models.CASCADE, related_name="projektai")
     pavadinimas = models.CharField(max_length=255)
     aprasymas = models.TextField(blank=True, null=True)
+
+    # istorija
+    history = HistoricalRecords()
 
     def __str__(self):
         return self.pavadinimas
@@ -66,6 +73,9 @@ class Detale(Timestamped):
     ppap_dokumentai = models.CharField(max_length=255, blank=True, null=True)
     priedai_info = models.CharField(max_length=255, blank=True, null=True)
 
+    # istorija
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"{self.pavadinimas} ({self.brezinio_nr or '—'})"
 
@@ -77,6 +87,9 @@ class DetaleSpecifikacija(Timestamped):
     svoris_kg = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
     medziagos_kodas = models.CharField(max_length=255, blank=True, null=True)
 
+    # istorija
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"Specifikacija: {self.detale}"
 
@@ -87,6 +100,9 @@ class PavirsiuDangos(Timestamped):
     miltelinis_name = models.CharField(max_length=255, blank=True, null=True)
     spalva_ral = models.CharField(max_length=64, blank=True, null=True)
     blizgumas = models.CharField(max_length=128, blank=True, null=True)
+
+    # istorija
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"Dangos: {self.detale}"
@@ -101,6 +117,9 @@ class Uzklausa(Timestamped):
 
     # data auto_now_add buvo minėta – laikomės jos
     data = models.DateField(auto_now_add=True, null=True, blank=True)
+
+    # istorija
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"Užklausa #{self.pk}"
@@ -131,6 +150,9 @@ class Kaina(Timestamped):
     fiksuotas_kiekis = models.PositiveIntegerField(null=True, blank=True)
     kainos_matas = models.CharField(max_length=8, choices=MATAS_CHOICES, null=True, blank=True)
 
+    # istorija
+    history = HistoricalRecords()
+
     class Meta:
         ordering = ["-id"]
 
@@ -151,6 +173,9 @@ class Kainodara(Timestamped):
     uzklausa = models.ForeignKey(Uzklausa, on_delete=models.CASCADE, related_name="kainodaros")
     pavadinimas = models.CharField(max_length=255, blank=True, null=True)
 
+    # istorija
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"Kainodara #{self.pk} ({self.pavadinimas or 'be pavadinimo'})"
 
@@ -165,6 +190,9 @@ class KainosPartijai(Timestamped):
     kiekis_iki = models.PositiveIntegerField(null=True, blank=True)
     suma = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     valiuta = models.CharField(max_length=10, default="EUR")
+
+    # istorija
+    history = HistoricalRecords()
 
     def __str__(self):
         r1 = self.kiekis_nuo or 0
