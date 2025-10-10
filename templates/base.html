@@ -1,34 +1,43 @@
+{% load static %}
 <!doctype html>
 <html lang="lt">
 <head>
   <meta charset="utf-8">
   <title>{% block title %}Registras{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
+    /* Pagrindas */
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;background:#f8fafc;color:#0f172a}
     header.site{background:#111827;color:#fff;padding:12px 16px}
     header.site a{color:#fff;text-decoration:none;margin-right:14px}
     main{padding:18px 0}
     .container{max-width:1200px;margin:0 auto;padding:0 16px}
+
+    /* Flash žinutės */
     .flash{margin:8px 0;padding:10px 12px;border-radius:6px}
     .flash-success{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
     .flash-error{background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d}
     .flash-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
-    a.btn, button.btn{display:inline-block;padding:8px 12px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;text-decoration:none;cursor:pointer}
-    a.btn-secondary, button.btn-secondary{background:#f3f4f6;color:#111827;border-color:#d1d5db}
-    /* Bendri „dėžutės“ ir „tinklelio“ stiliai, kuriuos kartoji puslapiuose */
+
+    /* Mygtukai */
+    a.btn,button.btn{display:inline-block;padding:8px 12px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;text-decoration:none;cursor:pointer}
+    a.btn-secondary,button.btn-secondary{background:#f3f4f6;color:#111827;border-color:#d1d5db}
+    a.btn:focus,button.btn:focus{outline:2px solid #60a5fa;outline-offset:2px}
+
+    /* Dėžutės ir tinklelis */
     .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media(max-width:640px){.grid{grid-template-columns:1fr}}
 
-    /* Subtili blokų antraštė ir „Istorija“ nuoroda (suploninta versija) */
+    /* „Istorija“ nuoroda */
     .block-head{display:flex;align-items:center;gap:8px}
     .block-head .grow{flex:1}
     .hist-link{font-size:.85rem;color:#6b7280;line-height:1;display:inline-flex;align-items:center;gap:6px;text-decoration:none;opacity:.9}
     .hist-link:hover{opacity:1;text-decoration:underline}
     .hist-link .dot{font-size:1rem;color:#9ca3af}
 
-    /* Kainų lentelės inputai — kad neužliptų iš stulpelių */
+    /* Kainų lentelės įvestys pilno pločio */
     table.kainos-table{table-layout:fixed}
     .kainos-table input[type="text"],
     .kainos-table input[type="number"],
@@ -38,22 +47,189 @@
     .kainos-table select,
     .kainos-table textarea{width:100%;box-sizing:border-box}
 
-    /* Mygtukų fokusas – patogiau klaviatūrai */
-    a.btn:focus,button.btn:focus{outline:2px solid #60a5fa;outline-offset:2px}
+    /* Sticky (jei kur dar naudosi) */
+    .sticky-head thead th{
+      position: sticky;
+      top: var(--app-header-offset, 0px);
+      background:#fff;
+      z-index:5;
+      box-shadow: 0 1px 0 #e5e7eb;
+    }
+
+    /* Fiksuotas klonuotas headeris */
+    .fixed-thead{
+      position: fixed;
+      top: var(--app-header-offset, 0px);
+      z-index: 10;
+      left: 0;
+      background:#fff;
+      box-shadow: 0 1px 0 #e5e7eb;
+      overflow:hidden;
+    }
+    .fixed-thead table{border-collapse:collapse}
+    .fixed-thead th{
+      text-align:left;
+      padding:8px 10px;
+      white-space:nowrap;
+      border-bottom:1px solid #e5e7eb;
+      box-sizing:border-box;
+    }
   </style>
+
   {% block extra_head %}{% endblock %}
 </head>
 <body>
   <header class="site">
-    <div class="container">
-      <a href="{% url 'detaliu_registras:uzklausa_list' %}"><strong>Detalių registras</strong></a>
-      <a href="{% url 'detaliu_registras:ivesti_uzklausa' %}" style="margin-left:10px">+ Nauja užklausa</a>
+    <div class="container" style="display:flex;align-items:center;gap:16px">
+      <a href="{% url 'detaliu_registras:uzklausa_list' %}">Užklausos</a>
+      <a href="{% url 'detaliu_registras:ivesti_uzklausa' %}">Nauja užklausa</a>
+      {% block site_header_extras %}{% endblock %}
     </div>
   </header>
-  <main class="container">
-    {% include "snippets/messages.html" %}
-    {% block content %}{% endblock %}
+
+  <main>
+    <div class="container">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash {% if message.tags %}flash-{{ message.tags }}{% endif %}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
   </main>
-  {% block extra_js %}{% endblock %}
+
+  <!-- Poslinkis pagal viršutinę juostą -->
+  <script>
+    (function(){
+      function setHeaderOffset(){
+        var h=document.querySelector('header.site');
+        var px=h?h.offsetHeight:0;
+        document.documentElement.style.setProperty('--app-header-offset',px+'px');
+      }
+      if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',setHeaderOffset);}else{setHeaderOffset();}
+      window.addEventListener('resize',setHeaderOffset);
+    })();
+  </script>
+
+  <!-- Fiksuotas headeris .js-fixed-head lentelėms (sinchronizuotas su stulpelių slėpimu) -->
+  <script>
+    (function(){
+      var COUNTER = 0;
+
+      function getHeaderOffset(){
+        return parseFloat(getComputedStyle(document.documentElement)
+          .getPropertyValue('--app-header-offset')) || 0;
+      }
+
+      function makeFixedHeader(table){
+        var wrap = table.closest('.table-wrap') || table.parentElement;
+        if(!wrap) return;
+        var thead = table.querySelector('thead');
+        if(!thead) return;
+
+        var tableId = table.id || ('jsfh-' + (++COUNTER));
+        table.id = tableId;
+
+        // Sukuriam fiksuotą headerį ir nuklonuojam eilutę
+        var fixed = document.createElement('div');
+        fixed.className = 'fixed-thead';
+        fixed.setAttribute('data-fixed-for', tableId);
+        fixed.style.display = 'none';
+
+        var ftable = document.createElement('table');
+        ftable.className = table.className;
+        var fthead = document.createElement('thead');
+        var srcRow = thead.querySelector('tr');
+        if(!srcRow) return;
+        fthead.appendChild(srcRow.cloneNode(true)); // th[data-col] kopijuojasi
+        ftable.appendChild(fthead);
+        fixed.appendChild(ftable);
+        document.body.appendChild(fixed);
+
+        var shown = false;
+
+        function applyCols(map){
+          // Slėpimas/rodymas fiksuotame header'yje
+          fthead.querySelectorAll('th[data-col]').forEach(function(th){
+            var key = th.dataset.col;
+            th.style.display = (map && map[key]===false) ? 'none' : '';
+          });
+        }
+
+        function syncSizes(){
+          var ths  = thead.querySelectorAll('th');
+          var fths = fthead.querySelectorAll('th');
+          if(!ths.length || ths.length !== fths.length) return;
+
+          ths.forEach(function(th,i){
+            var isHidden = getComputedStyle(th).display === 'none';
+            // atkartojam matomumą ir plotį
+            fths[i].style.display = isHidden ? 'none' : '';
+            var w = isHidden ? 0 : th.getBoundingClientRect().width;
+            ['width','minWidth','maxWidth'].forEach(function(p){ fths[i].style[p] = w + 'px'; });
+          });
+
+          var r = wrap.getBoundingClientRect();
+          fixed.style.width = r.width + 'px';
+          fixed.style.left  = r.left + 'px';
+        }
+
+        function syncScroll(){
+          if (shown) ftable.style.transform = 'translateX(' + (-wrap.scrollLeft) + 'px)';
+        }
+
+        function updateVisibility(){
+          var r = wrap.getBoundingClientRect();
+          var topLine = getHeaderOffset();
+          var shouldShow = (r.top < topLine) && (r.bottom > topLine);
+
+          if (shouldShow && !shown) {
+            shown = true;
+            fixed.style.display = 'block';
+            // paslepiam originalų thead (kad nebūtų dviejų „juostų“)
+            thead.style.visibility = 'hidden';
+            syncSizes();
+            syncScroll();
+          } else if (!shouldShow && shown) {
+            shown = false;
+            fixed.style.display = 'none';
+            thead.style.visibility = ''; // grąžinam
+          }
+        }
+
+        // Įvykiai
+        window.addEventListener('resize', function(){ syncSizes(); updateVisibility(); });
+        window.addEventListener('scroll', updateVisibility, { passive:true });
+        wrap.addEventListener('scroll', syncScroll);
+
+        // Reakcija į stulpelių pakeitimus iš puslapio
+        window.addEventListener('table:cols-changed', function(e){
+          var d = e.detail || {};
+          if (d.tableId === tableId){
+            applyCols(d.map || {});
+            syncSizes();
+          }
+        });
+
+        // Inic.
+        // truputį palaukiam, kad naršyklė suskaičiuotų pločius (ypač po fontų)
+        function initNow(){ applyCols({}); syncSizes(); updateVisibility(); syncScroll(); }
+        if (document.fonts && document.fonts.ready) { document.fonts.ready.then(initNow); }
+        else { setTimeout(initNow, 0); }
+
+        if ('ResizeObserver' in window) {
+          var ro = new ResizeObserver(function(){ syncSizes(); updateVisibility(); });
+          ro.observe(wrap); ro.observe(table);
+        }
+      }
+
+      function init(){
+        document.querySelectorAll('table.js-fixed-head').forEach(makeFixedHeader);
+      }
+      if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+    })();
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

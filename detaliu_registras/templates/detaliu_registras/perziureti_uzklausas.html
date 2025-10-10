@@ -66,7 +66,7 @@
 
   <!-- Lentelė -->
   <section class="table-wrap" style="overflow-x:auto">
-    <table class="table" style="width:100%;border-collapse:collapse">
+    <table id="uzklausos-table" class="table js-fixed-head" style="width:100%;border-collapse:collapse;table-layout:fixed">
       <thead>
         <tr>
           <th data-col="id">ID</th>
@@ -123,7 +123,7 @@
 </div>
 
 <script>
-/* ===== Donut su spalvomis ir click ===== */
+/* ===== Donut (palikta kaip buvo) ===== */
 (function() {
   const donut = document.getElementById("donut");
   if (!donut) return;
@@ -136,7 +136,6 @@
   const svg = donut.querySelector(".donut-svg");
   const g = svg.querySelector(".segments");
   const r = 54, C = 2 * Math.PI * r;
-
   const COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6","#06B6D4","#22C55E","#D946EF"];
 
   function goToSeg(slug) {
@@ -162,17 +161,12 @@
     const gap  = C - dash;
 
     const arc = document.createElementNS("http://www.w3.org/2000/svg","circle");
-    arc.setAttribute("cx","60");
-    arc.setAttribute("cy","60");
-    arc.setAttribute("r", String(r));
-    arc.setAttribute("fill","none");
-    arc.setAttribute("stroke-linecap","round");
-    arc.setAttribute("stroke-width","12");
+    arc.setAttribute("cx","60"); arc.setAttribute("cy","60"); arc.setAttribute("r", String(r));
+    arc.setAttribute("fill","none"); arc.setAttribute("stroke-linecap","round"); arc.setAttribute("stroke-width","12");
     arc.setAttribute("stroke", COLORS[i % COLORS.length]);
     arc.setAttribute("stroke-dasharray", `${dash} ${gap}`);
     arc.setAttribute("stroke-dashoffset", String(offset));
-    arc.style.transform = "rotate(-90deg)";
-    arc.style.transformOrigin = "50% 50%";
+    arc.style.transform = "rotate(-90deg)"; arc.style.transformOrigin = "50% 50%";
     arc.style.cursor = "pointer";
     arc.addEventListener("click", () => goToSeg(s.slug || ""));
     g.appendChild(arc);
@@ -187,7 +181,7 @@
     li.className = "legend-item";
     li.style.cssText = "display:flex;align-items:center;gap:8px;padding:2px 4px;border-radius:6px;cursor:pointer";
     li.innerHTML = `
-      <span class="legend-dot" style="background:${COLORS[i % COLORS.length]};width:10px;height:10px;border-radius:999px;display:inline-block"></span>
+      <span class="legend-dot" style="width:10px;height:10px;border-radius:999px;display:inline-block;background:${COLORS[i % COLORS.length]}"></span>
       <span class="legend-text" style="font-size:13px;color:#374151">${s.label || "—"}: <b>${s.value || 0}</b></span>
     `;
     li.addEventListener("click", () => goToSeg(s.slug || ""));
@@ -195,10 +189,11 @@
   });
 })();
 
-/* ===== Stulpelių panelė – 100% patikimas toggle ===== */
+/* ===== Stulpelių panelė → fiksuotam headeriui siunčiam „table:cols-changed“ ===== */
 (function() {
   const STORAGE_KEY = "uzklausos_cols_v1";
   const PANEL_OPEN_KEY = "uzklausos_cols_panel_open";
+  const TABLE_ID = "uzklausos-table";
 
   function init() {
     const wrap  = document.getElementById("cols-config");
@@ -208,7 +203,6 @@
     const panel = wrap.querySelector("#cols-panel");
     if (!btn || !panel) return;
 
-    // Atstatom būseną iš localStorage
     const savedOpen = localStorage.getItem(PANEL_OPEN_KEY);
     const isOpen = savedOpen === "1";
     panel.style.display = isOpen ? "flex" : "none";
@@ -220,7 +214,6 @@
       try { localStorage.setItem(PANEL_OPEN_KEY, nowOpen ? "1" : "0"); } catch {}
     });
 
-    // Stulpelių checkbox'ų logika
     const checks = panel.querySelectorAll('input[type="checkbox"][data-col]');
     const allCells = document.querySelectorAll('th[data-col], td[data-col]');
 
@@ -229,18 +222,29 @@
     }
     function savePrefs(map) { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); }
     function currentMap() { const m = {}; checks.forEach(ch => m[ch.dataset.col] = ch.checked); return m; }
+
     function apply(map) {
       allCells.forEach(el => {
         const key = el.dataset.col;
         el.style.display = (map[key] !== false) ? "" : "none";
       });
+      // pranešam fiksuotam headeriui
+      window.dispatchEvent(new CustomEvent('table:cols-changed', {
+        detail: { tableId: TABLE_ID, map }
+      }));
     }
 
     const saved = loadPrefs();
-    if (saved) { checks.forEach(ch => { if (saved.hasOwnProperty(ch.dataset.col)) ch.checked = !!saved[ch.dataset.col]; }); apply(saved); }
-    else { apply(currentMap()); }
+    if (saved) {
+      checks.forEach(ch => { if (saved.hasOwnProperty(ch.dataset.col)) ch.checked = !!saved[ch.dataset.col]; });
+      apply(saved);
+    } else {
+      const m = currentMap(); savePrefs(m); apply(m);
+    }
 
-    checks.forEach(ch => ch.addEventListener("change", () => { const m = currentMap(); savePrefs(m); apply(m); }));
+    checks.forEach(ch => ch.addEventListener("change", () => {
+      const m = currentMap(); savePrefs(m); apply(m);
+    }));
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
