@@ -16,6 +16,30 @@
     .flash-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
     a.btn, button.btn{display:inline-block;padding:8px 12px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;text-decoration:none;cursor:pointer}
     a.btn-secondary, button.btn-secondary{background:#f3f4f6;color:#111827;border-color:#d1d5db}
+    /* Bendri „dėžutės“ ir „tinklelio“ stiliai, kuriuos kartoji puslapiuose */
+    .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    @media(max-width:640px){.grid{grid-template-columns:1fr}}
+
+    /* Subtili blokų antraštė ir „Istorija“ nuoroda (suploninta versija) */
+    .block-head{display:flex;align-items:center;gap:8px}
+    .block-head .grow{flex:1}
+    .hist-link{font-size:.85rem;color:#6b7280;line-height:1;display:inline-flex;align-items:center;gap:6px;text-decoration:none;opacity:.9}
+    .hist-link:hover{opacity:1;text-decoration:underline}
+    .hist-link .dot{font-size:1rem;color:#9ca3af}
+
+    /* Kainų lentelės inputai — kad neužliptų iš stulpelių */
+    table.kainos-table{table-layout:fixed}
+    .kainos-table input[type="text"],
+    .kainos-table input[type="number"],
+    .kainos-table input[type="date"],
+    .kainos-table input[type="time"],
+    .kainos-table input[type="datetime-local"],
+    .kainos-table select,
+    .kainos-table textarea{width:100%;box-sizing:border-box}
+
+    /* Mygtukų fokusas – patogiau klaviatūrai */
+    a.btn:focus,button.btn:focus{outline:2px solid #60a5fa;outline-offset:2px}
   </style>
   {% block extra_head %}{% endblock %}
 </head>

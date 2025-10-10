@@ -1,19 +1,21 @@
 {% extends "base.html" %}
 {% block title %}
-  {% firstof uzklausa.klientas.pavadinimas uzklausa.klientas.name uzklausa.klientas "Užklausa" %} — Užklausa
+  {% firstof uzklausa.klientas.vardas uzklausa.klientas "Užklausa" %} — Užklausa
 {% endblock %}
 
 {% block content %}
 <div class="container">
   <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
-    <h1 style="margin:0">{% firstof uzklausa.klientas.pavadinimas uzklausa.klientas.name uzklausa.klientas "Užklausa" %}</h1>
+    <h1 style="margin:0">
+      {% firstof uzklausa.klientas.vardas uzklausa.klientas "Užklausa" %}
+    </h1>
     <div style="display:flex;gap:8px">
       <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Į sąrašą</a>
       <a class="btn" href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}">Redaguoti</a>
     </div>
   </header>
 
-  {# Paruošti patogūs URL'iai istorijai #}
+  {# Paruošti trumpi URL'ai istorijai #}
   {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Uzklausa' uzklausa.pk as hist_uzk_url %}
   {% if uzklausa.detale %}
     {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Detale' uzklausa.detale.id as hist_detale_url %}
@@ -47,7 +49,7 @@
   <section class="box block" data-block="main">
     <h3>Pagrindinė informacija</h3>
     <div class="grid">
-      <div><strong>Klientas:</strong> {{ uzklausa.klientas|default:"—" }}</div>
+      <div><strong>Klientas:</strong> {% firstof uzklausa.klientas.vardas uzklausa.klientas "—" %}</div>
       <div><strong>Projektas:</strong> {{ uzklausa.projektas|default:"—" }}</div>
       <div><strong>Detalė:</strong> {{ uzklausa.detale.pavadinimas|default:"—" }}</div>
       <div><strong>Brėžinio nr.:</strong> {{ uzklausa.detale.brezinio_nr|default:"—" }}</div>
@@ -59,7 +61,7 @@
   <section class="box block" data-block="spec">
     <div class="block-head">
       <h3 class="grow">Specifikacija</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-spec" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-spec" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     {% if uzklausa.detale.specifikacija %}
       <div class="grid">
@@ -78,7 +80,7 @@
   <section class="box block" data-block="coats">
     <div class="block-head">
       <h3 class="grow">Paviršių dangos</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-coats" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-coats" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     {% if uzklausa.detale.pavirsiu_dangos %}
       <div class="grid">
@@ -97,7 +99,7 @@
   <section class="box block" data-block="qty">
     <div class="block-head">
       <h3 class="grow">Kiekiai</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qty" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qty" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>Kiekis per metus:</strong> {{ uzklausa.detale.kiekis_metinis|default:"—" }}</div>
@@ -112,7 +114,7 @@
   <section class="box block" data-block="dims">
     <div class="block-head">
       <h3 class="grow">Matmenys</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-dims" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-dims" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>Ilgis (mm):</strong> {{ uzklausa.detale.ilgis_mm|default:"—" }}</div>
@@ -129,7 +131,7 @@
   <section class="box block" data-block="hang">
     <div class="block-head">
       <h3 class="grow">Kabinimas</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-hang" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-hang" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>Kabinimo būdas:</strong> {{ uzklausa.detale.kabinimo_budas|default:"—" }}</div>
@@ -144,7 +146,7 @@
   <section class="box block" data-block="pack">
     <div class="block-head">
       <h3 class="grow">Pakuotė</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-pack" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-pack" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>Pakuotės tipas:</strong> {{ uzklausa.detale.pakuotes_tipas|default:"—" }}</div>
@@ -159,7 +161,7 @@
   <section class="box block" data-block="qa">
     <div class="block-head">
       <h3 class="grow">Testai / Kokybė</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qa" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qa" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>Druskos rūkas (val.):</strong> {{ uzklausa.detale.testai_druskos_rukas_val|default:"—" }}</div>
@@ -174,7 +176,7 @@
   <section class="box block" data-block="docs">
     <div class="block-head">
       <h3 class="grow">Dokumentai / Pastabos</h3>
-      <a href="{{ hist_uzk_url }}" class="hist-link js-history-link" data-target="#hist-docs" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_uzk_url }}" class="hist-link js-history-link" data-target="#hist-docs" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
     <div class="grid">
       <div><strong>PPAP dokumentai:</strong> {{ uzklausa.detale.ppap_dokumentai|default:"—" }}</div>
@@ -189,7 +191,7 @@
   <section class="box block" data-block="price">
     <div class="block-head">
       <h3 class="grow">Kaina</h3>
-      <a href="{{ hist_kaina_url }}" class="hist-link js-history-link" data-target="#hist-price" title="Istorija"><span class="dot">•</span> istorija</a>
+      <a href="{{ hist_kaina_url }}" class="hist-link js-history-link" data-target="#hist-price" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
     </div>
 
     <div class="grid">
@@ -240,7 +242,7 @@
 </style>
 
 <script>
-/* ===== Blokų panelė – kaip turėjai, tik neleidžiame slėpti 1-o ("main") ===== */
+/* ===== Blokų panelė – neleidžiame slėpti 1-o ("main") ===== */
 (function() {
   const STORAGE_KEY = "uzklausa_blocks_v1";
   const PANEL_OPEN_KEY = "uzklausa_blocks_panel";
@@ -308,23 +310,42 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })();
+</script>
 
-/* ===== AJAX istorija – lengvas įkėlimas į kiekvieną bloką ===== */
+<script>
+/* ===== AJAX istorija: 'toggle' uždaro/atidaro, 'more' – krauna daugiau į tą pačią dėžutę ===== */
 (function(){
   document.addEventListener('click', async function(e) {
     const link = e.target.closest('.js-history-link');
     if (!link) return;
 
     e.preventDefault();
-    const targetSel = link.getAttribute('data-target');
-    const box = document.querySelector(targetSel);
+
+    const mode = link.dataset.mode || 'toggle';   // 'toggle' arba 'more'
+    const targetSel = link.getAttribute('data-target') || '';
+    let box = null;
+
+    if (targetSel === 'closest') {
+      box = link.closest('.history-box');
+    } else if (targetSel) {
+      box = document.querySelector(targetSel);
+    }
     if (!box) return;
 
-    if (box.dataset.loaded === '1') {
-      box.style.display = (box.style.display === 'none' || !box.style.display) ? '' : 'none';
+    // TOGGLE: jei jau užkrauta – tik perjungiam rodymą
+    if (mode === 'toggle' && box.dataset.loaded === '1') {
+      const isHidden = (box.style.display === 'none') || (getComputedStyle(box).display === 'none');
+      if (isHidden) {
+        box.style.display = '';
+        link.setAttribute('aria-expanded', 'true');
+      } else {
+        box.style.display = 'none';
+        link.setAttribute('aria-expanded', 'false');
+      }
       return;
     }
 
+    // Krovimas (pirmas kartas arba 'more')
     box.style.display = '';
     box.innerHTML = '<em>Kraunama...</em>';
 
@@ -333,6 +354,7 @@
       const html = await resp.text();
       box.innerHTML = html;
       box.dataset.loaded = '1';
+      link.setAttribute('aria-expanded', 'true');
     } catch (err) {
       box.innerHTML = '<span class="text-danger">Nepavyko užkrauti istorijos.</span>';
     }
