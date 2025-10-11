@@ -14,7 +14,7 @@ from .forms import (
     UzklausaCreateOrSelectForm,
     UzklausaEditForm,
     ImportUzklausosCSVForm,
-    KainaForm,
+    KainaForm, UzklausaCreateFullForm,
 )
 
 # CSV importo helperis (nebūtinas)
@@ -144,7 +144,7 @@ class UzklausaDetailView(DetailView):
 # === Nauja užklausa ===
 class UzklausaCreateView(CreateView):
     template_name = "detaliu_registras/ivesti_uzklausa.html"
-    form_class = UzklausaCreateOrSelectForm
+    form_class = UzklausaCreateFullForm
 
     def form_valid(self, form):
         uzklausa = form.save()

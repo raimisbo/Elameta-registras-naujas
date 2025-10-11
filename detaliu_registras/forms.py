@@ -350,6 +350,102 @@ class UzklausaEditForm(forms.ModelForm):
         return u
 
 
+# === KŪRIMAS: pilna forma su pasirinkimais ir visais laukais ===
+class UzklausaCreateFullForm(UzklausaEditForm):
+    # Pasirinkti esamą arba įvesti naują
+    klientas = forms.ModelChoiceField(
+        label="Klientas",
+        queryset=Klientas.objects.all().order_by("vardas"),
+        required=False, empty_label="— pasirinkite —",
+    )
+    naujas_klientas = forms.CharField(label="Naujas klientas", required=False)
+
+    projektas = forms.ModelChoiceField(
+        label="Projektas",
+        queryset=Projektas.objects.all().order_by("pavadinimas"),
+        required=False, empty_label="— pasirinkite —",
+    )
+    naujas_projektas = forms.CharField(label="Naujas projektas", required=False)
+
+    detale = forms.ModelChoiceField(
+        label="Detalė",
+        queryset=Detale.objects.all().order_by("pavadinimas"),
+        required=False, empty_label="— pasirinkite —",
+    )
+    detales_pavadinimas = forms.CharField(label="Detalės pavadinimas", required=False)
+    detale_brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
+
+    class Meta:
+        model = Uzklausa
+        fields = []  # valdom ranka, kaip ir UzklausaEditForm
+
+    def save(self, commit=True):
+        c = self.cleaned_data
+
+        # 1) Klientas
+        klientas = c.get("klientas")
+        if not klientas and (c.get("naujas_klientas") or "").strip():
+            klientas = Klientas.objects.create(vardas=c["naujas_klientas"].strip())
+
+        # 2) Projektas
+        projektas = c.get("projektas")
+        if not projektas and (c.get("naujas_projektas") or "").strip():
+            if not klientas:
+                raise ValidationError("Sukuriant naują projektą būtina nurodyti klientą.")
+            projektas = Projektas.objects.create(
+                pavadinimas=c["naujas_projektas"].strip(),
+                klientas=klientas,
+            )
+
+        # 3) Detalė
+        detale = c.get("detale")
+        if not detale:
+            pavad = (c.get("detales_pavadinimas") or "").strip()
+            brezas = (c.get("detale_brezinio_nr") or "").strip()
+            if not pavad:
+                raise ValidationError("Naujos detalės pavadinimas yra privalomas, jei nepasirenkama esama detalė.")
+            detale = Detale.objects.create(pavadinimas=pavad, brezinio_nr=brezas)
+
+        # 4) Užpildom Detalės laukus iš formos (kiekiai, matmenys, kabinimas, pakuotė, testai, dokumentai)
+        map_fields = [
+            # Kiekiai
+            "kiekis_metinis", "kiekis_menesis", "kiekis_partijai", "kiekis_per_val",
+            # Matmenys
+            "ilgis_mm", "plotis_mm", "aukstis_mm", "skersmuo_mm", "storis_mm",
+            # Specifikacija
+            "metalas", "plotas_m2", "svoris_kg", "medziagos_kodas",
+            # Kabinimas
+            "kabinimo_budas", "kabliuku_kiekis", "kabinimo_anga_mm", "kabinti_per",
+            # Pakuotė
+            "pakuotes_tipas", "vienetai_dezeje", "vienetai_paleje", "pakuotes_pastabos",
+            # Testai / kokybė
+            "testai_druskos_rukas_val", "testas_adhezija", "testas_storis_mikronai", "testai_kita",
+            # Dokumentai
+            "ppap_dokumentai", "priedai_info",
+        ]
+        for fname in map_fields:
+            if fname in self.fields:
+                setattr(detale, fname, c.get(fname))
+        detale.save()
+
+        # 5) Dangos (jei naudoji PavirsiuDangos modelį – paliekam kaip EditForm’e)
+        try:
+            from .models import PavirsiuDangos
+        except Exception:
+            PavirsiuDangos = None
+        if PavirsiuDangos:
+            pd, _ = PavirsiuDangos.objects.get_or_create(detale=detale)
+            for f in ["ktl_ec_name", "miltelinis_name", "spalva_ral", "blizgumas"]:
+                if f in self.fields and (c.get(f) or ""):
+                    setattr(pd, f, (c.get(f) or "").strip())
+            pd.save()
+
+        uzk = Uzklausa(klientas=klientas, projektas=projektas, detale=detale)
+        if commit:
+            uzk.save()
+        return uzk
+
+
 # --- KAINA: pažangios kainodaros forma ---
 class KainaForm(forms.ModelForm):
     class Meta:
