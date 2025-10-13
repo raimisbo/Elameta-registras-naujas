@@ -1,0 +1,143 @@
+{# templates/snippets/columns_dnd.html #}
+<style>
+  /* Nekeičiam bendro dizaino – tik suteikiam horizontalų scroll’ą,
+     jei tėvinis konteineris turi ribotą plotį. */
+  .table-scroll-x { overflow-x: auto; }
+  /* Lengva vizualinė indikacija vilkimo metu – nepakeičia tavo stilistikos */
+  .th-dragging { opacity: .6; }
+  .th-drop-target { outline: 2px dashed #888; outline-offset: -4px; }
+</style>
+
+<script>
+(function(){
+  // Surandam pirmą pagrindinę lentelę su thead/tbody; gali pridėti id="results-table"
+  var table = document.querySelector('#results-table') ||
+              document.querySelector('#data-table') ||
+              document.querySelector('main table') ||
+              document.querySelector('#content table') ||
+              document.querySelector('table');
+
+  if(!table || !table.tHead || !table.tBodies.length){ return; }
+
+  // Apvyniojam horizontaliai scrollinamu konteineriu – nekeičiam tavo layout'o,
+  // tik pridedam galimybę slinkti į šoną, kai stulpelių daug.
+  if(!table.parentElement.classList.contains('table-scroll-x')){
+    var wrap = document.createElement('div');
+    wrap.className = 'table-scroll-x';
+    table.parentElement.insertBefore(wrap, table);
+    wrap.appendChild(table);
+  }
+
+  var KEY = 'colOrder:' + (location.pathname || 'default');
+
+  // Iš th tekstų (ar data-key) sugeneruojam stabilų raktą
+  function colKey(th, idx){
+    var k = th.getAttribute('data-col-key') || th.textContent.trim().toLowerCase();
+    if(!k) k = 'col'+idx;
+    // supaprastinam
+    k = k.replace(/[^a-z0-9]+/g,'-');
+    return k;
+  }
+
+  // Nuskaityti ir pritaikyti išsaugotą tvarką
+  function applySavedOrder(){
+    try{
+      var saved = JSON.parse(localStorage.getItem(KEY)||'[]');
+      if(!saved.length) return;
+      var ths = Array.from(table.tHead.rows[0].cells);
+      var currentKeys = ths.map(colKey);
+      // Mappinam saved -> esamas indeksas
+      var newOrder = [];
+      saved.forEach(function(sk){
+        var i = currentKeys.indexOf(sk);
+        if(i>-1) newOrder.push(i);
+      });
+      // Pridedam bet ką, ko nebuvo (nauji stulpeliai)
+      currentKeys.forEach(function(k, i){
+        if(saved.indexOf(k)===-1) newOrder.push(i);
+      });
+      // pritaikom
+      reorderColumnsByIndex(newOrder);
+    }catch(e){}
+  }
+
+  function saveOrder(){
+    var ths = Array.from(table.tHead.rows[0].cells);
+    var keys = ths.map(colKey);
+    localStorage.setItem(KEY, JSON.stringify(keys));
+  }
+
+  // Perstumdo visus stulpelius pagal indeksų seką, pvz. [2,0,1,3,...]
+  function reorderColumnsByIndex(order){
+    var headRow = table.tHead.rows[0];
+    var bodyRows = Array.from(table.tBodies[0].rows);
+    // Apsauga nuo colspan
+    var ths = Array.from(headRow.cells);
+    if(ths.some(function(c){ return c.colSpan !== 1; })){ return; }
+
+    // HEAD
+    var fragH = document.createDocumentFragment();
+    order.forEach(function(i){ fragH.appendChild(ths[i]); });
+    headRow.appendChild(fragH);
+
+    // BODY
+    bodyRows.forEach(function(tr){
+      var tds = Array.from(tr.cells);
+      if(tds.length !== ths.length) return; // nelygios eilutės – praleidžiam
+      var frag = document.createDocumentFragment();
+      order.forEach(function(i){ frag.appendChild(tds[i]); });
+      tr.appendChild(frag);
+    });
+  }
+
+  // Drag&Drop ant thead
+  var dragSrcIdx = null;
+
+  Array.from(table.tHead.rows[0].cells).forEach(function(th, idx){
+    if(th.colSpan !== 1) return; // neapdorojam kompleksinių header'ių
+    th.setAttribute('draggable', 'true');
+    th.addEventListener('dragstart', function(e){
+      dragSrcIdx = Array.from(th.parentNode.children).indexOf(th);
+      th.classList.add('th-dragging');
+      try{ e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'col'); }catch(_){}
+    });
+    th.addEventListener('dragend', function(){
+      th.classList.remove('th-dragging');
+      Array.from(table.tHead.rows[0].cells).forEach(function(x){ x.classList.remove('th-drop-target'); });
+    });
+    th.addEventListener('dragover', function(e){
+      e.preventDefault();
+      this.classList.add('th-drop-target');
+      try{ e.dataTransfer.dropEffect = 'move'; }catch(_){}
+    });
+    th.addEventListener('dragleave', function(){
+      this.classList.remove('th-drop-target');
+    });
+    th.addEventListener('drop', function(e){
+      e.preventDefault();
+      this.classList.remove('th-drop-target');
+      var dropIdx = Array.from(this.parentNode.children).indexOf(this);
+      if(dragSrcIdx === null || dropIdx === dragSrcIdx) return;
+
+      // sukonstruojam naują seką
+      var len = table.tHead.rows[0].cells.length;
+      var order = Array.from({length: len}, function(_,i){ return i; });
+      var item = order.splice(dragSrcIdx, 1)[0];
+      order.splice(dropIdx, 0, item);
+
+      reorderColumnsByIndex(order);
+      saveOrder();
+      dragSrcIdx = null;
+    });
+  });
+
+  // Pritaikom tvarką iš localStorage, jei yra
+  applySavedOrder();
+
+  // Eksportuoju reset, jei prireiktų išvalyti:
+  window.resetTableColumnOrder = function(){
+    localStorage.removeItem(KEY);
+    location.reload();
+  };
+})();
+</script>

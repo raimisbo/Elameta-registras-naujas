@@ -3,6 +3,78 @@
 {% block title %}Užklausos{% endblock %}
 
 {% block content %}
+
+<style>
+  /* ===== LENTELĖS SKAITYMUMO + LYGIAVIMO TUNINGAS ===== */
+  /* Leisti kelių eilučių tekstą, gražiai laužyti žodžius */
+  #results-table th,
+  #results-table td{
+    white-space: normal;
+    word-break: break-word;
+    hyphens: auto;
+    line-height: 1.25;
+    padding: 8px 10px;
+  }
+
+  /* Centruojam visų stulpelių antraštes ir turinį pagal nutylėjimą */
+  #results-table thead th{
+    text-align: center;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  #results-table tbody td{
+    text-align: center;
+    border-bottom: 1px solid #ececec;
+  }
+
+  /* Zebra + hover */
+  #results-table tbody tr:nth-child(even) td{ background-color: #f7f7f7; }
+  #results-table tbody tr:hover td{ background-color: #f0f0f0; }
+
+  /* ===== MINIMALŪS PLOČIAI ===== */
+  #results-table [data-col="id"]        { min-width: 84px;  }
+  #results-table [data-col="klientas"]  { min-width: 180px; }
+  #results-table [data-col="projektas"] { min-width: 180px; }
+  #results-table [data-col="detale"]    { min-width: 200px; }
+  #results-table [data-col="brezinys"]  { min-width: 140px; font-family: ui-monospace, Menlo, monospace; }
+  #results-table [data-col="metalas"]   { min-width: 140px; }
+  #results-table [data-col="padengimas"]{ min-width: 160px; }
+
+  #results-table [data-col="specifikacija"] { min-width: 220px; }
+  #results-table [data-col="dangos"]        { min-width: 220px; }
+  #results-table [data-col="kiekiai"]       { min-width: 120px; } /* buvę right – dabar center */
+  #results-table [data-col="matmenys"]      { min-width: 160px; }
+  #results-table [data-col="kabinimas"]     { min-width: 160px; }
+  #results-table [data-col="pakuote"]       { min-width: 160px; }
+  #results-table [data-col="kokybe"]        { min-width: 200px; }
+  #results-table [data-col="dok"]           { min-width: 240px; }
+
+  #results-table [data-col="sukurta"]  { min-width: 120px; }
+  #results-table [data-col="veiksmai"] { min-width: 140px; text-align: right; white-space: nowrap; }
+
+  /* Tekstiniai stulpeliai skaitomumui paliekami KAIRĖJE (override) */
+  #results-table [data-col="klientas"],
+  #results-table [data-col="projektas"],
+  #results-table [data-col="detale"],
+  #results-table [data-col="specifikacija"],
+  #results-table [data-col="dangos"],
+  #results-table [data-col="pakuote"],
+  #results-table [data-col="kokybe"],
+  #results-table [data-col="dok"]{
+    text-align: left;
+  }
+
+  /* Neplėsti „Veiksmų“ mygtukų */
+  #results-table [data-col="veiksmai"] .btn{
+    display: inline-block;
+    /* neredaguojam padding/font-size – išlieka kaip pas tave projekte */
+  }
+
+  /* Slenkantis konteineris jau yra .table-wrap */
+  .table-wrap{ will-change: transform; }
+</style>
+
+
 <div class="container">
 
   <!-- Antraštė + donut -->
@@ -38,6 +110,18 @@
       <label><input type="checkbox" data-col="brezinys" checked> Brėžinio nr.</label>
       <label><input type="checkbox" data-col="metalas" checked> Metalas</label>
       <label><input type="checkbox" data-col="padengimas" checked> KTL/Milt.</label>
+
+      <!-- NAUJI stulpeliai -->
+      <label><input type="checkbox" data-col="specifikacija" checked> Specifikacija</label>
+      <label><input type="checkbox" data-col="dangos" checked> Paviršių dangos</label>
+      <label><input type="checkbox" data-col="kiekiai" checked> Kiekiai</label>
+      <label><input type="checkbox" data-col="matmenys" checked> Matmenys</label>
+      <label><input type="checkbox" data-col="kabinimas" checked> Kabinimas</label>
+      <label><input type="checkbox" data-col="pakuote" checked> Pakuotė</label>
+      <label><input type="checkbox" data-col="kokybe" checked> Testai/Kokybė</label>
+      <label><input type="checkbox" data-col="dok" checked> Dokumentai/Pastabos</label>
+      <!-- /NAUJI -->
+
       <label><input type="checkbox" data-col="sukurta" checked> Sukurta</label>
       <label><input type="checkbox" data-col="veiksmai" checked> Veiksmai</label>
     </div>
@@ -66,7 +150,7 @@
 
   <!-- Lentelė -->
   <section class="table-wrap" style="overflow-x:auto">
-    <table id="uzklausos-table" class="table js-fixed-head" style="width:100%;border-collapse:collapse;table-layout:fixed">
+    <table id="results-table" class="table js-fixed-head" style="width:100%;border-collapse:collapse;table-layout:fixed">
       <thead>
         <tr>
           <th data-col="id">ID</th>
@@ -76,6 +160,18 @@
           <th data-col="brezinys">Brėžinio nr.</th>
           <th data-col="metalas">Metalas</th>
           <th data-col="padengimas">KTL/Milt.</th>
+
+          <!-- NAUJI stulpeliai -->
+          <th data-col="specifikacija">Specifikacija</th>
+          <th data-col="dangos">Paviršių dangos</th>
+          <th data-col="kiekiai">Kiekiai</th>
+          <th data-col="matmenys">Matmenys</th>
+          <th data-col="kabinimas">Kabinimas</th>
+          <th data-col="pakuote">Pakuotė</th>
+          <th data-col="kokybe">Testai/Kokybė</th>
+          <th data-col="dok">Dokumentai/Pastabos</th>
+          <!-- /NAUJI -->
+
           <th data-col="sukurta">Sukurta</th>
           <th data-col="veiksmai" style="text-align:right">Veiksmai</th>
         </tr>
@@ -96,6 +192,87 @@
                 {{ u.detale.pavirsiu_dangos.ktl_ec_name|default_if_none:"" }}{% if u.detale.pavirsiu_dangos.ktl_ec_name and u.detale.pavirsiu_dangos.miltelinis_name %} / {% endif %}{{ u.detale.pavirsiu_dangos.miltelinis_name|default_if_none:"" }}
               {% else %}—{% endif %}
             </td>
+
+            <!-- NAUJI stulpeliai (be skliaustų if sąlygose) -->
+            <td data-col="specifikacija">
+              {% if u.detale.specifikacija %}
+                <div>{% if u.detale.specifikacija.metalas %}Metal.: {{ u.detale.specifikacija.metalas }}{% endif %}</div>
+                <div>
+                  {% if u.detale.specifikacija.storis %}Storis: {{ u.detale.specifikacija.storis }}
+                  {% elif u.detale.specifikacija.storis_mm %}Storis: {{ u.detale.specifikacija.storis_mm }} mm{% endif %}
+                </div>
+                <div>{% if u.detale.specifikacija.spalva %}Spalva: {{ u.detale.specifikacija.spalva }}{% endif %}</div>
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="dangos">
+              {% if u.detale.pavirsiu_dangos %}
+                <div>{% if u.detale.pavirsiu_dangos.ktl_ec_name %}KTL/EC: {{ u.detale.pavirsiu_dangos.ktl_ec_name }}{% endif %}</div>
+                <div>{% if u.detale.pavirsiu_dangos.miltelinis_name %}Milt.: {{ u.detale.pavirsiu_dangos.miltelinis_name }}{% endif %}</div>
+                <div>{% if u.detale.pavirsiu_dangos.kiti %}Kita: {{ u.detale.pavirsiu_dangos.kiti }}{% endif %}</div>
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="kiekiai">
+              {% if u.kiekis %}{{ u.kiekis }}
+              {% elif u.detale.kiekis %}{{ u.detale.kiekis }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="matmenys">
+              {% if u.detale and u.detale.specifikacija %}
+                {% if u.detale.specifikacija.ilgis or u.detale.specifikacija.plotis or u.detale.specifikacija.aukstis %}
+                  {{ u.detale.specifikacija.ilgis|default:"" }}×{{ u.detale.specifikacija.plotis|default:"" }}×{{ u.detale.specifikacija.aukstis|default:"" }}
+                {% elif u.ilgis or u.plotis or u.aukstis %}
+                  {{ u.ilgis|default:"" }}×{{ u.plotis|default:"" }}×{{ u.aukstis|default:"" }}
+                {% else %}—{% endif %}
+              {% else %}
+                {% if u.ilgis or u.plotis or u.aukstis %}
+                  {{ u.ilgis|default:"" }}×{{ u.plotis|default:"" }}×{{ u.aukstis|default:"" }}
+                {% else %}—{% endif %}
+              {% endif %}
+            </td>
+
+            <td data-col="kabinimas">
+              {% if u.detale.kabinimas %}{{ u.detale.kabinimas }}
+              {% elif u.kabinimas %}{{ u.kabinimas }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="pakuote">
+              {% if u.detale.pakuote %}{{ u.detale.pakuote }}
+              {% elif u.pakuote %}{{ u.pakuote }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="kokybe">
+              {% if u.detale.testai %}{{ u.detale.testai }}
+              {% elif u.testai %}{{ u.testai }}
+              {% elif u.kokybe %}{{ u.kokybe }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="dok">
+              {# 1) Dokumentai — jei yra, parodyti iki 3 vnt. #}
+              {% if u.detale and u.detale.dokumentai and u.detale.dokumentai.all %}
+                {% for d in u.detale.dokumentai.all|slice:":3" %}
+                  <div>{{ d }}</div>
+                {% endfor %}
+              {% endif %}
+              {# 2) Pastabos — jei yra, parodyti #}
+              {% if u.pastabos %}
+                <div>{{ u.pastabos }}</div>
+              {% else %}
+                {# 3) Jei nėra nei pastabų, nei dokumentų — rodyti brūkšnį #}
+                {% if u.detale and u.detale.dokumentai and u.detale.dokumentai.all %}
+                  {# yra dokumentų, bet nėra pastabų — nieko papildomai #}
+                {% else %}
+                  —
+                {% endif %}
+              {% endif %}
+            </td>
+            <!-- /NAUJI -->
+
             <td data-col="sukurta">{{ u.data|date:"Y-m-d" }}</td>
             <td data-col="veiksmai" style="text-align:right">
               <a class="btn" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Peržiūrėti</a>
@@ -103,7 +280,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="9" style="color:#6b7280;font-style:italic;text-align:center;padding:8px">Įrašų nėra.</td></tr>
+          <tr><td colspan="17" style="color:#6b7280;font-style:italic;text-align:center;padding:8px">Įrašų nėra.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -193,7 +370,7 @@
 (function() {
   const STORAGE_KEY = "uzklausos_cols_v1";
   const PANEL_OPEN_KEY = "uzklausos_cols_panel_open";
-  const TABLE_ID = "uzklausos-table";
+  const TABLE_ID = "results-table";
 
   function init() {
     const wrap  = document.getElementById("cols-config");
@@ -251,4 +428,7 @@
   else init();
 })();
 </script>
+
+{% include "snippets/columns_dnd.html" %}
+
 {% endblock %}
