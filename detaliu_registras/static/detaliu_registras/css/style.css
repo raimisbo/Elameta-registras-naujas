@@ -3,7 +3,7 @@ body {
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -27,9 +27,10 @@ header.header-container {
 }
 
 /* ====== Pagrindinis turinys ====== */
+/* Sticky patikimiau veikia, kai vertikaliai scrollina pats puslapis */
 .main-content {
   flex: 1;
-  overflow: auto;
+  overflow: visible;   /* buvo: auto */
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -38,7 +39,7 @@ header.header-container {
 /* ====== Lentelės ====== */
 .table-container {
   flex: 1;
-  overflow: auto;
+  overflow: visible;   /* buvo: auto – kad nedubliuotų scrollerių */
   display: flex;
   flex-direction: column;
 }
@@ -46,7 +47,7 @@ header.header-container {
 .scrollable-table {
   display: block;
   height: 100%;
-  overflow-y: scroll;
+  overflow-y: auto;    /* buvo: scroll */
 }
 
 table {
@@ -61,15 +62,17 @@ th, td {
   border-bottom: 1px solid #ddd;
 }
 
-th {
-  position: sticky;
-  top: 0;
+/* Globaliai nenaudojam sticky – paliekam tik foną.
+   Sticky valdom SPECIFIŠKAI puslapyje (#results-table thead th arba .scrollable-table) */
+thead th {
   background-color: #f4f4f4;
   z-index: 2;
 }
 
-.filter-input {
-  width: 100%;
+/* „Senasis“ scrollinamas sąrašas su .scrollable-table */
+.scrollable-table thead th {
+  position: sticky;
+  top: 0;
 }
 
 /* ====== Specialūs stulpeliai ====== */
@@ -106,8 +109,10 @@ th {
   height: 100%;
 }
 
-/* ====== Užklausų blokai ====== */
-.container {
+/* ====== UŽKLAUSŲ BLOKAI ======
+   BUVO: .container { display:grid ... }  ➜  DABAR: .blocks-layout (opt-in)
+   Kad veiktų kaip anksčiau, naudok: <div class="container blocks-layout"> … */
+.blocks-layout {
   display: grid;
   grid-template-areas:
     "blokas-1 blokas-2 blokas-3"
@@ -178,17 +183,43 @@ th {
 .messages li.info    { background: #d1ecf1; color: #0c5460; }
 
 /* ====== Paieškos forma ====== */
-.search-form {
-  margin-bottom: 20px;
+.search-form { margin-bottom: 20px; }
+.search-form input[type="text"] { padding: 5px; font-size: 16px; }
+.search-form input[type="submit"] { padding: 5px 10px; font-size: 16px; cursor: pointer; }
+
+/* ====== Sticky „saugikliai“ — ta pačia logika kaip šablone ====== */
+.table-wrap{
+  overflow-x: auto;
+  overflow-y: visible !important;
+  position: relative;
 }
 
-.search-form input[type="text"] {
-  padding: 5px;
-  font-size: 16px;
+.table-scroll-x{
+  overflow-x: auto;
+  overflow-y: visible !important;
 }
 
-.search-form input[type="submit"] {
-  padding: 5px 10px;
-  font-size: 16px;
-  cursor: pointer;
+/* Jei kur nors buvo klonuotas header (nerekomenduojam čia), neleiskim gaudyti klikų */
+.fixed-thead{
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Papildomas guard’as: šie wrap’ai niekada neturi turėti vertikalaus overflow */
+:where(body) :where(.table-wrap),
+:where(body) :where(.table-scroll-x){
+  overflow-y: visible !important;
+}
+
+body{ min-height:100vh; height:auto; }
+
+.container.uzklausos-page .table-wrap,
+.container.uzklausos-page .table-scroll-x{
+  overflow-y: visible !important;
+  overflow-x: auto;
+  position: relative;
+}
+
+.container.uzklausos-page .scrollable-table{
+  overflow-y: visible !important;
 }
