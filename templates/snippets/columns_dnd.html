@@ -1,128 +1,147 @@
-{# templates/snippets/columns_dnd.html #}
 <style>
-  .th-dragging { opacity:.6; }
-  .th-drop-target { outline:2px dashed #888; outline-offset:-4px; }
+  .th-dragging {
+    opacity: .6;
+  }
+
+  .th-drop-target {
+    outline: 2px dashed #888;
+    outline-offset: -4px;
+  }
 </style>
 
 <script>
 (function(){
-  // Imame TIK esamą lentelę – jokių papildomų wrapperių
-  var table = document.querySelector('#results-table');
-  if(!table || !table.tHead || !table.tBodies.length) return;
+  const table = document.querySelector('#results-table');
+  if (!table || !table.tHead || !table.tBodies.length) return;
 
-  var colgroup = table.querySelector('colgroup');
-  var KEY = 'colOrder:' + (table.id || 'results-table') + ':' + (location.pathname || 'default');
+  const colgroup = table.querySelector('colgroup');
+  const KEY = 'colOrder_v2:' + (table.id || 'results-table') + ':' + (location.pathname || 'default');
 
-  function colKey(th, idx){
-    var k = th.getAttribute('data-col') ||
-            th.getAttribute('data-col-key') ||
-            th.textContent.trim().toLowerCase();
-    if(!k) k = 'col'+idx;
-    return k.replace(/[^a-z0-9]+/gi,'-');
+  function colKey(th, idx) {
+    const k = th.getAttribute('data-col');
+    return (k && k.trim()) ? k.trim() : ('col' + idx);
   }
 
-  function saveOrder(){
-    var keys = Array.from(table.tHead.rows[0].cells).map(colKey);
-    try{ localStorage.setItem(KEY, JSON.stringify(keys)); }catch(_){}
+  function saveOrder() {
+    const keys = Array.from(table.tHead.rows[0].cells).map(colKey);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(keys));
+    } catch (_) {}
   }
 
-  function applySavedOrder(){
-    var saved; try{ saved = JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(_){ saved=[]; }
-    if(!saved || !saved.length) return;
+  function applySavedOrder() {
+    let saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+    } catch (_) {
+      saved = [];
+    }
+    if (!saved || !saved.length) return;
 
-    var ths = Array.from(table.tHead.rows[0].cells);
-    var curKeys = ths.map(colKey);
-    var order = [];
+    const ths = Array.from(table.tHead.rows[0].cells);
+    const curKeys = ths.map(colKey);
+    const order = [];
 
-    // išsaugotus → esami
-    saved.forEach(function(sk){
-      var i = curKeys.indexOf(sk);
-      if(i>-1) order.push(i);
+    // Reikia atitikti tik tas, kurios egzistuoja
+    saved.forEach(sk => {
+      const i = curKeys.indexOf(sk);
+      if (i > -1) order.push(i);
     });
-    // nauji (kurių nebuvo saved)
-    curKeys.forEach(function(k,i){ if(saved.indexOf(k)===-1) order.push(i); });
+    // Pridedam naujus, jei jų dar nebuvo
+    curKeys.forEach((k, i) => {
+      if (saved.indexOf(k) === -1) order.push(i);
+    });
 
     reorder(order);
   }
 
-  // Perversiam THEAD, TBODY ir COLGROUP (be jokio layout keitimo aplinkui)
-  function reorder(order){
-    var headRow = table.tHead.rows[0];
-    var ths = Array.from(headRow.cells);
-    if(!ths.length || ths.some(function(c){ return c.colSpan!==1; })) return;
+  function reorder(order) {
+    const headRow = table.tHead.rows[0];
+    const ths = Array.from(headRow.cells);
+    if (!ths.length || ths.some(c => c.colSpan !== 1)) return;
 
-    var keysByIndex = ths.map(colKey);
+    const keysByIndex = ths.map(colKey);
 
     // HEAD
-    var fH = document.createDocumentFragment();
-    order.forEach(function(i){ fH.appendChild(ths[i]); });
-    headRow.appendChild(fH);
+    const fragHead = document.createDocumentFragment();
+    order.forEach(i => fragHead.appendChild(ths[i]));
+    headRow.appendChild(fragHead);
 
     // BODY
-    Array.from(table.tBodies[0].rows).forEach(function(tr){
-      var tds = Array.from(tr.cells);
-      if(tds.length !== ths.length) return;
-      var f = document.createDocumentFragment();
-      order.forEach(function(i){ f.appendChild(tds[i]); });
-      tr.appendChild(f);
+    Array.from(table.tBodies).forEach(tbody => {
+      Array.from(tbody.rows).forEach(tr => {
+        const tds = Array.from(tr.cells);
+        if (tds.length !== keysByIndex.length) return;
+        const frag = document.createDocumentFragment();
+        order.forEach(i => frag.appendChild(tds[i]));
+        tr.appendChild(frag);
+      });
     });
 
-    // COLGROUP – kad sutaptų plotis ir nustotų „makaluotis“
-    if (colgroup && colgroup.children.length){
-      var colsByKey = {};
-      Array.from(colgroup.children).forEach(function(c){
-        var k = c.getAttribute('data-col'); if(k) colsByKey[k]=c;
+    // COLGROUP
+    if (colgroup && colgroup.children.length) {
+      const colsByKey = {};
+      Array.from(colgroup.children).forEach(c => {
+        const k = c.getAttribute('data-col');
+        if (k) colsByKey[k] = c;
       });
-      var fC = document.createDocumentFragment();
-      order.forEach(function(i){
-        var k = keysByIndex[i];
-        var col = colsByKey[k];
-        if (col) fC.appendChild(col);
+
+      const fragCol = document.createDocumentFragment();
+      order.forEach(i => {
+        const k = keysByIndex[i];
+        const col = colsByKey[k];
+        if (col) fragCol.appendChild(col);
       });
-      colgroup.appendChild(fC);
+      colgroup.appendChild(fragCol);
     }
 
     window.dispatchEvent(new Event('table:order-changed'));
   }
 
-  // Drag&Drop
-  Array.from(table.tHead.rows[0].cells).forEach(function(th){
+  // Drag & Drop init
+  Array.from(table.tHead.rows[0].cells).forEach((th, index) => {
     if (th.colSpan !== 1) return;
-    th.setAttribute('draggable','true');
+    th.setAttribute('draggable', 'true');
 
-    th.addEventListener('dragstart', function(e){
+    th.addEventListener('dragstart', e => {
       th.classList.add('th-dragging');
       th.dataset.dragIndex = Array.from(th.parentNode.children).indexOf(th);
-      try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','col'); }catch(_){}
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'col');
+      } catch (_) {}
     });
 
-    th.addEventListener('dragend', function(){
+    th.addEventListener('dragend', () => {
       th.classList.remove('th-dragging');
-      Array.from(table.tHead.rows[0].cells).forEach(function(x){ x.classList.remove('th-drop-target'); });
+      Array.from(table.tHead.rows[0].cells).forEach(x => x.classList.remove('th-drop-target'));
       delete th.dataset.dragIndex;
     });
 
-    th.addEventListener('dragover', function(e){
+    th.addEventListener('dragover', e => {
       e.preventDefault();
       th.classList.add('th-drop-target');
-      try{ e.dataTransfer.dropEffect='move'; }catch(_){}
+      try {
+        e.dataTransfer.dropEffect = 'move';
+      } catch (_) {}
     });
 
-    th.addEventListener('dragleave', function(){
+    th.addEventListener('dragleave', () => {
       th.classList.remove('th-drop-target');
     });
 
-    th.addEventListener('drop', function(e){
+    th.addEventListener('drop', e => {
       e.preventDefault();
       th.classList.remove('th-drop-target');
-      var from = parseInt(document.querySelector('.th-dragging')?.dataset.dragIndex||'-1',10);
-      var to   = Array.from(th.parentNode.children).indexOf(th);
-      if(from<0 || to<0 || from===to) return;
+      const drag = document.querySelector('.th-dragging');
+      const from = drag ? parseInt(drag.dataset.dragIndex || '-1', 10) : -1;
+      const to = Array.from(th.parentNode.children).indexOf(th);
+      if (from < 0 || to < 0 || from === to) return;
 
-      var len = table.tHead.rows[0].cells.length;
-      var order = Array.from({length:len}, function(_,i){ return i; });
-      var item = order.splice(from,1)[0];
-      order.splice(to,0,item);
+      const len = table.tHead.rows[0].cells.length;
+      const order = Array.from({ length: len }, (_, i) => i);
+      const item = order.splice(from, 1)[0];
+      order.splice(to, 0, item);
 
       reorder(order);
       saveOrder();
@@ -131,7 +150,7 @@
 
   applySavedOrder();
 
-  // Patogus reset (jei prireiktų)
+  // Patogus reset per naršyklės konsolę
   window.resetTableColumnOrder = function(){
     localStorage.removeItem(KEY);
     location.reload();

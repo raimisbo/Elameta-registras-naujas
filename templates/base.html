@@ -40,13 +40,19 @@
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media(max-width:640px){.grid{grid-template-columns:1fr}}
 
-    /* 👉 Vienintelis globalus sticky (thead th). */
-    .sticky-head thead th,
-    #results-table thead th{
+    /* ✅ PATAISYTA: sticky taikomas VISAM <thead>, <th> – static.
+       Taip antraštė nelipa ant 1-os eilutės ir visada dera su stulpeliais. */
+    .sticky-head thead,
+    #results-table thead{
       position: sticky;
       top: var(--app-header-offset, 0px);
       background:#fff;
       z-index: 20;
+    }
+    .sticky-head thead th,
+    #results-table thead th{
+      position: static;
+      background:#fff;
       box-shadow: 0 1px 0 #e5e7eb;
     }
   </style>
@@ -89,7 +95,6 @@
         document.documentElement.style.setProperty('--app-header-offset', px + 'px');
       }
 
-      // pradinis + po pilno įkėlimo (fontai, vėlyvas CSS)
       if(document.readyState==='loading'){
         document.addEventListener('DOMContentLoaded', setHeaderOffset);
       }else{
@@ -98,7 +103,6 @@
       window.addEventListener('load', setHeaderOffset);
       window.addEventListener('resize', setHeaderOffset);
 
-      // jeigu header turinys keičiasi (pvz., inject’inamos žinutės ar blokai)
       var header=document.querySelector('header.site');
       if(header){
         new MutationObserver(setHeaderOffset).observe(header, {childList:true, subtree:true, attributes:true});
