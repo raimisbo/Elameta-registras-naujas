@@ -57,8 +57,14 @@
     }
   </style>
 
+  <link rel="stylesheet" href="{% static 'detaliu_registras/css/style.css' %}">
+  {% block page_css %}{% endblock %}
+
   {% block extra_head %}{% endblock %}
 </head>
+
+  {% block page_js %}{% endblock %}
+
 <body>
   <header class="site">
     <div class="container" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">

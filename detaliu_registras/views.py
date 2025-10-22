@@ -3,7 +3,7 @@ from urllib.parse import unquote as urlunquote
 from django.contrib import messages
 from django.db.models import Q, Count, Value
 from django.db.models.functions import Coalesce
-from django.forms import inlineformset_factory
+
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
@@ -134,21 +134,41 @@ class UzklausaDetailView(DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         uzk = self.object
+        # palik, jei turi senus šablonus, kuriems reikia sąrašo:
         kainos = uzk.kainos.all().order_by("-id")
         current = kainos.filter(busena="aktuali").first()
-        ctx["kainos"] = kainos
+        # rekomenduojamas minimaliam UI:
         ctx["kaina_aktuali"] = current
+        ctx["kainos"] = kainos  # laikinai paliekam atgaliniam suderinamumui
         return ctx
 
 
 # === Nauja užklausa ===
 class UzklausaCreateView(CreateView):
     template_name = "detaliu_registras/ivesti_uzklausa.html"
-    form_class = UzklausaCreateFullForm
+    form_class = UzklausaCreateFullForm  # kaip pas tave
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        if self.request.method == "POST":
+            ctx["kaina_form"] = KainaForm(self.request.POST)
+        else:
+            ctx["kaina_form"] = KainaForm()
+        return ctx
 
     def form_valid(self, form):
         uzklausa = form.save()
-        messages.success(self.request, "Užklausa sukurta.")
+
+        kaina_form = KainaForm(self.request.POST)
+        if kaina_form.is_valid() and kaina_form.cleaned_data.get("suma") is not None:
+            k = kaina_form.save(commit=False)
+            k.uzklausa = uzklausa
+            k.busena = k.busena or "aktuali"
+            k.save()
+            messages.success(self.request, "Užklausa sukurta su kaina.")
+        else:
+            messages.success(self.request, "Užklausa sukurta (be kainos).")
+
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
 
@@ -167,7 +187,7 @@ class UzklausaUpdateView(UpdateView):
 # === KAINOS: redagavimas per formset'ą ===
 class KainosRedagavimasView(FormView):
     template_name = "detaliu_registras/redaguoti_kaina.html"
-    form_class = KainaForm  # nenaudojama tiesiogiai; reikalinga FormView struktūrai
+    form_class = KainaForm
 
     def dispatch(self, request, *args, **kwargs):
         self.uzklausa = (
@@ -177,54 +197,30 @@ class KainosRedagavimasView(FormView):
         )
         return super().dispatch(request, *args, **kwargs)
 
-    def get_formset(self, data=None):
-        FormSet = inlineformset_factory(
-            parent_model=Uzklausa,
-            model=Kaina,
-            form=KainaForm,
-            extra=0,
-            can_delete=True,
-        )
-        return FormSet(data=data, instance=self.uzklausa)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Viena kaina per užklausą – redaguojame esamą, o jei nėra, sukursim
+        instance = Kaina.objects.filter(uzklausa=self.uzklausa).first()
+        kwargs["instance"] = instance
+        return kwargs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["uzklausa"] = self.uzklausa
-        ctx["formset"] = kwargs.get("formset", self.get_formset())
+        k = Kaina.objects.filter(uzklausa=self.uzklausa).first()
+        ctx["kaina"] = k
+        ctx["kainos_history"] = (k.history.order_by("-history_date")[:5] if k else [])
         return ctx
 
-    def get(self, request, *args, **kwargs):
-        formset = self.get_formset()
-        return self.render_to_response(self.get_context_data(formset=formset))
-
-    def post(self, request, *args, **kwargs):
-        formset = self.get_formset(data=request.POST)
-        if not formset.is_valid():
-            messages.error(request, "Patikrinkite kainų formą.")
-            return self.render_to_response(self.get_context_data(formset=formset))
-
-        instances = formset.save(commit=False)
-
-        # trinti pažymėtas
-        for obj in formset.deleted_objects:
-            obj.delete()
-
-        # išsaugoti/atnaujinti
-        for inst in instances:
-            inst.uzklausa = self.uzklausa
-            inst.save()
-
-        # užtikrinti, kad liktų tik viena "aktuali"
-        aktualios = Kaina.objects.filter(uzklausa=self.uzklausa, busena="aktuali").order_by("id")
-        if aktualios.count() > 1:
-            palikti = aktualios.last()
-            (Kaina.objects
-                .filter(uzklausa=self.uzklausa, busena="aktuali")
-                .exclude(pk=palikti.pk)
-                .update(busena="sena"))
-
-        messages.success(request, "Kainos išsaugotos.")
+    def form_valid(self, form):
+        kaina = form.save(commit=False)
+        kaina.uzklausa = self.uzklausa
+        if not kaina.busena:
+            kaina.busena = "aktuali"
+        kaina.save()
+        messages.success(self.request, "Kaina išsaugota.")
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[self.uzklausa.pk]))
+
 
 
 # === CSV importas (stub) ===

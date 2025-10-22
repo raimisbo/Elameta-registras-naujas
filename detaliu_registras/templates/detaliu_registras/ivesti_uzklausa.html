@@ -28,6 +28,7 @@
       <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
       <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
       <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
+      <label><input type="checkbox" data-block="price" checked> Kaina</label>
     </div>
   </div>
 
@@ -137,6 +138,29 @@
         <label class="field"><span>Projekto aprašymas</span>{{ form.projekto_aprasymas }}</label>
         <label class="field"><span>Užklausos pastabos</span>{{ form.uzklausos_pastabos }}</label>
       </div>
+    </section>
+
+    <!-- KAINA (neprivaloma) -->
+    <section class="box block" data-block="price">
+      <h3>Kaina (pasirenkama)</h3>
+
+      {% if kaina_form.non_field_errors %}
+        <div class="flash flash-error">{{ kaina_form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="grid">
+        <label class="field"><span>Suma</span>{{ kaina_form.suma }}</label>
+        <label class="field"><span>Valiuta</span>{{ kaina_form.valiuta }}</label>
+        <label class="field"><span>Yra fiksuota?</span>{{ kaina_form.yra_fiksuota }}</label>
+
+        <label class="field"><span>Kiekis nuo</span>{{ kaina_form.kiekis_nuo }}</label>
+        <label class="field"><span>Kiekis iki</span>{{ kaina_form.kiekis_iki }}</label>
+
+        <label class="field"><span>Fiksuotas kiekis</span>{{ kaina_form.fiksuotas_kiekis }}</label>
+        <label class="field"><span>Kainos matas</span>{{ kaina_form.kainos_matas }}</label>
+      </div>
+
+      <p class="hint">Jei nepildysite, užklausa bus sukurta be kainos. Kainą galėsite pridėti / redaguoti vėliau.</p>
     </section>
 
     <div class="actions" style="margin-top:12px;display:flex;gap:8px">

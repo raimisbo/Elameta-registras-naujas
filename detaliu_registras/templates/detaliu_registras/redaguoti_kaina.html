@@ -1,139 +1,152 @@
 {% extends "base.html" %}
 {% load static %}
-
-{% block title %}Kainų redagavimas{% endblock %}
+{% block title %}Kaina — {{ uzklausa|default:"Užklausa" }}{% endblock %}
 
 {% block content %}
 <div class="container">
   <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
-    <h1 style="margin:0">Kainų redagavimas</h1>
-    <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.id %}">← Atgal</a>
+    <h1 style="margin:0">
+      {% if kaina %}Redaguoti kainą{% else %}Pridėti kainą{% endif %}
+    </h1>
+    <div style="display:flex;gap:8px">
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.pk %}">← Į užklausą</a>
+    </div>
   </header>
 
-  <div class="info" style="margin-bottom:8px">
-    Užklausa #{{ uzklausa.id }} — <strong>{{ uzklausa.detale.pavadinimas }}</strong>
-    <span class="small-note">| Projektas: {{ uzklausa.projektas.pavadinimas }}</span>
+  {% if messages %}
+    {% for m in messages %}
+      <div class="flash {% if m.tags %}flash-{{ m.tags }}{% endif %}">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <div class="flash flash-error" style="margin-bottom:10px">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="box" style="margin-top:8px">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="grid">
+        <label class="field">
+          <span>Suma</span>
+          {{ form.suma }}
+          {% if form.suma.errors %}<div class="err">{{ form.suma.errors|striptags }}</div>{% endif %}
+        </label>
+
+        <label class="field">
+          <span>Valiuta</span>
+          {{ form.valiuta }}
+          {% if form.valiuta.errors %}<div class="err">{{ form.valiuta.errors|striptags }}</div>{% endif %}
+        </label>
+
+        <label class="field">
+          <span>Būsena</span>
+          {{ form.busena }}
+          {% if form.busena.errors %}<div class="err">{{ form.busena.errors|striptags }}</div>{% endif %}
+        </label>
+
+        <label class="field" style="align-self:end;display:flex;flex-direction:row;gap:8px">
+          {{ form.yra_fiksuota }} <span>Yra fiksuota?</span>
+          {% if form.yra_fiksuota.errors %}<div class="err">{{ form.yra_fiksuota.errors|striptags }}</div>{% endif %}
+        </label>
+
+        <!-- Intervalinė kaina -->
+        <div class="field js-int" data-role="interval">
+          <span>Kiekis nuo</span>
+          {{ form.kiekis_nuo }}
+          {% if form.kiekis_nuo.errors %}<div class="err">{{ form.kiekis_nuo.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div class="field js-int" data-role="interval">
+          <span>Kiekis iki</span>
+          {{ form.kiekis_iki }}
+          {% if form.kiekis_iki.errors %}<div class="err">{{ form.kiekis_iki.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <!-- Fiksuota kaina -->
+        <div class="field js-fix" data-role="fixed">
+          <span>Fiksuotas kiekis</span>
+          {{ form.fiksuotas_kiekis }}
+          {% if form.fiksuotas_kiekis.errors %}<div class="err">{{ form.fiksuotas_kiekis.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div class="field js-fix" data-role="fixed">
+          <span>Kainos matas</span>
+          {{ form.kainos_matas }}
+          {% if form.kainos_matas.errors %}<div class="err">{{ form.kainos_matas.errors|striptags }}</div>{% endif %}
+        </div>
+      </div>
+
+      <p class="hint" style="margin-top:8px;color:#6b7280">
+        Jei pažymėta <b>„Yra fiksuota“</b>, privalomi <b>Fiksuotas kiekis</b> ir <b>Kainos matas</b>.
+        Jei nepažymėta — naudokite <b>Kiekis nuo</b>/<b>Kiekis iki</b>.
+      </p>
+
+      <div class="actions" style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn" type="submit">Išsaugoti</button>
+        <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.pk %}">Atšaukti</a>
+      </div>
+    </form>
   </div>
 
-  <form method="post" class="box" novalidate>
-    {% csrf_token %}
-    {{ formset.non_form_errors }}
-    {{ formset.management_form }}
-
-    <table id="kainos-table" class="kainos-table" style="width:100%;border-collapse:collapse;table-layout:fixed">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Būsena</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kaina</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Valiuta</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Yra fiksuota?</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kiekis nuo</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kiekis iki</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Fiksuotas kiekis</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Kainos matas</th>
-          <th style="text-align:left;padding:8px;border-bottom:1px solid #e5e7eb">Trinti</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for form in formset %}
-          <tr class="kaina-row">
-            <td style="padding:6px 8px">
-              {# ↓ HIDDEN FIELDS ĮDĖTI Į ŠĮ TD, NE Į TBODY #}
-              {% for h in form.hidden_fields %}{{ h }}{% endfor %}
-              {{ form.busena.errors }}{{ form.busena }}
-            </td>
-            <td style="padding:6px 8px">{{ form.suma.errors }}{{ form.suma }}</td>
-            <td style="padding:6px 8px">{{ form.valiuta.errors }}{{ form.valiuta }}</td>
-            <td style="padding:6px 8px">{{ form.yra_fiksuota.errors }}{{ form.yra_fiksuota }}</td>
-            <td style="padding:6px 8px">{{ form.kiekis_nuo.errors }}{{ form.kiekis_nuo }}</td>
-            <td style="padding:6px 8px">{{ form.kiekis_iki.errors }}{{ form.kiekis_iki }}</td>
-            <td style="padding:6px 8px">{{ form.fiksuotas_kiekis.errors }}{{ form.fiksuotas_kiekis }}</td>
-            <td style="padding:6px 8px">{{ form.kainos_matas.errors }}{{ form.kainos_matas }}</td>
-            <td style="padding:6px 8px">{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
-          </tr>
-        {% empty %}
-          {# tuščia – pridėkite per „Pridėti eilutę“ #}
+  <!-- Istorija -->
+  <section class="box" style="margin-top:12px">
+    <h3 style="margin-top:0">Kainos istorija</h3>
+    {% if kainos_history %}
+      <ul style="margin:8px 0 0 18px">
+        {% for h in kainos_history %}
+          <li>
+            {{ h.history_date|date:"Y-m-d H:i" }} —
+            {{ h.instance.suma }} {{ h.instance.valiuta }}
+            {% if h.instance.yra_fiksuota %}
+              (fiks. {{ h.instance.fiksuotas_kiekis }} {{ h.instance.kainos_matas }})
+            {% else %}
+              {% if h.instance.kiekis_nuo or h.instance.kiekis_iki %}
+                ({{ h.instance.kiekis_nuo|default:"0" }}–{{ h.instance.kiekis_iki|default:"∞" }})
+              {% endif %}
+            {% endif %}
+            — {{ h.history_user|default:"sistema" }}
+          </li>
         {% endfor %}
-      </tbody>
-    </table>
-
-    <div class="actions" style="margin-top:12px;display:flex;gap:8px">
-      <button type="button" class="btn" id="add-row">Pridėti eilutę</button>
-      <button type="submit" class="btn">Išsaugoti</button>
-      <a class="btn btn-secondary" href="{% url 'detaliu_registras:perziureti_uzklausa' uzklausa.id %}">Atgal</a>
-    </div>
-
-    <template id="empty-row">
-      <tr class="kaina-row">
-        <td>
-          {# ↓ HIDDEN FIELDS IŠ EMPTY_FORM – TAIP PAT Į PIRMĄ TD #}
-          {% for h in formset.empty_form.hidden_fields %}{{ h }}{% endfor %}
-          {{ formset.empty_form.busena }}
-        </td>
-        <td>{{ formset.empty_form.suma }}</td>
-        <td>{{ formset.empty_form.valiuta }}</td>
-        <td>{{ formset.empty_form.yra_fiksuota }}</td>
-        <td>{{ formset.empty_form.kiekis_nuo }}</td>
-        <td>{{ formset.empty_form.kiekis_iki }}</td>
-        <td>{{ formset.empty_form.fiksuotas_kiekis }}</td>
-        <td>{{ formset.empty_form.kainos_matas }}</td>
-        <td>{% if formset.empty_form.DELETE %}{{ formset.empty_form.DELETE }}{% endif %}</td>
-      </tr>
-    </template>
-  </form>
+      </ul>
+    {% else %}
+      <p style="color:#6b7280">Istorijos įrašų dar nėra.</p>
+    {% endif %}
+  </section>
 </div>
 
 <style>
 .container{max-width:960px;margin:0 auto;padding:0 16px}
 .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;cursor:pointer;text-decoration:none}
-.btn-secondary{background:#fff}
-.small-note{color:#6b7280}
-
-/* Kad kontrolės gražiai tilptų į langelius */
-.kainos-table input[type="text"],
-.kainos-table input[type="number"],
-.kainos-table input[type="date"],
-.kainos-table input[type="time"],
-.kainos-table input[type="datetime-local"],
-.kainos-table select,
-.kainos-table textarea{width:100%;box-sizing:border-box}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input,.field select,.field textarea{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px}
+.err{color:#b91c1c;font-size:.9rem}
+.hint{font-size:.9rem}
+.flash{padding:8px 10px;border-radius:6px}
+.flash-success{background:#ecfdf5;border:1px solid #10b981;color:#065f46}
+.flash-error{background:#fef2f2;border:1px solid #ef4444;color:#991b1b}
 </style>
 
 <script>
 (function(){
-  const addBtn=document.getElementById('add-row');
-  if(!addBtn) return;
-  addBtn.addEventListener('click',function(){
-    const total=document.querySelector('input[name$="-TOTAL_FORMS"]');
-    if(!total) return;
-    const count=parseInt(total.value,10)||0;
-    const tpl=document.getElementById('empty-row');
-    if(!tpl) return;
-    const html=tpl.innerHTML.replace(/__prefix__/g,String(count));
-    const tbody=document.querySelector('#kainos-table tbody');
-    const wrapper=document.createElement('tbody');  // tik naud. kaip parserį
-    wrapper.innerHTML=html.trim();
-    while(wrapper.firstChild){tbody.appendChild(wrapper.firstChild);}
-    total.value=String(count+1);
-  });
+  const chk = document.getElementById('{{ form.yra_fiksuota.auto_id }}');
+  const fixed = document.querySelectorAll('.js-fix');
+  const interval = document.querySelectorAll('.js-int');
 
-  // UX: "Yra fiksuota" – perjungiam susijusius laukus toje pačioje eilutėje
-  document.addEventListener('change', function(e){
-    if(e.target && e.target.matches('input[type="checkbox"][name$="-yra_fiksuota"]')){
-      const row = e.target.closest('tr');
-      if(!row) return;
-      const fixed = e.target.checked;
-      const nuo = row.querySelector('input[name$="-kiekis_nuo"]');
-      const iki = row.querySelector('input[name$="-kiekis_iki"]');
-      const fiks = row.querySelector('input[name$="-fiksuotas_kiekis"]');
-      const matas = row.querySelector('select[name$="-kainos_matas"]');
-      if(nuo) nuo.disabled = fixed;
-      if(iki) iki.disabled = fixed;
-      if(fiks) fiks.disabled = !fixed;
-      if(matas) matas.disabled = !fixed;
-    }
-  });
+  function toggle(){
+    const isFixed = chk && chk.checked;
+    fixed.forEach(el => el.style.display = isFixed ? '' : 'none');
+    interval.forEach(el => el.style.display = isFixed ? 'none' : '');
+  }
+
+  if (chk){
+    chk.addEventListener('change', toggle);
+    // Pirmas pritaikymas pagal esamą reikšmę
+    toggle();
+  }
 })();
 </script>
 {% endblock %}

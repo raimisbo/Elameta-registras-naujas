@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.apps import apps
+from decimal import Decimal, ROUND_HALF_UP
 from django.db.models.manager import BaseManager
 
 from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
@@ -461,12 +462,29 @@ class KainaForm(forms.ModelForm):
             "kainos_matas",
         ]
         widgets = {
-            "suma": forms.NumberInput(attrs={"step": "0.01"}),
+            "suma": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+            "kiekis_nuo": forms.NumberInput(attrs={"min": "0"}),
+            "kiekis_iki": forms.NumberInput(attrs={"min": "0"}),
+            "fiksuotas_kiekis": forms.NumberInput(attrs={"min": "0"}),
         }
 
     def clean(self):
         c = super().clean()
-        yra_fiksuota = c.get("yra_fiksuota") is True
+        valiuta = (c.get("valiuta") or "EUR").strip()
+        c["valiuta"] = valiuta.upper() or "EUR"
+
+        suma = c.get("suma")
+        if suma is None:
+            raise ValidationError("Kaina (suma) yra privaloma.")
+        try:
+            suma = (Decimal(suma)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except Exception:
+            raise ValidationError("Neteisingas kainos formatas.")
+        if suma < Decimal("0.00"):
+            raise ValidationError("Kaina (suma) negali būti neigiama.")
+        c["suma"] = suma
+
+        yra_fiksuota = bool(c.get("yra_fiksuota"))
         kiekis_nuo = c.get("kiekis_nuo")
         kiekis_iki = c.get("kiekis_iki")
         fiksuotas_kiekis = c.get("fiksuotas_kiekis")
@@ -474,16 +492,22 @@ class KainaForm(forms.ModelForm):
 
         if yra_fiksuota:
             if not fiksuotas_kiekis:
-                raise ValidationError("Pažymėjus 'Yra fiksuota', privalomas 'Fiksuotas kiekis'.")
+                raise ValidationError("Pažymėjus „Yra fiksuota“, privalomas „Fiksuotas kiekis“.")
+            if fiksuotas_kiekis is not None and fiksuotas_kiekis <= 0:
+                raise ValidationError("„Fiksuotas kiekis“ turi būti didesnis už 0.")
             if not matas:
-                raise ValidationError("Pažymėjus 'Yra fiksuota', privalomas 'Kainos matas'.")
+                raise ValidationError("Pažymėjus „Yra fiksuota“, privalomas „Kainos matas“.")
             c["kiekis_nuo"] = None
             c["kiekis_iki"] = None
         else:
             if kiekis_nuo is None and kiekis_iki is None and fiksuotas_kiekis is None:
-                raise ValidationError("Nurodykite kiekio intervalą (bent 'Kiekis nuo') arba pažymėkite 'Yra fiksuota'.")
+                raise ValidationError("Nurodykite kiekio intervalą (bent „Kiekis nuo“) arba pažymėkite „Yra fiksuota“.")
+            if (kiekis_nuo is not None and kiekis_nuo < 0) or (kiekis_iki is not None and kiekis_iki < 0):
+                raise ValidationError("Kiekio ribos negali būti neigiamos.")
             if kiekis_nuo is not None and kiekis_iki is not None and kiekis_nuo > kiekis_iki:
-                raise ValidationError("'Kiekis nuo' negali būti didesnis už 'Kiekis iki'.")
-            c["fiksuotas_kiekis"] = None  # intervalinei kainai netaikoma
+                raise ValidationError("„Kiekis nuo“ negali būti didesnis už „Kiekis iki“.")
+            c["fiksuotas_kiekis"] = None
 
+        # Viena kaina per užklausą – ši forma visada „aktuali“
+        c["busena"] = "aktuali"
         return c

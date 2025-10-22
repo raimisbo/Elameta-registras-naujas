@@ -42,6 +42,7 @@
       <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
       <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
       <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
+      <label><input type="checkbox" data-block="price" checked> Kaina</label>
     </div>
   </div>
 
@@ -187,7 +188,7 @@
     <div id="hist-docs" class="history-box" style="display:none; margin-top:6px;"></div>
   </section>
 
-  {# --- KAINA --- #}
+  {# --- 10) KAINA --- #}
   <section class="box block" data-block="price">
     <div class="block-head">
       <h3 class="grow">Kaina</h3>
@@ -199,15 +200,28 @@
         <strong>Aktuali kaina:</strong>
         {% if kaina_aktuali %}
           {{ kaina_aktuali.suma }} {{ kaina_aktuali.valiuta }} ({{ kaina_aktuali.busena }})
+          {% if kaina_aktuali.yra_fiksuota and kaina_aktuali.fiksuotas_kiekis %}
+            — fiksuota: {{ kaina_aktuali.fiksuotas_kiekis }} {{ kaina_aktuali.kainos_matas }}
+          {% else %}
+            {% if kaina_aktuali.kiekis_nuo or kaina_aktuali.kiekis_iki %}
+              — diapazonas: {{ kaina_aktuali.kiekis_nuo|default:"0" }}–{{ kaina_aktuali.kiekis_iki|default:"∞" }}
+            {% endif %}
+          {% endif %}
         {% else %}
           — nėra
         {% endif %}
       </div>
+
       <div>
-        <a class="btn" href="{% url 'detaliu_registras:prideti_kaina' uzklausa.pk %}">➕ Nauja kaina</a>
+        {% if kaina_aktuali %}
+          <a class="btn" href="{% url 'detaliu_registras:kainos_redagavimas' uzklausa.pk %}">Redaguoti kainą</a>
+        {% else %}
+          <a class="btn" href="{% url 'detaliu_registras:kainos_redagavimas' uzklausa.pk %}">Pridėti kainą</a>
+        {% endif %}
       </div>
     </div>
 
+    {# (pasirenkama) jei palikai 'kainos' sąrašą kontekste — trumpa santrauka #}
     {% if kainos %}
       <div style="margin-top:10px">
         <strong>Istorija (santrauka):</strong>

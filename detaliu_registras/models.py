@@ -198,3 +198,44 @@ class KainosPartijai(Timestamped):
         r1 = self.kiekis_nuo or 0
         r2 = self.kiekis_iki or "∞"
         return f"{self.kainodara} [{r1}–{r2}] = {self.suma or '—'} {self.valiuta}"
+
+
+class LegacyKaina(Timestamped):
+    MATAS_CHOICES = [
+        ("vnt", "Vnt"),
+        ("m2", "m²"),
+        ("kg", "kg"),
+        ("val", "val."),
+    ]
+
+    uzklausa = models.ForeignKey("Uzklausa", on_delete=models.CASCADE, related_name="legacy_kainos")
+
+    suma = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    valiuta = models.CharField(max_length=10, default="EUR")
+    busena = models.CharField(
+        max_length=10,
+        choices=[("aktuali", "Aktuali"), ("sena", "Sena")],
+        default="sena",
+    )
+
+
+    kiekis_nuo = models.PositiveIntegerField(null=True, blank=True)
+    kiekis_iki = models.PositiveIntegerField(null=True, blank=True)
+    fiksuotas_kiekis = models.PositiveIntegerField(null=True, blank=True)
+    yra_fiksuota = models.BooleanField(default=False)
+    kainos_matas = models.CharField(max_length=10, choices=MATAS_CHOICES, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        base = f"{self.suma or '—'} {self.valiuta}"
+        if self.yra_fiksuota and self.fiksuotas_kiekis:
+            return f"{base} ({self.fiksuotas_kiekis} {self.kainos_matas or ''}, {self.busena})"
+        if self.kiekis_nuo or self.kiekis_iki:
+            r1 = self.kiekis_nuo or 0
+            r2 = self.kiekis_iki or "∞"
+            return f"{base} [{r1}–{r2}] ({self.busena})"
+        return f"{base} ({self.busena})"
+
+

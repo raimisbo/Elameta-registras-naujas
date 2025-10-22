@@ -1,34 +1,49 @@
 # detaliu_registras/urls.py
-from django.urls import path
-from . import views
+
+from django.urls import path, re_path
+from django.views.generic import RedirectView
+
+from .views import (
+    UzklausaListView,
+    UzklausaDetailView,
+    UzklausaCreateView,
+    UzklausaUpdateView,
+    KainosRedagavimasView,
+    ImportUzklausosCSVView,
+)
 
 app_name = "detaliu_registras"
 
 urlpatterns = [
-    # ALIAS: /detaliu_registras/ -> senasis sąrašas (kad nebekristų 404)
-    path("", views.UzklausaListView.as_view(), name="uzklausa_list_alias"),
+    # Patogūs alias'ai -> sąrašas
+    path("", RedirectView.as_view(pattern_name="detaliu_registras:uzklausa_list", permanent=False)),
+    path("uzklausos/", RedirectView.as_view(pattern_name="detaliu_registras:uzklausa_list", permanent=False)),
 
-    # Senasis sąrašas
-    path("uzklausos/", views.UzklausaListView.as_view(), name="uzklausa_list"),
+    # Sąrašas (tikrasis kelias, kurį naudoja šablonai)
+    path("perziureti_uzklausas/", UzklausaListView.as_view(), name="uzklausa_list"),
 
     # Nauja užklausa
-    path("ivesti_uzklausa/", views.UzklausaCreateView.as_view(), name="ivesti_uzklausa"),
+    path("ivesti_uzklausa/", UzklausaCreateView.as_view(), name="ivesti_uzklausa"),
 
-    # Peržiūra (palieku abu variantus dėl suderinamumo)
-    path("perziureti_uzklausa/<int:pk>/", views.UzklausaDetailView.as_view(), name="perziureti_uzklausa"),
-    path("perziureti_uzklausa/<int:uzklausa_id>/", views.UzklausaDetailView.as_view(), name="perziureti_uzklausa"),
+    # Peržiūra
+    path("perziureti_uzklausa/<int:pk>/", UzklausaDetailView.as_view(), name="perziureti_uzklausa"),
 
-    # Redagavimas (tas pats principas)
-    path("ivesti_uzklausa/<int:pk>/", views.UzklausaUpdateView.as_view(), name="redaguoti_uzklausa"),
-    path("ivesti_uzklausa/<int:uzklausa_id>/", views.UzklausaUpdateView.as_view(), name="redaguoti_uzklausa"),
+    # Redagavimas (pagrindiniai duomenys)
+    path("redaguoti_uzklausa/<int:pk>/", UzklausaUpdateView.as_view(), name="redaguoti_uzklausa"),
 
-    # Kainos
-    path("perziureti_uzklausa/<int:pk>/kainos/", views.KainosRedagavimasView.as_view(), name="redaguoti_kaina"),
-    path("perziureti_uzklausa/<int:uzklausa_id>/kainos/", views.KainosRedagavimasView.as_view(), name="redaguoti_kaina"),
+    # Kaina (viena kaina per užklausą)
+    path("perziureti_uzklausa/<int:pk>/kainos/", KainosRedagavimasView.as_view(), name="kainos_redagavimas"),
 
-    path("perziureti_uzklausa/<int:pk>/kainos/nauja/", views.KainosRedagavimasView.as_view(), name="prideti_kaina"),
-    path("perziureti_uzklausa/<int:uzklausa_id>/kainos/nauja/", views.KainosRedagavimasView.as_view(), name="prideti_kaina"),
+    # CSV importas (pasirenkama)
+    path("importuoti_uzklausas/", ImportUzklausosCSVView.as_view(), name="import_uzklausos"),
 
-    # CSV importas
-    path("importas/", views.ImportUzklausosCSVView.as_view(), name="import_uzklausos"),
+    # Legacy saugikliai
+    re_path(
+        r"^perziureti_uzklausa/(?P<pk>\d+)/kaina/?$",
+        RedirectView.as_view(pattern_name="detaliu_registras:kainos_redagavimas", permanent=False),
+    ),
+    re_path(
+        r"^perziureti_uzklausa/(?P<pk>\d+)/kainos/?$",
+        RedirectView.as_view(pattern_name="detaliu_registras:kainos_redagavimas", permanent=False),
+    ),
 ]
