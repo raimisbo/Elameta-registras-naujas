@@ -32,8 +32,7 @@
   .uzklausos-page #results-table tbody tr:nth-child(even) td{ background:#f7f7f7; }
   .uzklausos-page #results-table tbody tr:hover td{ background:#f0f0f0; }
 
-  /* ✅ VISOS žemiau esančios min-plotis taisyklės galioja TIK lentelės viduje,
-     kad nebeišpūstų „Stulpeliai“ checkbox meniu (inputs taip pat turi data-col). */
+  /* Min plotis – tik lentelės viduje */
   .uzklausos-page #results-table [data-col="id"]{min-width:70px}
   .uzklausos-page #results-table [data-col="klientas"]{min-width:140px}
   .uzklausos-page #results-table [data-col="projektas"]{min-width:140px}
@@ -121,14 +120,13 @@
     </div>
   </div>
 
-  <!-- Filtrai (palikta tik bendra paieška) -->
+  <!-- Filtrai (tik bendra paieška, be mygtuko) -->
   <section class="filters-wrap" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px">
     <form method="get" class="filters-form" id="search-form" style="display:flex;gap:12px;align-items:center">
       <label class="f" style="flex:1;display:flex;flex-direction:column;gap:6px">
         <span>Paieška</span>
         {{ filter_form.q }}
       </label>
-      <button class="btn" type="submit">Ieškoti</button>
       {% if request.GET.q %}
         <a class="btn btn-secondary" id="clear-search" href="{% url 'detaliu_registras:uzklausa_list' %}">Išvalyti</a>
       {% endif %}
@@ -184,17 +182,39 @@
       <tbody id="results-tbody">
         {% for u in uzklausos %}
           <tr>
-            <td data-col="id"><a href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">#{{ u.pk }}</a></td>
-            <td data-col="klientas">{{ u.klientas|default:"—" }}</td>
-            <td data-col="projektas">{{ u.projektas|default:"—" }}</td>
-            <td data-col="detale">{{ u.detale.pavadinimas|default:"—" }}</td>
-            <td data-col="brezinys">{{ u.detale.brezinio_nr|default:"—" }}</td>
-            <td data-col="metalas">{% if u.detale.specifikacija %}{{ u.detale.specifikacija.metalas|default:"—" }}{% else %}—{% endif %}</td>
+            <td data-col="id">
+              <a href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">#{{ u.pk }}</a>
+            </td>
+
+            <td data-col="klientas">
+              {% firstof u.klientas.vardas u.klientas as klnt %}
+              {{ klnt|default:"—" }}
+            </td>
+
+            <td data-col="projektas">
+              {{ u.projektas|default:"—" }}
+            </td>
+
+            <td data-col="detale">
+              {{ u.detale.pavadinimas|default:"—" }}
+            </td>
+
+            <td data-col="brezinys">
+              {{ u.detale.brezinio_nr|default:"—" }}
+            </td>
+
+            <td data-col="metalas">
+              {% if u.detale.specifikacija %}
+                {{ u.detale.specifikacija.metalas|default:"—" }}
+              {% else %}—{% endif %}
+            </td>
+
             <td data-col="padengimas">
               {% if u.detale.pavirsiu_dangos %}
                 {{ u.detale.pavirsiu_dangos.ktl_ec_name|default_if_none:"" }}{% if u.detale.pavirsiu_dangos.ktl_ec_name and u.detale.pavirsiu_dangos.miltelinis_name %} / {% endif %}{{ u.detale.pavirsiu_dangos.miltelinis_name|default_if_none:"" }}
               {% else %}—{% endif %}
             </td>
+
             <td data-col="specifikacija">
               {% if u.detale.specifikacija %}
                 <div>{% if u.detale.specifikacija.metalas %}Metal.: {{ u.detale.specifikacija.metalas }}{% endif %}</div>
@@ -202,6 +222,7 @@
                 <div>{% if u.detale.specifikacija.spalva %}Spalva: {{ u.detale.specifikacija.spalva }}{% endif %}</div>
               {% else %}—{% endif %}
             </td>
+
             <td data-col="dangos">
               {% if u.detale.pavirsiu_dangos %}
                 <div>{% if u.detale.pavirsiu_dangos.ktl_ec_name %}KTL/EC: {{ u.detale.pavirsiu_dangos.ktl_ec_name }}{% endif %}</div>
@@ -209,7 +230,13 @@
                 <div>{% if u.detale.pavirsiu_dangos.kiti %}Kita: {{ u.detale.pavirsiu_dangos.kiti }}{% endif %}</div>
               {% else %}—{% endif %}
             </td>
-            <td data-col="kiekiai">{% if u.kiekis %}{{ u.kiekis }}{% elif u.detale.kiekis %}{{ u.detale.kiekis }}{% else %}—{% endif %}</td>
+
+            <td data-col="kiekiai">
+              {% if u.kiekis %}{{ u.kiekis }}
+              {% elif u.detale.kiekis %}{{ u.detale.kiekis }}
+              {% else %}—{% endif %}
+            </td>
+
             <td data-col="matmenys">
               {% if u.detale and u.detale.specifikacija %}
                 {% if u.detale.specifikacija.ilgis or u.detale.specifikacija.plotis or u.detale.specifikacija.aukstis %}
@@ -223,16 +250,35 @@
                 {% else %}—{% endif %}
               {% endif %}
             </td>
-            <td data-col="kabinimas">{% if u.detale.kabinimas %}{{ u.detale.kabinimas }}{% elif u.kabinimas %}{{ u.kabinimas }}{% else %}—{% endif %}</td>
-            <td data-col="pakuote">{% if u.detale.pakuote %}{{ u.detale.pakuote }}{% elif u.pakuote %}{{ u.pakuote }}{% else %}—{% endif %}</td>
-            <td data-col="kokybe">{% if u.detale.testai %}{{ u.detale.testai }}{% elif u.testai %}{{ u.testai }}{% elif u.kokybe %}{{ u.kokybe }}{% else %}—{% endif %}</td>
+
+            <td data-col="kabinimas">
+              {% if u.detale.kabinimas %}{{ u.detale.kabinimas }}
+              {% elif u.kabinimas %}{{ u.kabinimas }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="pakuote">
+              {% if u.detale.pakuote %}{{ u.detale.pakuote }}
+              {% elif u.pakuote %}{{ u.pakuote }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td data-col="kokybe">
+              {% if u.detale.testai %}{{ u.detale.testai }}
+              {% elif u.testai %}{{ u.testai }}
+              {% elif u.kokybe %}{{ u.kokybe }}
+              {% else %}—{% endif %}
+            </td>
+
             <td data-col="dok">
               {% with docs=u.detale.dokumentai.all %}
                 {% if docs|length %}{% for d in docs|slice:":3" %}<div>{{ d }}</div>{% endfor %}{% endif %}
               {% endwith %}
               {% if u.pastabos %}<div>{{ u.pastabos }}</div>{% else %}{% with docs=u.detale.dokumentai.all %}{% if docs|length == 0 %}—{% endif %}{% endwith %}{% endif %}
             </td>
+
             <td data-col="sukurta">{{ u.data|date:"Y-m-d" }}</td>
+
             <td data-col="veiksmai" style="text-align:right">
               <a class="btn" href="{% url 'detaliu_registras:perziureti_uzklausa' u.pk %}">Peržiūrėti</a>
               <a class="btn" href="{% url 'detaliu_registras:redaguoti_uzklausa' u.pk %}">Redaguoti</a>
@@ -245,47 +291,33 @@
     </table>
   </section>
 
-  <div id="pagination-container">
-    {% if is_paginated %}
-      <nav class="pagination" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:12px 0 18px">
-        {% if page_obj.has_previous %}
-          <a class="page btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">‹</a>
-        {% else %}<span class="page btn" style="opacity:.5;pointer-events:none">‹</span>{% endif %}
-        <span class="page" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;background:#f3f4f6">Puslapis {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-          <a class="page btn" href="?page={{ page_obj.next_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">›</a>
-        {% else %}<span class="page btn" style="opacity:.5;pointer-events:none">›</span>{% endif %}
-      </nav>
-    {% endif %}
-  </div>
+  {% if is_paginated %}
+    <nav class="pagination" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:12px 0 18px">
+      {% if page_obj.has_previous %}
+        <a class="page btn" href="?page={{ page_obj.previous_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">‹</a>
+      {% else %}<span class="page btn" style="opacity:.5;pointer-events:none">‹</span>{% endif %}
+      <span class="page" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;background:#f3f4f6">Puslapis {{ page_obj.number }} iš {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="page btn" href="?page={{ page_obj.next_page_number }}{% if request.GET %}&{{ request.GET.urlencode|cut:'page='|cut:page_obj.number %}{% endif %}">›</a>
+      {% else %}<span class="page btn" style="opacity:.5;pointer-events:none">›</span>{% endif %}
+    </nav>
+  {% endif %}
 </div>
 
-<!-- Donut (refaktorinta į funkciją, kad būtų galima perpiešti po paieškos) -->
+<!-- Donut (be pakeitimų) -->
 <script>
-function renderDonutFromDOM(){
-  const donut=document.getElementById("donut");
-  if(!donut) return;
-  const segScript=document.getElementById("segments-data");
-  let seg=[]; try{ seg=JSON.parse(segScript?.textContent||"[]"); }catch(_){ seg=[]; }
-  const totalBox=donut.querySelector(".donut-total");
-  const legend=document.getElementById("donut-legend");
-  const segGroup=donut.querySelector(".segments");
-
-  // išvalom ankstesnius segmentus
-  segGroup.innerHTML = "";
-  legend.innerHTML = "";
-
-  const total = seg.reduce((a,b)=>a+(+b.value||0), 0) || parseInt(donut.dataset.total||"0",10);
-  totalBox.textContent = total;
-
-  if(!total || !seg.length){
-    legend.innerHTML = '<div style="color:#6b7280">Nėra duomenų grafikai.</div>';
+(function(){
+  const donut=document.getElementById("donut"); if(!donut) return;
+  const total=parseInt(donut.dataset.total||"0",10);
+  const dataEl=document.getElementById("segments-data");
+  let seg=[]; try{ seg=JSON.parse(dataEl?.textContent||"[]"); }catch(_){ seg=[]; }
+  if(!total||!seg.length){
+    const l=document.getElementById("donut-legend");
+    if(l) l.innerHTML='<div style="color:#6b7280">Nėra duomenų grafikai.</div>';
     return;
   }
   const COLORS=["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6","#06B6D4","#22C55E","#D946EF"];
-  const r=54, C=2*Math.PI*r;
-  let off=0;
-
+  const g=donut.querySelector(".segments"), r=54, C=2*Math.PI*r;
   function go(slug){
     const u=new URL(location.href);
     const cur=u.searchParams.get("seg")||"";
@@ -293,36 +325,34 @@ function renderDonutFromDOM(){
     u.searchParams.delete("page"); u.hash="results-top";
     location.href=u.toString();
   }
-
+  let off=0;
   seg.forEach((s,i)=>{
     const v=+s.value||0; if(v<=0) return;
     const dash=Math.max(0.0001,(v/total)*C), gap=C-dash;
     const arc=document.createElementNS("http://www.w3.org/2000/svg","circle");
-    arc.setAttribute("cx","60"); arc.setAttribute("cy","60"); arc.setAttribute("r","54");
-    arc.setAttribute("fill","none"); arc.setAttribute("stroke-linecap","round"); arc.setAttribute("stroke-width","12");
+    arc.setAttribute("cx","60");arc.setAttribute("cy","60");arc.setAttribute("r","54");
+    arc.setAttribute("fill","none");arc.setAttribute("stroke-linecap","round");arc.setAttribute("stroke-width","12");
     arc.setAttribute("stroke",COLORS[i%COLORS.length]);
     arc.setAttribute("stroke-dasharray",`${dash} ${gap}`); arc.setAttribute("stroke-dashoffset",String(off));
     arc.style.transform="rotate(-90deg)"; arc.style.transformOrigin="50% 50%"; arc.style.cursor="pointer";
-    arc.addEventListener("click",()=>go(s.slug||""));
-    segGroup.appendChild(arc);
-    off-=dash;
+    arc.addEventListener("click",()=>go(s.slug||"")); g.appendChild(arc); off-=dash;
   });
-
+  const legend=document.getElementById("donut-legend"); legend.innerHTML="";
   seg.forEach((s,i)=>{
     const div=document.createElement("div");
     div.style.cssText="display:flex;align-items:center;gap:8px;padding:2px 4px;border-radius:6px;cursor:pointer";
     div.innerHTML=`<span style="width:10px;height:10px;border-radius:999px;display:inline-block;background:${COLORS[i%COLORS.length]}"></span>
                    <span style="font-size:13px;color:#374151">${s.label||"—"}: <b>${s.value||0}</b></span>`;
-    div.addEventListener("click",()=>go(s.slug||""));
-    legend.appendChild(div);
+    div.addEventListener("click",()=>go(s.slug||"")); legend.appendChild(div);
   });
-}
-
-// pirmas piešimas
-renderDonutFromDOM();
+  try{
+    const u=new URL(location.href);
+    if(u.searchParams.has('seg')&&u.searchParams.has('page')){u.searchParams.delete('page'); history.replaceState(null,'',u.toString());}
+  }catch(_){}
+})();
 </script>
 
-<!-- Stulpelių rodyti/slėpti (+ reset) – be pakeitimų elgsenai -->
+<!-- Stulpelių rodyti/slėpti (+ reset) -->
 <script>
 (function(){
   const WRAP=document.getElementById("cols-config");
@@ -372,7 +402,54 @@ renderDonutFromDOM();
   else { const init=mapFromUI(); save(init); apply(init); }
 
   const f=document.getElementById('search-form');
-  if(f){ f.addEventListener('submit',(e)=>{ e.preventDefault(); /* submit nenaudojam – turim live paiešką */ }); }
+  if(f){
+    // jei kas nors vis tiek paspaustų submit – sulaikom, „gyva“ paieška tvarko pati
+    f.addEventListener('submit', (e)=> e.preventDefault());
+  }
+})();
+</script>
+
+<!-- „Gyva“ paieška (debounce, Enter/Escape) -->
+<script>
+(function(){
+  const form = document.getElementById('search-form');
+  if(!form) return;
+
+  const input = form.querySelector('input[name="q"]');
+  let t = null;
+
+  function applyQuery(q) {
+    const u = new URL(location.href);
+    if (q && q.trim().length) {
+      u.searchParams.set('q', q.trim());
+    } else {
+      u.searchParams.delete('q');
+    }
+    // nauja paieška – nuimam puslapio numerį
+    u.searchParams.delete('page');
+    location.href = u.toString();
+  }
+
+  if (input) {
+    // „Gyva“ paieška rašant (300 ms debounce)
+    input.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => applyQuery(input.value), 300);
+    });
+
+    // Enter – ieškoti iškart; Esc – išvalyti
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(t);
+        applyQuery(input.value);
+      } else if (e.key === 'Escape') {
+        input.value = '';
+        clearTimeout(t);
+        applyQuery('');
+      }
+    });
+  }
 })();
 </script>
 
@@ -444,92 +521,6 @@ renderDonutFromDOM();
   const init=()=>{ rebuild(); syncX(); placeAndToggle(); };
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
   window.addEventListener('load', init);
-})();
-</script>
-
-<!-- 🔎 Gyva paieška: „rašant“ filtruojam per XHR (be backend pakeitimų) -->
-<script>
-(function(){
-  const form = document.getElementById('search-form');
-  const input = form ? form.querySelector('input[name="q"], #id_q') : null;
-  const tbody = document.getElementById('results-tbody');
-  const paginationBox = document.getElementById('pagination-container');
-
-  if (!input || !tbody) return;
-
-  // išjungiam default submit – naudosim live paiešką
-  form.addEventListener('submit', (e)=> e.preventDefault());
-
-  // helper: 250ms debounce
-  let t = null, ctrl = null;
-  function debounce(fn, ms){ return function(...args){ clearTimeout(t); t=setTimeout(()=>fn.apply(this,args), ms); }; }
-
-  async function runSearch(){
-    const url = new URL(window.location.href);
-    const q = (input.value || "").trim();
-    if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
-    url.searchParams.delete('page'); // nuo pradžios
-
-    // abortinam ankstesnį requestą
-    if (ctrl) ctrl.abort();
-    ctrl = new AbortController();
-
-    try{
-      const resp = await fetch(url.toString(), { signal: ctrl.signal });
-      if (!resp.ok) return;
-      const html = await resp.text();
-
-      // parsavimas į DOM
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // pakeičiam TBODY
-      const newBody = doc.querySelector('#results-tbody');
-      if (newBody) tbody.innerHTML = newBody.innerHTML;
-
-      // pakeičiam paginaciją (visa dėžutė)
-      const newPag = doc.querySelector('#pagination-container');
-      if (newPag && paginationBox) paginationBox.innerHTML = newPag.innerHTML;
-
-      // atnaujinam donut data script + total ir perpiešiam
-      const curSeg = document.getElementById('segments-data');
-      const newSeg = doc.getElementById('segments-data');
-      if (curSeg && newSeg) curSeg.textContent = newSeg.textContent;
-
-      const donut = document.getElementById('donut');
-      const newDonut = doc.getElementById('donut');
-      if (donut && newDonut){
-        donut.dataset.total = newDonut.dataset.total || "0";
-      }
-      renderDonutFromDOM();
-
-      // atnaujink URL be perkrovimo
-      history.replaceState({}, "", url.toString());
-    }catch(err){
-      if (err.name !== "AbortError") console.error(err);
-    }
-  }
-
-  const onType = debounce(runSearch, 250);
-  input.addEventListener('input', onType);
-
-  // ESC – greitam išvalymui
-  input.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape'){
-      input.value = '';
-      onType();
-    }
-  });
-
-  // „Išvalyti“ mygtuko perėmimas (kad per live veikimą neiššautų pilnas reload)
-  const clearBtn = document.getElementById('clear-search');
-  if (clearBtn){
-    clearBtn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      input.value = '';
-      onType();
-    });
-  }
 })();
 </script>
 {% endblock %}
