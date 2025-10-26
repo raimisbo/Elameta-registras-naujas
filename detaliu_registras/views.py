@@ -1,9 +1,10 @@
+# detaliu_registras/views.py
 from urllib.parse import unquote as urlunquote
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.db.models import Q, Count, Value
 from django.db.models.functions import Coalesce
-
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
@@ -11,10 +12,11 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, F
 from .models import Uzklausa, Kaina
 from .forms import (
     UzklausaFilterForm,
-    UzklausaCreateOrSelectForm,
+    UzklausaCreateOrSelectForm,  # jei nenaudoji – gali pašalinti importą
     UzklausaEditForm,
     ImportUzklausosCSVForm,
-    KainaForm, UzklausaCreateFullForm,
+    KainaForm,
+    UzklausaCreateFullForm,
 )
 
 # CSV importo helperis (nebūtinas)
@@ -54,13 +56,80 @@ class UzklausaListView(ListView):
             metalas = form.cleaned_data.get("metalas")
             padengimas = form.cleaned_data.get("padengimas")
 
+            # Bendras filtras: apima VISAS pozicijas (tekstai, skaičiai, data)
             if q:
-                qs = qs.filter(
-                    Q(detale__pavadinimas__icontains=q) |
-                    Q(detale__brezinio_nr__icontains=q) |
-                    Q(klientas__vardas__icontains=q) |
-                    Q(projektas__pavadinimas__icontains=q)
+                qq = q.strip()
+
+                # Skaičiai (int/decimal)
+                num_int = None
+                num_dec = None
+                try:
+                    num_int = int(qq)
+                except (TypeError, ValueError):
+                    pass
+                try:
+                    num_dec = Decimal(qq)
+                except (InvalidOperation, TypeError, ValueError):
+                    pass
+
+                text_Q = (
+                    Q(detale__pavadinimas__icontains=qq) |
+                    Q(detale__brezinio_nr__icontains=qq) |
+                    Q(klientas__vardas__icontains=qq) |
+                    Q(projektas__pavadinimas__icontains=qq) |
+                    Q(projektas__aprasymas__icontains=qq) |
+                    Q(pastabos__icontains=qq) |
+                    # Specifikacija
+                    Q(detale__specifikacija__metalas__icontains=qq) |
+                    Q(detale__specifikacija__medziagos_kodas__icontains=qq) |
+                    # Dangos
+                    Q(detale__pavirsiu_dangos__ktl_ec_name__icontains=qq) |
+                    Q(detale__pavirsiu_dangos__miltelinis_name__icontains=qq) |
+                    Q(detale__pavirsiu_dangos__spalva_ral__icontains=qq) |
+                    Q(detale__pavirsiu_dangos__blizgumas__icontains=qq) |
+                    # Pakuotė / kita
+                    Q(detale__pakuotes_tipas__icontains=qq) |
+                    Q(detale__pakuotes_pastabos__icontains=qq) |
+                    Q(detale__testas_adhezija__icontains=qq) |
+                    Q(detale__testai_kita__icontains=qq) |
+                    Q(detale__ppap_dokumentai__icontains=qq) |
+                    Q(detale__priedai_info__icontains=qq)
                 )
+
+                number_Q = Q()
+                if num_int is not None or num_dec is not None:
+                    number_Q = (
+                        Q(id=num_int) |
+                        # kiekiai
+                        Q(detale__kiekis_metinis=num_int) |
+                        Q(detale__kiekis_menesis=num_int) |
+                        Q(detale__kiekis_partijai=num_int) |
+                        Q(detale__kiekis_per_val=num_int) |
+                        # matmenys (Decimal)
+                        Q(detale__ilgis_mm=num_dec) |
+                        Q(detale__plotis_mm=num_dec) |
+                        Q(detale__aukstis_mm=num_dec) |
+                        Q(detale__skersmuo_mm=num_dec) |
+                        Q(detale__storis_mm=num_dec) |
+                        # kabinimas/pakuotė/testai
+                        Q(detale__kabliuku_kiekis=num_int) |
+                        Q(detale__kabinimo_anga_mm=num_dec) |
+                        Q(detale__vienetai_dezeje=num_int) |
+                        Q(detale__vienetai_paleje=num_int) |
+                        Q(detale__testai_druskos_rukas_val=num_int) |
+                        Q(detale__testas_storis_mikronai=num_int) |
+                        # specifikacija skaičiai
+                        Q(detale__specifikacija__plotas_m2=num_dec) |
+                        Q(detale__specifikacija__svoris_kg=num_dec)
+                    )
+
+                date_Q = Q()
+                if len(qq) == 10 and qq[4] == "-" and qq[7] == "-":
+                    # YYYY-MM-DD
+                    date_Q = Q(data=qq)
+
+                qs = qs.filter(text_Q | number_Q | date_Q).distinct()
+
             if klientas:
                 qs = qs.filter(klientas=klientas)
             if projektas:
@@ -85,10 +154,13 @@ class UzklausaListView(ListView):
         # papildomas donut filtras ?seg=client:<vardas> / ?seg=others
         seg = self.request.GET.get("seg")
         if seg:
+            # TOP5 klientų vardai iš jau filtruoto QS
             top_names = list(
-                qs.values_list(Coalesce("klientas__vardas", Value("Be kliento")), flat=True)
+                qs.annotate(label=Coalesce("klientas__vardas", Value("Be kliento")))
+                  .values("label")
                   .annotate(c=Count("id"))
-                  .order_by("-c")[:5]
+                  .order_by("-c")
+                  .values_list("label", flat=True)[:5]
             )
             if seg == "others":
                 qs = qs.exclude(klientas__vardas__in=top_names)
@@ -106,10 +178,12 @@ class UzklausaListView(ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["filter_form"] = getattr(self, "_filter_form", UzklausaFilterForm())
 
-        qs_all = self.get_queryset().select_related("klientas")
+        # Naudojam jau sugeneruotą self.object_list (nebekviečiam get_queryset())
+        qs_all = self.object_list.select_related("klientas")
         total = qs_all.count()
         top_rows = (
-            qs_all.values(label=Coalesce("klientas__vardas", Value("Be kliento")))
+            qs_all.annotate(label=Coalesce("klientas__vardas", Value("Be kliento")))
+                  .values("label")
                   .annotate(value=Count("id"))
                   .order_by("-value")[:5]
         )
@@ -134,12 +208,11 @@ class UzklausaDetailView(DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         uzk = self.object
-        # palik, jei turi senus šablonus, kuriems reikia sąrašo:
+        # laikinas suderinamumas su senesniais šablonais:
         kainos = uzk.kainos.all().order_by("-id")
         current = kainos.filter(busena="aktuali").first()
-        # rekomenduojamas minimaliam UI:
         ctx["kaina_aktuali"] = current
-        ctx["kainos"] = kainos  # laikinai paliekam atgaliniam suderinamumui
+        ctx["kainos"] = kainos
         return ctx
 
 
@@ -220,7 +293,6 @@ class KainosRedagavimasView(FormView):
         kaina.save()
         messages.success(self.request, "Kaina išsaugota.")
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[self.uzklausa.pk]))
-
 
 
 # === CSV importas (stub) ===
