@@ -9,10 +9,10 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, FormView
 
-from .models import Uzklausa, Kaina
+from .models import Uzklausa, Kaina, Brezinys
 from .forms import (
     UzklausaFilterForm,
-    UzklausaCreateOrSelectForm,  # jei nenaudoji – gali pašalinti importą
+    UzklausaCreateOrSelectForm,  # jei nenaudoji – galima pašalinti importą
     UzklausaEditForm,
     ImportUzklausosCSVForm,
     KainaForm,
@@ -24,6 +24,46 @@ try:
     from .importers import import_uzklausos_csv
 except Exception:
     import_uzklausos_csv = None
+
+
+# === Pagalbinė brėžinių kūrimo funkcija (kelis failus + URL) ===
+def _create_drawings_from_form(request, uzklausa, cleaned_data):
+    """
+    Sukuria Brezinys įrašus pagal formos laukus:
+      - 'drawing_files' (gali būti keli)
+      - 'drawing_url' (vienas)
+      - 'drawing_name', 'drawing_version', 'drawing_type' (pasirenkama)
+    """
+    if not uzklausa or not uzklausa.detale:
+        return
+
+    files = request.FILES.getlist("drawing_files")
+    base_name = (cleaned_data.get("drawing_name") or "").strip()
+    base_ver = (cleaned_data.get("drawing_version") or "").strip()
+    opt_type = (cleaned_data.get("drawing_type") or "").strip()
+    url = (cleaned_data.get("drawing_url") or "").strip()
+
+    # Failai (galima keli)
+    for i, f in enumerate(files, start=1):
+        Brezinys.objects.create(
+            detale=uzklausa.detale,
+            pavadinimas=f"{base_name} ({i})" if base_name and len(files) > 1 else (base_name or getattr(f, "name", "")),
+            versija=base_ver or "",
+            tipas=opt_type or Brezinys.detect_type_by_ext(getattr(f, "name", "")),
+            failas=f,
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+
+    # Išorinis URL (neprivalomas)
+    if url:
+        Brezinys.objects.create(
+            detale=uzklausa.detale,
+            pavadinimas=base_name or "Brėžinys (URL)",
+            versija=base_ver or "",
+            tipas=opt_type or Brezinys.detect_type_by_ext(url),
+            isorinis_url=url,
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
 
 
 # === Sąrašas su filtrais ir donut ===
@@ -38,7 +78,7 @@ class UzklausaListView(ListView):
             Uzklausa.objects
             .select_related(
                 "klientas", "projektas", "detale",
-                "detale__specifikacija", "detale__pavirsiu_dangos"
+                "detale__specifikacija", "detale__pavirsiu_dangos",
             )
             .order_by("-id")
         )
@@ -56,11 +96,11 @@ class UzklausaListView(ListView):
             metalas = form.cleaned_data.get("metalas")
             padengimas = form.cleaned_data.get("padengimas")
 
-            # Bendras filtras: apima VISAS pozicijas (tekstai, skaičiai, data)
+            # Bendras filtras (apima visus rodymo stulpelius): tekstas + skaičiai + data
             if q:
                 qq = q.strip()
 
-                # Skaičiai (int/decimal)
+                # Skaitinių reikšmių paruošimas
                 num_int = None
                 num_dec = None
                 try:
@@ -105,7 +145,7 @@ class UzklausaListView(ListView):
                         Q(detale__kiekis_menesis=num_int) |
                         Q(detale__kiekis_partijai=num_int) |
                         Q(detale__kiekis_per_val=num_int) |
-                        # matmenys (Decimal)
+                        # matmenys
                         Q(detale__ilgis_mm=num_dec) |
                         Q(detale__plotis_mm=num_dec) |
                         Q(detale__aukstis_mm=num_dec) |
@@ -124,8 +164,7 @@ class UzklausaListView(ListView):
                     )
 
                 date_Q = Q()
-                if len(qq) == 10 and qq[4] == "-" and qq[7] == "-":
-                    # YYYY-MM-DD
+                if len(qq) == 10 and qq[4] == "-" and qq[7] == "-":  # YYYY-MM-DD
                     date_Q = Q(data=qq)
 
                 qs = qs.filter(text_Q | number_Q | date_Q).distinct()
@@ -154,7 +193,7 @@ class UzklausaListView(ListView):
         # papildomas donut filtras ?seg=client:<vardas> / ?seg=others
         seg = self.request.GET.get("seg")
         if seg:
-            # TOP5 klientų vardai iš jau filtruoto QS
+            # TOP5 vardų sąrašas iš jau filtruoto QS
             top_names = list(
                 qs.annotate(label=Coalesce("klientas__vardas", Value("Be kliento")))
                   .values("label")
@@ -178,7 +217,7 @@ class UzklausaListView(ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["filter_form"] = getattr(self, "_filter_form", UzklausaFilterForm())
 
-        # Naudojam jau sugeneruotą self.object_list (nebekviečiam get_queryset())
+        # Naudojame jau sugeneruotą self.object_list (nebekviečiam get_queryset())
         qs_all = self.object_list.select_related("klientas")
         total = qs_all.count()
         top_rows = (
@@ -208,7 +247,7 @@ class UzklausaDetailView(DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         uzk = self.object
-        # laikinas suderinamumas su senesniais šablonais:
+        # Paliekame suderinamumui
         kainos = uzk.kainos.all().order_by("-id")
         current = kainos.filter(busena="aktuali").first()
         ctx["kaina_aktuali"] = current
@@ -219,7 +258,7 @@ class UzklausaDetailView(DetailView):
 # === Nauja užklausa ===
 class UzklausaCreateView(CreateView):
     template_name = "detaliu_registras/ivesti_uzklausa.html"
-    form_class = UzklausaCreateFullForm  # kaip pas tave
+    form_class = UzklausaCreateFullForm
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -232,6 +271,7 @@ class UzklausaCreateView(CreateView):
     def form_valid(self, form):
         uzklausa = form.save()
 
+        # Kainos kūrimas (jei paduota)
         kaina_form = KainaForm(self.request.POST)
         if kaina_form.is_valid() and kaina_form.cleaned_data.get("suma") is not None:
             k = kaina_form.save(commit=False)
@@ -241,6 +281,9 @@ class UzklausaCreateView(CreateView):
             messages.success(self.request, "Užklausa sukurta su kaina.")
         else:
             messages.success(self.request, "Užklausa sukurta (be kainos).")
+
+        # Brėžiniai (kelis failus + URL)
+        _create_drawings_from_form(self.request, uzklausa, form.cleaned_data)
 
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
@@ -253,11 +296,15 @@ class UzklausaUpdateView(UpdateView):
 
     def form_valid(self, form):
         uzklausa = form.save()
+
+        # Brėžiniai (kelis failus + URL)
+        _create_drawings_from_form(self.request, uzklausa, form.cleaned_data)
+
         messages.success(self.request, "Užklausa atnaujinta.")
         return redirect(reverse("detaliu_registras:perziureti_uzklausa", args=[uzklausa.pk]))
 
 
-# === KAINOS: redagavimas per formset'ą ===
+# === KAINOS: redagavimas per formą ===
 class KainosRedagavimasView(FormView):
     template_name = "detaliu_registras/redaguoti_kaina.html"
     form_class = KainaForm
@@ -272,7 +319,6 @@ class KainosRedagavimasView(FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        # Viena kaina per užklausą – redaguojame esamą, o jei nėra, sukursim
         instance = Kaina.objects.filter(uzklausa=self.uzklausa).first()
         kwargs["instance"] = instance
         return kwargs

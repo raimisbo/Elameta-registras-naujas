@@ -1,378 +1,278 @@
 {% extends "base.html" %}
-{% block title %}
-  {% firstof uzklausa.klientas.vardas uzklausa.klientas "Užklausa" %} — Užklausa
-{% endblock %}
+{% block title %}Užklausa #{{ uzklausa.pk }}{% endblock %}
 
 {% block content %}
 <div class="container">
-  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0">
-    <h1 style="margin:0">
-      {% firstof uzklausa.klientas.vardas uzklausa.klientas "Užklausa" %}
-    </h1>
-    <div style="display:flex;gap:8px">
-      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">← Į sąrašą</a>
+  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 12px">
+    <h1 style="margin:0">Užklausa #{{ uzklausa.pk }}</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
       <a class="btn" href="{% url 'detaliu_registras:redaguoti_uzklausa' uzklausa.pk %}">Redaguoti</a>
+      <a class="btn" href="{% url 'detaliu_registras:redaguoti_kaina' uzklausa.pk %}">Redaguoti kainą</a>
+      <a class="btn btn-secondary" href="{% url 'detaliu_registras:uzklausa_list' %}">Atgal</a>
     </div>
   </header>
 
-  {# Paruošti trumpi URL'ai istorijai #}
-  {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Uzklausa' uzklausa.pk as hist_uzk_url %}
-  {% if uzklausa.detale %}
-    {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Detale' uzklausa.detale.id as hist_detale_url %}
-  {% else %}
-    {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Uzklausa' uzklausa.pk as hist_detale_url %}
-  {% endif %}
-  {% if kaina_aktuali %}
-    {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Kaina' kaina_aktuali.id as hist_kaina_url %}
-  {% else %}
-    {% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Uzklausa' uzklausa.pk as hist_kaina_url %}
-  {% endif %}
-
-  <!-- Valdiklis blokams rodyti/slėpti (įsimena būseną) -->
-  <div class="cols-config" id="cols-config" style="display:flex;align-items:center;gap:12px;margin:8px 0 10px">
-    <button type="button" class="btn" id="cols-toggle">⚙️ Stulpeliai</button>
-    <div class="cols-panel" id="cols-panel"
-         style="display:none;gap:12px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;background:#fff">
-      <label><input type="checkbox" data-block="main" checked> Pagrindinė</label>
-      <label><input type="checkbox" data-block="spec" checked> Specifikacija</label>
-      <label><input type="checkbox" data-block="coats" checked> Paviršių dangos</label>
-      <label><input type="checkbox" data-block="qty" checked> Kiekiai</label>
-      <label><input type="checkbox" data-block="dims" checked> Matmenys</label>
-      <label><input type="checkbox" data-block="hang" checked> Kabinimas</label>
-      <label><input type="checkbox" data-block="pack" checked> Pakuotė</label>
-      <label><input type="checkbox" data-block="qa" checked> Testai / Kokybė</label>
-      <label><input type="checkbox" data-block="docs" checked> Dokumentai / Pastabos</label>
-      <label><input type="checkbox" data-block="price" checked> Kaina</label>
-    </div>
-  </div>
-
-  {# 1) PAGRINDINĖ — be istorijos, visada matoma #}
-  <section class="box block" data-block="main">
-    <h3>Pagrindinė informacija</h3>
+  <!-- Pagrindinė informacija (paliekam visada atidarytą) -->
+  <section class="box">
+    <h3 style="margin:0 0 10px">Pagrindinė informacija</h3>
     <div class="grid">
       <div><strong>Klientas:</strong> {% firstof uzklausa.klientas.vardas uzklausa.klientas "—" %}</div>
       <div><strong>Projektas:</strong> {{ uzklausa.projektas|default:"—" }}</div>
       <div><strong>Detalė:</strong> {{ uzklausa.detale.pavadinimas|default:"—" }}</div>
       <div><strong>Brėžinio nr.:</strong> {{ uzklausa.detale.brezinio_nr|default:"—" }}</div>
-      <div><strong>Sukurta:</strong> {{ uzklausa.data|date:"Y-m-d" }}</div>
+      <div><strong>Data:</strong> {{ uzklausa.data|date:"Y-m-d" }}</div>
+      <div style="grid-column:1/-1"><strong>Pastabos:</strong> {{ uzklausa.pastabos|default:"—" }}</div>
     </div>
   </section>
 
-  {# 2) SPECIFIKACIJA — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="spec">
-    <div class="block-head">
-      <h3 class="grow">Specifikacija</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-spec" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
+  <!-- Specifikacija -->
+  <section class="box blk" data-key="spec">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Specifikacija</h3>
+      <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
     </div>
-    {% if uzklausa.detale.specifikacija %}
-      <div class="grid">
-        <div><strong>Metalas:</strong> {{ uzklausa.detale.specifikacija.metalas|default:"—" }}</div>
-        <div><strong>Plotas m²:</strong> {{ uzklausa.detale.specifikacija.plotas_m2|default:"—" }}</div>
-        <div><strong>Svoris kg:</strong> {{ uzklausa.detale.specifikacija.svoris_kg|default:"—" }}</div>
-        <div><strong>Medžiagos kodas:</strong> {{ uzklausa.detale.specifikacija.medziagos_kodas|default:"—" }}</div>
-      </div>
-    {% else %}
-      <p>—</p>
-    {% endif %}
-    <div id="hist-spec" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 3) PAVIRŠIŲ DANGOS — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="coats">
-    <div class="block-head">
-      <h3 class="grow">Paviršių dangos</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-coats" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    {% if uzklausa.detale.pavirsiu_dangos %}
-      <div class="grid">
-        <div><strong>KTL / e-coating:</strong> {{ uzklausa.detale.pavirsiu_dangos.ktl_ec_name|default:"—" }}</div>
-        <div><strong>Miltelinis padengimas:</strong> {{ uzklausa.detale.pavirsiu_dangos.miltelinis_name|default:"—" }}</div>
-        <div><strong>RAL / spalva:</strong> {{ uzklausa.detale.pavirsiu_dangos.spalva_ral|default:"—" }}</div>
-        <div><strong>Blizgumas / tekstūra:</strong> {{ uzklausa.detale.pavirsiu_dangos.blizgumas|default:"—" }}</div>
-      </div>
-    {% else %}
-      <p>—</p>
-    {% endif %}
-    <div id="hist-coats" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 4) KIEKIAI — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="qty">
-    <div class="block-head">
-      <h3 class="grow">Kiekiai</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qty" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>Kiekis per metus:</strong> {{ uzklausa.detale.kiekis_metinis|default:"—" }}</div>
-      <div><strong>Kiekis per mėnesį:</strong> {{ uzklausa.detale.kiekis_menesis|default:"—" }}</div>
-      <div><strong>Kiekis partijai:</strong> {{ uzklausa.detale.kiekis_partijai|default:"—" }}</div>
-      <div><strong>Gaminių/val. (jei nurodyta):</strong> {{ uzklausa.detale.kiekis_per_val|default:"—" }}</div>
-    </div>
-    <div id="hist-qty" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 5) MATMENYS — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="dims">
-    <div class="block-head">
-      <h3 class="grow">Matmenys</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-dims" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>Ilgis (mm):</strong> {{ uzklausa.detale.ilgis_mm|default:"—" }}</div>
-      <div><strong>Plotis (mm):</strong> {{ uzklausa.detale.plotis_mm|default:"—" }}</div>
-      <div><strong>Aukštis (mm):</strong> {{ uzklausa.detale.aukstis_mm|default:"—" }}</div>
-      <div><strong>Skersmuo (mm):</strong> {{ uzklausa.detale.skersmuo_mm|default:"—" }}</div>
-      <div><strong>Storis (mm):</strong> {{ uzklausa.detale.storis_mm|default:"—" }}</div>
-      <div><strong>Paviršiaus plotas (m²):</strong> {{ uzklausa.detale.specifikacija.plotas_m2|default:"—" }}</div>
-    </div>
-    <div id="hist-dims" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 6) KABINIMAS — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="hang">
-    <div class="block-head">
-      <h3 class="grow">Kabinimas</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-hang" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>Kabinimo būdas:</strong> {{ uzklausa.detale.kabinimo_budas|default:"—" }}</div>
-      <div><strong>Kabliukų kiekis:</strong> {{ uzklausa.detale.kabliuku_kiekis|default:"—" }}</div>
-      <div><strong>Kabinimo anga (mm):</strong> {{ uzklausa.detale.kabinimo_anga_mm|default:"—" }}</div>
-      <div><strong>Kabinti per:</strong> {{ uzklausa.detale.kabinti_per|default:"—" }}</div>
-    </div>
-    <div id="hist-hang" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 7) PAKUOTĖ — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="pack">
-    <div class="block-head">
-      <h3 class="grow">Pakuotė</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-pack" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>Pakuotės tipas:</strong> {{ uzklausa.detale.pakuotes_tipas|default:"—" }}</div>
-      <div><strong>Vnt/dėžėje:</strong> {{ uzklausa.detale.vienetai_dezeje|default:"—" }}</div>
-      <div><strong>Vnt/palėje:</strong> {{ uzklausa.detale.vienetai_paleje|default:"—" }}</div>
-      <div><strong>Spec. žymėjimas:</strong> {{ uzklausa.detale.pakuotes_pastabos|default:"—" }}</div>
-    </div>
-    <div id="hist-pack" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 8) TESTAI / KOKYBĖ — istorija per Detalę/Užklausą #}
-  <section class="box block" data-block="qa">
-    <div class="block-head">
-      <h3 class="grow">Testai / Kokybė</h3>
-      <a href="{{ hist_detale_url }}" class="hist-link js-history-link" data-target="#hist-qa" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>Druskos rūkas (val.):</strong> {{ uzklausa.detale.testai_druskos_rukas_val|default:"—" }}</div>
-      <div><strong>Adhezijos testas:</strong> {{ uzklausa.detale.testas_adhezija|default:"—" }}</div>
-      <div><strong>Storis (µm):</strong> {{ uzklausa.detale.testas_storis_mikronai|default:"—" }}</div>
-      <div><strong>Kiti reikalavimai:</strong> {{ uzklausa.detale.testai_kita|default:"—" }}</div>
-    </div>
-    <div id="hist-qa" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# 9) DOKUMENTAI / PASTABOS — istorija per Užklausą #}
-  <section class="box block" data-block="docs">
-    <div class="block-head">
-      <h3 class="grow">Dokumentai / Pastabos</h3>
-      <a href="{{ hist_uzk_url }}" class="hist-link js-history-link" data-target="#hist-docs" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-    <div class="grid">
-      <div><strong>PPAP dokumentai:</strong> {{ uzklausa.detale.ppap_dokumentai|default:"—" }}</div>
-      <div><strong>Brėžiniai / priedai:</strong> {{ uzklausa.detale.priedai_info|default:"—" }}</div>
-      <div><strong>Projekto aprašymas:</strong> {{ uzklausa.projektas.aprasymas|default:"—" }}</div>
-      <div><strong>Užklausos pastabos:</strong> {{ uzklausa.pastabos|default:"—" }}</div>
-    </div>
-    <div id="hist-docs" class="history-box" style="display:none; margin-top:6px;"></div>
-  </section>
-
-  {# --- 10) KAINA --- #}
-  <section class="box block" data-block="price">
-    <div class="block-head">
-      <h3 class="grow">Kaina</h3>
-      <a href="{{ hist_kaina_url }}" class="hist-link js-history-link" data-target="#hist-price" data-mode="toggle" title="Istorija"><span class="dot">•</span> istorija</a>
-    </div>
-
-    <div class="grid">
-      <div>
-        <strong>Aktuali kaina:</strong>
-        {% if kaina_aktuali %}
-          {{ kaina_aktuali.suma }} {{ kaina_aktuali.valiuta }} ({{ kaina_aktuali.busena }})
-          {% if kaina_aktuali.yra_fiksuota and kaina_aktuali.fiksuotas_kiekis %}
-            — fiksuota: {{ kaina_aktuali.fiksuotas_kiekis }} {{ kaina_aktuali.kainos_matas }}
-          {% else %}
-            {% if kaina_aktuali.kiekis_nuo or kaina_aktuali.kiekis_iki %}
-              — diapazonas: {{ kaina_aktuali.kiekis_nuo|default:"0" }}–{{ kaina_aktuali.kiekis_iki|default:"∞" }}
-            {% endif %}
-          {% endif %}
+    <div class="blk-body" style="margin-top:10px">
+      {% with s=uzklausa.detale.specifikacija %}
+        {% if s %}
+          <div class="grid">
+            <div><strong>Metalas:</strong> {{ s.metalas|default:"—" }}</div>
+            <div><strong>Plotas m²:</strong> {% if s.plotas_m2 or s.plotas_m2 == 0 %}{{ s.plotas_m2 }}{% else %}—{% endif %}</div>
+            <div><strong>Svoris kg:</strong> {% if s.svoris_kg or s.svoris_kg == 0 %}{{ s.svoris_kg }}{% else %}—{% endif %}</div>
+            <div><strong>Medžiagos kodas:</strong> {{ s.medziagos_kodas|default:"—" }}</div>
+          </div>
         {% else %}
-          — nėra
+          —
         {% endif %}
-      </div>
+      {% endwith %}
+    </div>
+  </section>
 
-      <div>
-        {% if kaina_aktuali %}
-          <a class="btn" href="{% url 'detaliu_registras:kainos_redagavimas' uzklausa.pk %}">Redaguoti kainą</a>
+  <!-- Paviršių dangos -->
+  <section class="box blk" data-key="dangos">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Paviršių dangos</h3>
+      <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
+    </div>
+    <div class="blk-body" style="margin-top:10px">
+      {% with d=uzklausa.detale.pavirsiu_dangos %}
+        {% if d %}
+          <div class="grid">
+            <div><strong>KTL / e-coating:</strong> {{ d.ktl_ec_name|default:"—" }}</div>
+            <div><strong>Miltelinis:</strong> {{ d.miltelinis_name|default:"—" }}</div>
+            <div><strong>RAL / spalva:</strong> {{ d.spalva_ral|default:"—" }}</div>
+            <div><strong>Blizgumas / tekstūra:</strong> {{ d.blizgumas|default:"—" }}</div>
+          </div>
         {% else %}
-          <a class="btn" href="{% url 'detaliu_registras:kainos_redagavimas' uzklausa.pk %}">Pridėti kainą</a>
+          —
         {% endif %}
+      {% endwith %}
+    </div>
+  </section>
+
+  <!-- Papildomi duomenys -->
+  <section class="box blk" data-key="extra">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Papildomi duomenys</h3>
+      <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
+    </div>
+    <div class="blk-body" style="margin-top:10px">
+      <div class="grid">
+        <div>
+          <strong>Kiekiai:</strong><br>
+          {% with d=uzklausa.detale %}
+            {% if d.kiekis_metinis or d.kiekis_menesis or d.kiekis_partijai or d.kiekis_per_val %}
+              {% if d.kiekis_metinis %}Metinis: {{ d.kiekis_metinis }}<br>{% endif %}
+              {% if d.kiekis_menesis %}Mėnesio: {{ d.kiekis_menesis }}<br>{% endif %}
+              {% if d.kiekis_partijai %}Partijai: {{ d.kiekis_partijai }}<br>{% endif %}
+              {% if d.kiekis_per_val %}Per val.: {{ d.kiekis_per_val }}{% endif %}
+            {% else %}—{% endif %}
+          {% endwith %}
+        </div>
+        <div>
+          <strong>Matmenys:</strong><br>
+          {% with d=uzklausa.detale %}
+            {% if d.ilgis_mm or d.plotis_mm or d.aukstis_mm or d.skersmuo_mm or d.storis_mm %}
+              {% if d.ilgis_mm %}Ilgis: {{ d.ilgis_mm }} mm<br>{% endif %}
+              {% if d.plotis_mm %}Plotis: {{ d.plotis_mm }} mm<br>{% endif %}
+              {% if d.aukstis_mm %}Aukštis: {{ d.aukstis_mm }} mm<br>{% endif %}
+              {% if d.skersmuo_mm %}Skersmuo: {{ d.skersmuo_mm }} mm<br>{% endif %}
+              {% if d.storis_mm %}Storis: {{ d.storis_mm }} mm{% endif %}
+            {% else %}—{% endif %}
+          {% endwith %}
+        </div>
+        <div>
+          <strong>Kabinimas:</strong><br>
+          {% with d=uzklausa.detale %}
+            {% if d.kabinimo_budas or d.kabliuku_kiekis or d.kabinimo_anga_mm or d.kabinti_per %}
+              {% if d.kabinimo_budas %}Būdas: {{ d.kabinimo_budas }}<br>{% endif %}
+              {% if d.kabliuku_kiekis %}Kabliukų: {{ d.kabliuku_kiekis }}<br>{% endif %}
+              {% if d.kabinimo_anga_mm %}Anga: {{ d.kabinimo_anga_mm }} mm<br>{% endif %}
+              {% if d.kabinti_per %}Kabinti per: {{ d.kabinti_per }}{% endif %}
+            {% else %}—{% endif %}
+          {% endwith %}
+        </div>
+        <div>
+          <strong>Pakuotė:</strong><br>
+          {% with d=uzklausa.detale %}
+            {% if d.pakuotes_tipas or d.vienetai_dezeje or d.vienetai_paleje or d.pakuotes_pastabos %}
+              {% if d.pakuotes_tipas %}Tipas: {{ d.pakuotes_tipas }}<br>{% endif %}
+              {% if d.vienetai_dezeje %}Vnt. dėžėje: {{ d.vienetai_dezeje }}<br>{% endif %}
+              {% if d.vienetai_paleje %}Vnt. palėje: {{ d.vienetai_paleje }}<br>{% endif %}
+              {% if d.pakuotes_pastabos %}Pastabos: {{ d.pakuotes_pastabos }}{% endif %}
+            {% else %}—{% endif %}
+          {% endwith %}
+        </div>
+        <div style="grid-column:1/-1">
+          <strong>Testai / kokybė:</strong><br>
+          {% with d=uzklausa.detale %}
+            {% if d.testai_druskos_rukas_val or d.testas_adhezija or d.testas_storis_mikronai or d.testai_kita %}
+              {% if d.testai_druskos_rukas_val %}Druskos rūkas: {{ d.testai_druskos_rukas_val }} val<br>{% endif %}
+              {% if d.testas_adhezija %}Adhezija: {{ d.testas_adhezija }}<br>{% endif %}
+              {% if d.testas_storis_mikronai %}Storis: {{ d.testas_storis_mikronai }} μm<br>{% endif %}
+              {% if d.testai_kita %}Kita: {{ d.testai_kita }}{% endif %}
+            {% else %}—{% endif %}
+          {% endwith %}
+        </div>
       </div>
     </div>
+  </section>
 
-    {# (pasirenkama) jei palikai 'kainos' sąrašą kontekste — trumpa santrauka #}
-    {% if kainos %}
-      <div style="margin-top:10px">
-        <strong>Istorija (santrauka):</strong>
-        <ul style="margin:6px 0 0 18px">
+  <!-- Kainos -->
+  <section class="box blk" data-key="kainos">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Kainos</h3>
+      <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
+    </div>
+    <div class="blk-body" style="margin-top:10px">
+      {% if kaina_aktuali %}
+        <div><strong>Aktuali:</strong> {{ kaina_aktuali }}</div>
+      {% else %}
+        <div>—</div>
+      {% endif %}
+      {% if kainos %}
+        <div style="margin-top:8px;color:#6b7280">Visos:</div>
+        <ul style="margin:6px 0 0 16px">
           {% for k in kainos %}
-            <li>
-              {{ k.suma }} {{ k.valiuta }} — {{ k.busena }} (ID: {{ k.id }})
-            </li>
+            <li>{{ k }}</li>
           {% endfor %}
         </ul>
-      </div>
-    {% endif %}
-
-    <div id="hist-price" class="history-box" style="display:none; margin-top:6px;"></div>
+      {% endif %}
+    </div>
   </section>
+
+  <!-- Brėžiniai -->
+  <section class="box blk" data-key="brez">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Brėžiniai</h3>
+      <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
+    </div>
+    <div class="blk-body" style="margin-top:10px">
+      {% with br=uzklausa.detale.breziniai.all %}
+        {% if br %}
+          <ul style="list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+            {% for b in br %}
+              <li style="border:1px solid #e5e7eb;border-radius:8px;padding:8px;background:#fff">
+                <div style="font-weight:600">{{ b.pavadinimas|default:"Brėžinys" }}</div>
+
+                {% if b.failas or b.isorinis_url %}
+                  {% if b.tipas == "img" %}
+                    <a href="{{ b.failas.url|default:b.isorinis_url }}" target="_blank" rel="noopener">
+                      <img src="{{ b.failas.url|default:b.isorinis_url }}" alt="" style="max-width:100%;height:auto;border-radius:6px;margin-top:6px">
+                    </a>
+                  {% else %}
+                    <a class="btn" href="{{ b.failas.url|default:b.isorinis_url }}" target="_blank" rel="noopener">
+                      Atverti ({{ b.tipas|upper }})
+                    </a>
+                  {% endif %}
+                {% endif %}
+
+                {% if b.versija %}<div style="color:#6b7280;margin-top:6px">Versija: {{ b.versija }}</div>{% endif %}
+                <div style="color:#6b7280;margin-top:6px">Tipas: {{ b.tipas|upper }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          —
+        {% endif %}
+      {% endwith %}
+    </div>
+  </section>
+
+  <!-- ISTORIJA (lazy load) -->
+  <section class="box blk" data-key="history" id="history-box">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Istorija</h3>
+      <div style="display:flex;gap:8px">
+        <button id="history-toggle" class="btn btn-secondary" type="button">Įkelti</button>
+        <button type="button" class="btn btn-secondary blk-toggle">Slėpti</button>
+      </div>
+    </div>
+    <div class="blk-body" style="margin-top:10px; display:block">
+      <div id="history-content" style="display:none"></div>
+    </div>
+  </section>
+
+  <script>
+  (function(){
+    // --- Rodyti/Slėpti blokai su prisiminimu ---
+    const pk = {{ uzklausa.pk|default:0 }};
+    const KEY = (k)=>`uzkl:${pk}:blk:${k}`;
+    document.querySelectorAll('.blk').forEach(sec=>{
+      const key = sec.getAttribute('data-key') || 'blk';
+      const body = sec.querySelector('.blk-body');
+      const btn  = sec.querySelector('.blk-toggle');
+      if(!body || !btn) return;
+
+      // atstatom būseną iš localStorage (default atidaryta)
+      let state = localStorage.getItem(KEY(key)) || 'open';
+      if(state === 'closed'){ body.style.display = 'none'; btn.textContent = 'Rodyti'; }
+      else { body.style.display = ''; btn.textContent = 'Slėpti'; }
+
+      btn.addEventListener('click', ()=>{
+        const isHidden = (body.style.display === 'none');
+        if(isHidden){ body.style.display=''; btn.textContent='Slėpti'; localStorage.setItem(KEY(key),'open'); }
+        else { body.style.display='none'; btn.textContent='Rodyti'; localStorage.setItem(KEY(key),'closed'); }
+      });
+    });
+
+    // --- Istorijos lazy-load ---
+    const hBtn  = document.getElementById('history-toggle');
+    const hWrap = document.getElementById('history-content');
+    if(hBtn && hWrap){
+      let loaded=false;
+      const url = "{% url 'detaliu_registras_history:history_partial' uzklausa.pk 'Uzklausa' uzklausa.pk %}?limit=20";
+      hBtn.addEventListener('click', async function(){
+        if(loaded){ // pakartotinis paspaudimas – perjungiam rodyti/slėpti
+          hWrap.style.display = (hWrap.style.display==='none') ? '' : 'none';
+          this.textContent = (hWrap.style.display==='none') ? 'Rodyti' : 'Slėpti';
+          return;
+        }
+        try{
+          const r = await fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+          hWrap.innerHTML = await r.text();
+          hWrap.style.display = '';
+          this.textContent = 'Slėpti';
+          loaded = true;
+        }catch(e){
+          hWrap.innerHTML = '<div class="flash flash-error">Nepavyko įkelti istorijos.</div>';
+          hWrap.style.display = '';
+          this.textContent = 'Slėpti';
+        }
+      });
+
+      // palaikom "Rodyti daugiau" nuorodas partiale (be reload)
+      document.addEventListener('click', async function(ev){
+        const a = ev.target.closest('.js-history-link');
+        if(!a || !hWrap.contains(a)) return;
+        ev.preventDefault();
+        try{
+          const r = await fetch(a.href, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+          hWrap.innerHTML = await r.text();
+        }catch(_){}
+      });
+    }
+  })();
+  </script>
+
 </div>
-
-<style>
-.container{max-width:960px;margin:0 auto;padding:0 16px}
-.box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-@media(max-width:640px){.grid{grid-template-columns:1fr}}
-
-/* Subtili antraštės eilutė blokams */
-.block-head{display:flex;align-items:center;gap:8px}
-.block-head .grow{flex:1}
-
-/* „Istorija“ kaip lengvas, nepastebimas link'as */
-.hist-link{font-size:.85rem;color:#6b7280;line-height:1;display:inline-flex;align-items:center;gap:6px;text-decoration:none;opacity:.9}
-.hist-link:hover{opacity:1;text-decoration:underline}
-.hist-link .dot{font-size:1rem;color:#9ca3af}
-</style>
-
-<script>
-/* ===== Blokų panelė – neleidžiame slėpti 1-o ("main") ===== */
-(function() {
-  const STORAGE_KEY = "uzklausa_blocks_v1";
-  const PANEL_OPEN_KEY = "uzklausa_blocks_panel";
-
-  function init() {
-    const wrap  = document.getElementById("cols-config");
-    if (!wrap) return;
-
-    const btn   = wrap.querySelector("#cols-toggle");
-    const panel = wrap.querySelector("#cols-panel");
-    const checks = panel ? panel.querySelectorAll('input[type="checkbox"][data-block]') : [];
-
-    if (btn && panel) {
-      const savedOpen = localStorage.getItem(PANEL_OPEN_KEY);
-      panel.style.display = savedOpen === "1" ? "flex" : "none";
-      btn.addEventListener("click", function(e){
-        e.preventDefault();
-        const openNow = panel.style.display === "none";
-        panel.style.display = openNow ? "flex" : "none";
-        try { localStorage.setItem(PANEL_OPEN_KEY, openNow ? "1" : "0"); } catch {}
-      });
-    }
-
-    const blocks = document.querySelectorAll(".block[data-block]");
-
-    function apply(map) {
-      map["main"] = true; // 1-as blokas visada matomas
-      blocks.forEach(b => {
-        const key = b.dataset.block;
-        b.style.display = (map[key] !== false) ? "" : "none";
-      });
-      checks.forEach(ch => {
-        const key = ch.dataset.block;
-        if (key === "main") { ch.checked = true; return; }
-        ch.checked = map.hasOwnProperty(key) ? (map[key] !== false) : true;
-      });
-    }
-    function currentFromChecks() {
-      const m = {};
-      checks.forEach(ch => {
-        const key = ch.dataset.block;
-        if (key === "main") { m[key] = true; return; }
-        m[key] = ch.checked;
-      });
-      return m;
-    }
-    function loadPrefs() {
-      try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
-    }
-    function savePrefs(map) { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); }
-
-    const saved = loadPrefs();
-    if (saved) apply(saved);
-    else apply(currentFromChecks());
-
-    checks.forEach(ch => ch.addEventListener("change", () => {
-      const key = ch.dataset.block;
-      if (key === "main") { ch.checked = true; return; } // neleidžiam slėpti
-      const m = currentFromChecks();
-      apply(m);
-      savePrefs(m);
-    }));
-  }
-
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
-})();
-</script>
-
-<script>
-/* ===== AJAX istorija: 'toggle' uždaro/atidaro, 'more' – krauna daugiau į tą pačią dėžutę ===== */
-(function(){
-  document.addEventListener('click', async function(e) {
-    const link = e.target.closest('.js-history-link');
-    if (!link) return;
-
-    e.preventDefault();
-
-    const mode = link.dataset.mode || 'toggle';   // 'toggle' arba 'more'
-    const targetSel = link.getAttribute('data-target') || '';
-    let box = null;
-
-    if (targetSel === 'closest') {
-      box = link.closest('.history-box');
-    } else if (targetSel) {
-      box = document.querySelector(targetSel);
-    }
-    if (!box) return;
-
-    // TOGGLE: jei jau užkrauta – tik perjungiam rodymą
-    if (mode === 'toggle' && box.dataset.loaded === '1') {
-      const isHidden = (box.style.display === 'none') || (getComputedStyle(box).display === 'none');
-      if (isHidden) {
-        box.style.display = '';
-        link.setAttribute('aria-expanded', 'true');
-      } else {
-        box.style.display = 'none';
-        link.setAttribute('aria-expanded', 'false');
-      }
-      return;
-    }
-
-    // Krovimas (pirmas kartas arba 'more')
-    box.style.display = '';
-    box.innerHTML = '<em>Kraunama...</em>';
-
-    try {
-      const resp = await fetch(link.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const html = await resp.text();
-      box.innerHTML = html;
-      box.dataset.loaded = '1';
-      link.setAttribute('aria-expanded', 'true');
-    } catch (err) {
-      box.innerHTML = '<span class="text-danger">Nepavyko užkrauti istorijos.</span>';
-    }
-  });
-})();
-</script>
 {% endblock %}

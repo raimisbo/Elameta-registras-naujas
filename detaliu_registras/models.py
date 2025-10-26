@@ -1,6 +1,70 @@
 from django.db import models
+from uuid import uuid4
+from pathlib import Path
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from simple_history.models import HistoricalRecords
 
+
+def upload_drawing(instance, filename):
+    ext = Path(filename).suffix.lower()
+    return f"breziniai/{instance.detale_id or 'unknown'}/{uuid4().hex}{ext}"
+
+IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif", ".svg"}
+PDF_EXT = {".pdf"}
+CAD_EXT = {".dxf", ".dwg"}
+ALL_EXT = IMG_EXT | PDF_EXT | CAD_EXT
+
+TIPAI = [("img", "Vaizdas"), ("pdf", "PDF"), ("cad", "CAD")]
+
+
+class Brezinys(models.Model):
+    detale = models.ForeignKey("Detale", on_delete=models.CASCADE, related_name="breziniai")
+    pavadinimas = models.CharField(max_length=255, blank=True)
+    versija = models.CharField(max_length=64, blank=True, null=True)
+    tipas = models.CharField(max_length=10, choices=TIPAI, default="img")
+    failas = models.FileField(
+        upload_to=upload_drawing,
+        blank=True, null=True,
+        validators=[FileExtensionValidator(allowed_extensions=[e[1:] for e in sorted(ALL_EXT)])],
+    )
+    isorinis_url = models.URLField(blank=True, null=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created",)
+
+    def __str__(self):
+        return self.pavadinimas or (self.failas.name if self.failas else self.isorinis_url) or f"Brezinys #{self.pk}"
+
+    @staticmethod
+    def detect_type_by_ext(name: str) -> str:
+        ext = Path(name or "").suffix.lower()
+        if ext in IMG_EXT: return "img"
+        if ext in PDF_EXT: return "pdf"
+        if ext in CAD_EXT: return "cad"
+        return "img"  # numatyta
+
+    @property
+    def is_image(self) -> bool:
+        if self.failas:
+            return Path(self.failas.name).suffix.lower() in IMG_EXT
+        return False
+
+    def clean(self):
+        if not self.failas and not self.isorinis_url:
+            raise ValidationError("Reikia failo arba išorinio URL.")
+        if self.failas and self.failas.size > 50 * 1024 * 1024:  # 50 MB pvz.
+            raise ValidationError("Failas per didelis (maks. 50 MB).")
+
+    def save(self, *args, **kwargs):
+        # auto nustatyk tipą pagal failo plėtinį (jei nepaduotas)
+        if not self.tipas:
+            src = self.failas.name if self.failas else self.isorinis_url or ""
+            self.tipas = Brezinys.detect_type_by_ext(src)
+        return super().save(*args, **kwargs)
 
 # --- Bazinė laiko žymų klasė: BŪTINAI abstract ---
 class Timestamped(models.Model):

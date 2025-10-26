@@ -33,6 +33,7 @@ urlpatterns = [
 
     # Kaina (viena kaina per užklausą)
     path("perziureti_uzklausa/<int:pk>/kainos/", KainosRedagavimasView.as_view(), name="kainos_redagavimas"),
+    path("uzklausa/<int:pk>/kaina/", KainosRedagavimasView.as_view(), name="redaguoti_kaina"),
 
     # CSV importas (pasirenkama)
     path("importuoti_uzklausas/", ImportUzklausosCSVView.as_view(), name="import_uzklausos"),

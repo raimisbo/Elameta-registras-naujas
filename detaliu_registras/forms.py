@@ -6,6 +6,9 @@ from django.db.models.manager import BaseManager
 
 from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
 
 # === Filtrų forma (sąrašui) ===
 class UzklausaFilterForm(forms.Form):
@@ -25,6 +28,39 @@ class UzklausaFilterForm(forms.Form):
     brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
     metalas = forms.CharField(label="Metalas", required=False)
     padengimas = forms.CharField(label="Padengimas", required=False)
+
+
+
+
+DRAWING_TYPE_CHOICES = [("img","Vaizdas"),("pdf","PDF"),("cad","CAD")]
+
+class DrawingMixin(forms.Form):
+    drawing_files = forms.FileField(
+        required=False,
+        label="Brėžiniai (galima keli)",
+        widget=MultipleFileInput(attrs={
+            "multiple": True,
+            "accept": "image/*,application/pdf,.dxf,.dwg",
+        }),
+    )
+    drawing_name = forms.CharField(required=False, max_length=255, label="Pavadinimas")
+    drawing_version = forms.CharField(required=False, max_length=64, label="Versija")
+    drawing_type = forms.ChoiceField(
+        required=False,
+        choices=[("img","Vaizdas"),("pdf","PDF"),("cad","CAD")],
+        label="Tipas (neprivaloma)",
+    )
+    drawing_url = forms.URLField(required=False, label="Išorinis URL (alternatyva failui)")
+
+class UzklausaCreateFullForm(DrawingMixin, forms.ModelForm):
+    class Meta:
+        model = Uzklausa
+        fields = "__all__"
+
+class UzklausaEditForm(DrawingMixin, forms.ModelForm):
+    class Meta:
+        model = Uzklausa
+        fields = "__all__"
 
 
 # === CSV importas (stub) ===
