@@ -220,58 +220,99 @@
             </td>
 
             <td data-col="specifikacija">
-              {% if u.detale.specifikacija %}
-                <div>{% if u.detale.specifikacija.metalas %}Metal.: {{ u.detale.specifikacija.metalas }}{% endif %}</div>
-                <div>{% if u.detale.specifikacija.storis %}Storis: {{ u.detale.specifikacija.storis }}{% elif u.detale.specifikacija.storis_mm %}Storis: {{ u.detale.specifikacija.storis_mm }} mm{% endif %}</div>
-                <div>{% if u.detale.specifikacija.spalva %}Spalva: {{ u.detale.specifikacija.spalva }}{% endif %}</div>
-              {% else %}—{% endif %}
+              {% with s=u.detale.specifikacija %}
+                {% if s %}
+                  {% with m=s.metalas p=s.plotas_m2 g=s.svoris_kg k=s.medziagos_kodas %}
+                    {% if m %}<div>Metalas: {{ m }}</div>{% endif %}
+
+                    {% if p is not None %}
+                      <div>Plotas: {{ p|floatformat:2 }} m²</div>
+                    {% endif %}
+
+                    {% if g is not None %}
+                      <div>Svoris: {{ g|floatformat:3 }} kg</div>
+                    {% endif %}
+
+                    {% if k %}
+                      <div>Medžiagos kodas: {{ k }}</div>
+                    {% endif %}
+
+                    {% if not m and p is None and g is None and not k %}
+                      —
+                    {% endif %}
+                  {% endwith %}
+                {% else %}
+                  —
+                {% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="dangos">
-              {% if u.detale.pavirsiu_dangos %}
-                <div>{% if u.detale.pavirsiu_dangos.ktl_ec_name %}KTL/EC: {{ u.detale.pavirsiu_dangos.ktl_ec_name }}{% endif %}</div>
-                <div>{% if u.detale.pavirsiu_dangos.miltelinis_name %}Milt.: {{ u.detale.pavirsiu_dangos.miltelinis_name }}{% endif %}</div>
-                <div>{% if u.detale.pavirsiu_dangos.kiti %}Kita: {{ u.detale.pavirsiu_dangos.kiti }}{% endif %}</div>
-              {% else %}—{% endif %}
+              {% with d=u.detale.pavirsiu_dangos %}
+                {% if d %}
+                  {% if d.ktl_ec_name %}<div>KTL/e-coating: {{ d.ktl_ec_name }}</div>{% endif %}
+                  {% if d.spalva_ral %}<div>RAL / spalva: {{ d.spalva_ral }}</div>{% endif %}
+                  {% if d.miltelinis_name %}<div>Miltelinis padengimas: {{ d.miltelinis_name }}</div>{% endif %}
+                  {% if d.blizgumas %}<div>Blizgumas: {{ d.blizgumas }}</div>{% endif %}
+                  {% if not d.ktl_ec_name and not d.spalva_ral and not d.miltelinis_name and not d.blizgumas %}—{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="kiekiai">
-              {% if u.kiekis %}{{ u.kiekis }}
-              {% elif u.detale.kiekis %}{{ u.detale.kiekis }}
-              {% else %}—{% endif %}
+              {% with d=u.detale %}
+                {% if d.kiekis_metinis or d.kiekis_menesis or d.kiekis_partijai or d.kiekis_per_val %}
+                  {% if d.kiekis_metinis %}<div>Metiniai: {{ d.kiekis_metinis }}</div>{% endif %}
+                  {% if d.kiekis_menesis %}<div>Mėn.: {{ d.kiekis_menesis }}</div>{% endif %}
+                  {% if d.kiekis_partijai %}<div>Partijai: {{ d.kiekis_partijai }}</div>{% endif %}
+                  {% if d.kiekis_per_val %}<div>vnt/val.: {{ d.kiekis_per_val }}</div>{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="matmenys">
-              {% if u.detale and u.detale.specifikacija %}
-                {% if u.detale.specifikacija.ilgis or u.detale.specifikacija.plotis or u.detale.specifikacija.aukstis %}
-                  {{ u.detale.specifikacija.ilgis|default:"" }}×{{ u.detale.specifikacija.plotis|default:"" }}×{{ u.detale.specifikacija.aukstis|default:"" }}
-                {% elif u.ilgis or u.plotis or u.aukstis %}
-                  {{ u.ilgis|default:"" }}×{{ u.plotis|default:"" }}×{{ u.aukstis|default:"" }}
+              {% with d=u.detale %}
+                {% if d.ilgis_mm or d.plotis_mm or d.aukstis_mm %}
+                  {{ d.ilgis_mm|default:"" }}×{{ d.plotis_mm|default:"" }}×{{ d.aukstis_mm|default:"" }} mm
+                {% elif d.skersmuo_mm %}
+                  Ø {{ d.skersmuo_mm }} mm
+                {% elif d.storis_mm %}
+                  Storis: {{ d.storis_mm }} mm
                 {% else %}—{% endif %}
-              {% else %}
-                {% if u.ilgis or u.plotis or u.aukstis %}
-                  {{ u.ilgis|default:"" }}×{{ u.plotis|default:"" }}×{{ u.aukstis|default:"" }}
-                {% else %}—{% endif %}
-              {% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="kabinimas">
-              {% if u.detale.kabinimas %}{{ u.detale.kabinimas }}
-              {% elif u.kabinimas %}{{ u.kabinimas }}
-              {% else %}—{% endif %}
+              {% with d=u.detale %}
+                {% if d.kabinimo_budas or d.kabliuku_kiekis or d.kabinimo_anga_mm or d.kabinti_per %}
+                  {% if d.kabinimo_budas %}<div>Būdas: {{ d.kabinimo_budas }}</div>{% endif %}
+                  {% if d.kabliuku_kiekis %}<div>Kabliukai: {{ d.kabliuku_kiekis }}</div>{% endif %}
+                  {% if d.kabinimo_anga_mm %}<div>Anga: {{ d.kabinimo_anga_mm }} mm</div>{% endif %}
+                  {% if d.kabinti_per %}<div>Kabinti per: {{ d.kabinti_per }}</div>{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="pakuote">
-              {% if u.detale.pakuote %}{{ u.detale.pakuote }}
-              {% elif u.pakuote %}{{ u.pakuote }}
-              {% else %}—{% endif %}
+              {% with d=u.detale %}
+                {% if d.pakuotes_tipas or d.vienetai_dezeje or d.vienetai_paleje or d.pakuotes_pastabos %}
+                  {% if d.pakuotes_tipas %}<div>Tipas: {{ d.pakuotes_tipas }}</div>{% endif %}
+                  {% if d.vienetai_dezeje %}<div>vnt/dėžėje: {{ d.vienetai_dezeje }}</div>{% endif %}
+                  {% if d.vienetai_paleje %}<div>vnt/palėje: {{ d.vienetai_paleje }}</div>{% endif %}
+                  {% if d.pakuotes_pastabos %}<div>{{ d.pakuotes_pastabos }}</div>{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="kokybe">
-              {% if u.detale.testai %}{{ u.detale.testai }}
-              {% elif u.testai %}{{ u.testai }}
-              {% elif u.kokybe %}{{ u.kokybe }}
-              {% else %}—{% endif %}
+              {% with d=u.detale %}
+                {% if d.testai_druskos_rukas_val or d.testas_adhezija or d.testas_storis_mikronai or d.testai_kita %}
+                  {% if d.testai_druskos_rukas_val %}<div>Druskos rūkas: {{ d.testai_druskos_rukas_val }} val</div>{% endif %}
+                  {% if d.testas_adhezija %}<div>Adhezija: {{ d.testas_adhezija }}</div>{% endif %}
+                  {% if d.testas_storis_mikronai %}<div>Storis: {{ d.testas_storis_mikronai }} µm</div>{% endif %}
+                  {% if d.testai_kita %}<div>Kita: {{ d.testai_kita }}</div>{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
             </td>
 
             <td data-col="dok">
