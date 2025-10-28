@@ -1,38 +1,15 @@
+# detaliu_registras/forms.py
 from django import forms
 from django.core.exceptions import ValidationError
-from django.apps import apps
-from decimal import Decimal, ROUND_HALF_UP
-from django.db.models.manager import BaseManager
 
-from .models import Uzklausa, Klientas, Projektas, Detale, Kaina
+from .models import (
+    Uzklausa, Klientas, Projektas, Detale,
+    DetaleSpecifikacija, PavirsiuDangos, Kaina
+)
 
+# ---------- Brėžinių įkėlimas (multiple) ----------
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
-
-
-# === Filtrų forma (sąrašui) ===
-class UzklausaFilterForm(forms.Form):
-    q = forms.CharField(label="Paieška", required=False)
-    klientas = forms.ModelChoiceField(
-        queryset=Klientas.objects.all().order_by("vardas"),
-        required=False, empty_label="— visi —",
-    )
-    projektas = forms.ModelChoiceField(
-        queryset=Projektas.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— visi —",
-    )
-    detale = forms.ModelChoiceField(
-        queryset=Detale.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— visos —",
-    )
-    brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
-    metalas = forms.CharField(label="Metalas", required=False)
-    padengimas = forms.CharField(label="Padengimas", required=False)
-
-
-
-
-DRAWING_TYPE_CHOICES = [("img","Vaizdas"),("pdf","PDF"),("cad","CAD")]
 
 class DrawingMixin(forms.Form):
     drawing_files = forms.FileField(
@@ -40,237 +17,279 @@ class DrawingMixin(forms.Form):
         label="Brėžiniai (galima keli)",
         widget=MultipleFileInput(attrs={
             "multiple": True,
-            "accept": "image/*,application/pdf,.dxf,.dwg",
+            "accept": "image/*,application/pdf,.dxf,.dwg,.svg",
         }),
     )
     drawing_name = forms.CharField(required=False, max_length=255, label="Pavadinimas")
     drawing_version = forms.CharField(required=False, max_length=64, label="Versija")
     drawing_type = forms.ChoiceField(
         required=False,
-        choices=[("img","Vaizdas"),("pdf","PDF"),("cad","CAD")],
-        label="Tipas (neprivaloma)",
+        choices=[("img", "Vaizdas"), ("pdf", "PDF"), ("cad", "CAD")],
+        label="Tipas",
     )
-    drawing_url = forms.URLField(required=False, label="Išorinis URL (alternatyva failui)")
+    drawing_url = forms.URLField(required=False, label="Išorinis URL")
 
-class UzklausaCreateFullForm(DrawingMixin, forms.ModelForm):
-    class Meta:
-        model = Uzklausa
-        fields = "__all__"
+# ---------- Pagalbiniai 1–1 gavėjai ----------
+def _get_or_create_spec(detale: Detale) -> DetaleSpecifikacija:
+    if getattr(detale, "specifikacija_id", None):
+        return detale.specifikacija
+    return DetaleSpecifikacija.objects.create(detale=detale)
 
-class UzklausaEditForm(DrawingMixin, forms.ModelForm):
-    class Meta:
-        model = Uzklausa
-        fields = "__all__"
+def _get_or_create_dangos(detale: Detale) -> PavirsiuDangos:
+    if getattr(detale, "pavirsiu_dangos_id", None):
+        return detale.pavirsiu_dangos
+    return PavirsiuDangos.objects.create(detale=detale)
 
-
-# === CSV importas (stub) ===
-class ImportUzklausosCSVForm(forms.Form):
-    file = forms.FileField(label="Pasirinkite CSV failą")
-
-
-# === Nauja užklausa: pasirink arba sukurk vietoje ===
-class UzklausaCreateOrSelectForm(forms.ModelForm):
-    # Klientas
+# ---------- Filtrų forma (naudojama sąraše) ----------
+class UzklausaFilterForm(forms.Form):
+    q = forms.CharField(required=False, label="Paieška", widget=forms.TextInput(attrs={
+        "placeholder": "ieškoti pagal detalę, brėžinį, klientą, projektą…"
+    }))
     klientas = forms.ModelChoiceField(
-        label="Klientas",
-        queryset=Klientas.objects.all().order_by("vardas"),
-        required=False, empty_label="— pasirinkite —",
+        required=False, queryset=Klientas.objects.all(), label="Klientas"
     )
-    naujas_klientas = forms.CharField(label="Naujas klientas", required=False)
-
-    # Projektas
     projektas = forms.ModelChoiceField(
-        label="Projektas",
-        queryset=Projektas.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— pasirinkite —",
+        required=False, queryset=Projektas.objects.all(), label="Projektas"
     )
-    naujas_projektas = forms.CharField(label="Naujas projektas", required=False)
-
-    # Detalė
     detale = forms.ModelChoiceField(
-        label="Detalė",
-        queryset=Detale.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— pasirinkite —",
+        required=False, queryset=Detale.objects.all(), label="Detalė"
     )
-    detales_pavadinimas = forms.CharField(label="Nauja detalė – pavadinimas", required=False)
-    brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
+    brezinio_nr = forms.CharField(required=False, label="Brėžinio nr.")
+    metalas = forms.CharField(required=False, label="Metalas")
+    padengimas = forms.CharField(required=False, label="Padengimas")
 
-    # Specifikacija
-    metalas = forms.CharField(label="Metalas", required=False)
-    plotas_m2 = forms.DecimalField(label="Plotas m²", required=False, decimal_places=4, max_digits=12)
-    svoris_kg = forms.DecimalField(label="Svoris kg", required=False, decimal_places=4, max_digits=12)
-    medziagos_kodas = forms.CharField(label="Medžiagos kodas", required=False)
+# ---------- CSV importo forma (views.ImportUzklausosCSVView) ----------
+class ImportUzklausosCSVForm(forms.Form):
+    file = forms.FileField(label="CSV failas")
 
+# ---------- Kainos forma (naudojama kūrimo puslapyje) ----------
+class KainaForm(forms.ModelForm):
+    class Meta:
+        model = Kaina
+        fields = (
+            "suma", "valiuta", "busena",
+            "yra_fiksuota", "kiekis_nuo", "kiekis_iki",
+            "fiksuotas_kiekis", "kainos_matas",
+        )
+        widgets = {
+            "busena": forms.Select(choices=[("aktuali", "Aktuali"), ("sena", "Sena")]),
+        }
+
+# ---------- (legacy) Select/Create forma, kad importas nesulužtų ----------
+class UzklausaCreateOrSelectForm(forms.ModelForm):
+    """
+    Minimalus „adapteris“, jei kur nors projekte dar referencijuojama ši klasė.
+    Realų kūrimą daro UzklausaCreateFullForm.
+    """
+    class Meta:
+        model = Uzklausa
+        fields = ["klientas", "projektas", "detale", "pastabos"]
+
+# ---------- Pilna kūrimo forma (su blokais) ----------
+class UzklausaCreateFullForm(DrawingMixin, forms.ModelForm):
+    # Detalė – bazė
+    detale_pavadinimas = forms.CharField(required=False, max_length=255, label="Detalės pavadinimas")
+    detale_brezinio_nr = forms.CharField(required=False, max_length=255, label="Brėžinio nr.")
+    # Kiekiai
+    kiekis_metinis = forms.IntegerField(required=False, label="Metinis kiekis")
+    kiekis_menesis = forms.IntegerField(required=False, label="Mėnesio kiekis")
+    kiekis_partijai = forms.IntegerField(required=False, label="Kiekis partijai")
+    kiekis_per_val = forms.IntegerField(required=False, label="Kiekis per val.")
+    # Matmenys
+    ilgis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Ilgis (mm)")
+    plotis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Plotis (mm)")
+    aukstis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Aukštis (mm)")
+    skersmuo_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Skersmuo (mm)")
+    storis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Storis (mm)")
+    # Kabinimas
+    kabinimo_budas = forms.CharField(required=False, max_length=255, label="Kabinimo būdas")
+    kabliuku_kiekis = forms.IntegerField(required=False, label="Kabliukų kiekis")
+    kabinimo_anga_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Kabinimo anga (mm)")
+    kabinti_per = forms.CharField(required=False, max_length=255, label="Kabinti per")
+    # Pakuotė
+    pakuotes_tipas = forms.CharField(required=False, max_length=255, label="Pakuotės tipas")
+    vienetai_dezeje = forms.IntegerField(required=False, label="Vnt. dėžėje")
+    vienetai_paleje = forms.IntegerField(required=False, label="Vnt. palėje")
+    pakuotes_pastabos = forms.CharField(required=False, max_length=255, label="Pakuotės pastabos")
+    # Testai
+    testai_druskos_rukas_val = forms.IntegerField(required=False, label="Druskos rūkas (val.)")
+    testas_adhezija = forms.CharField(required=False, max_length=255, label="Adhezija")
+    testas_storis_mikronai = forms.IntegerField(required=False, label="Storis (µm)")
+    testai_kita = forms.CharField(required=False, max_length=255, label="Kiti testai")
+    # Doc/pastabos
+    ppap_dokumentai = forms.CharField(required=False, max_length=255, label="PPAP dokumentai")
+    priedai_info = forms.CharField(required=False, max_length=255, label="Priedai/info")
+    # Spec
+    spec_metalas = forms.CharField(required=False, max_length=255, label="Metalas")
+    spec_plotas_m2 = forms.DecimalField(required=False, max_digits=12, decimal_places=4, label="Plotas (m²)")
+    spec_svoris_kg = forms.DecimalField(required=False, max_digits=12, decimal_places=4, label="Svoris (kg)")
+    spec_medziagos_kodas = forms.CharField(required=False, max_length=255, label="Medžiagos kodas")
     # Dangos
-    ktl_ec_name = forms.CharField(label="KTL / e-coating", required=False)
-    miltelinis_name = forms.CharField(label="Miltelinis padengimas", required=False)
-    spalva_ral = forms.CharField(label="RAL / spalva", required=False)
-    blizgumas = forms.CharField(label="Blizgumas / tekstūra", required=False)
+    dang_ktl_ec_name = forms.CharField(required=False, max_length=255, label="KTL / e-coating")
+    dang_miltelinis_name = forms.CharField(required=False, max_length=255, label="Miltelinis")
+    dang_spalva_ral = forms.CharField(required=False, max_length=64, label="RAL / spalva")
+    dang_blizgumas = forms.CharField(required=False, max_length=128, label="Blizgumas / tekstūra")
 
     class Meta:
         model = Uzklausa
-        fields = []  # viską kuriame save() metu
+        fields = ["klientas", "projektas", "detale", "pastabos"]
 
     def clean(self):
-        cleaned = super().clean()
-        if not cleaned.get("klientas") and not cleaned.get("naujas_klientas"):
-            raise ValidationError("Pasirinkite klientą arba įveskite naują.")
-        if not cleaned.get("projektas") and not cleaned.get("naujas_projektas"):
-            raise ValidationError("Pasirinkite projektą arba įveskite naują.")
-        turi_detale = cleaned.get("detale")
-        turi_naujos_detales_duomenis = cleaned.get("detales_pavadinimas") or cleaned.get("brezinio_nr")
-        if not turi_detale and not turi_naujos_detales_duomenis:
-            raise ValidationError("Pasirinkite detalę arba įveskite naujos detalės duomenis.")
-        return cleaned
+        cd = super().clean()
+        if not cd.get("detale"):
+            # jei nepasirinkta esama detalė – privaloma bent pavadinimas arba bent failas
+            if not cd.get("detale_pavadinimas") and not self.files.getlist("drawing_files"):
+                raise ValidationError("Jei nepasirenkama esama detalė, nurodykite detalės pavadinimą arba įkelkite brėžinį.")
+        return cd
 
     def save(self, commit=True):
-        c = self.cleaned_data
-
-        # Klientas
-        klientas = c.get("klientas")
-        if not klientas:
-            klientas = Klientas.objects.create(vardas=(c.get("naujas_klientas") or "").strip())
-
-        # Projektas
-        projektas = c.get("projektas")
-        if not projektas:
-            projektas = Projektas.objects.create(
-                pavadinimas=(c.get("naujas_projektas") or "").strip(),
-                klientas=klientas,
-            )
-
-        # Detalė
-        detale = c.get("detale")
-        if not detale:
+        uzk = super().save(commit=False)
+        detale = self.cleaned_data.get("detale")
+        if detale is None:
             detale = Detale.objects.create(
-                pavadinimas=c.get("detales_pavadinimas") or "Be pavadinimo",
-                brezinio_nr=c.get("brezinio_nr") or "",
+                pavadinimas=self.cleaned_data.get("detale_pavadinimas") or "Detalė",
+                brezinio_nr=self.cleaned_data.get("detale_brezinio_nr") or None,
+                # kiekiai
+                kiekis_metinis=self.cleaned_data.get("kiekis_metinis"),
+                kiekis_menesis=self.cleaned_data.get("kiekis_menesis"),
+                kiekis_partijai=self.cleaned_data.get("kiekis_partijai"),
+                kiekis_per_val=self.cleaned_data.get("kiekis_per_val"),
+                # matmenys
+                ilgis_mm=self.cleaned_data.get("ilgis_mm"),
+                plotis_mm=self.cleaned_data.get("plotis_mm"),
+                aukstis_mm=self.cleaned_data.get("aukstis_mm"),
+                skersmuo_mm=self.cleaned_data.get("skersmuo_mm"),
+                storis_mm=self.cleaned_data.get("storis_mm"),
+                # kabinimas
+                kabinimo_budas=self.cleaned_data.get("kabinimo_budas"),
+                kabliuku_kiekis=self.cleaned_data.get("kabliuku_kiekis"),
+                kabinimo_anga_mm=self.cleaned_data.get("kabinimo_anga_mm"),
+                kabinti_per=self.cleaned_data.get("kabinti_per"),
+                # pakuotė
+                pakuotes_tipas=self.cleaned_data.get("pakuotes_tipas"),
+                vienetai_dezeje=self.cleaned_data.get("vienetai_dezeje"),
+                vienetai_paleje=self.cleaned_data.get("vienetai_paleje"),
+                pakuotes_pastabos=self.cleaned_data.get("pakuotes_pastabos"),
+                # testai
+                testai_druskos_rukas_val=self.cleaned_data.get("testai_druskos_rukas_val"),
+                testas_adhezija=self.cleaned_data.get("testas_adhezija"),
+                testas_storis_mikronai=self.cleaned_data.get("testas_storis_mikronai"),
+                testai_kita=self.cleaned_data.get("testai_kita"),
+                # dok
+                ppap_dokumentai=self.cleaned_data.get("ppap_dokumentai"),
+                priedai_info=self.cleaned_data.get("priedai_info"),
             )
+        else:
+            # jeigu paduoti laukai – atnaujinti
+            mapping = {
+                "pavadinimas": "detale_pavadinimas",
+                "brezinio_nr": "detale_brezinio_nr",
+                "kiekis_metinis": "kiekis_metinis",
+                "kiekis_menesis": "kiekis_menesis",
+                "kiekis_partijai": "kiekis_partijai",
+                "kiekis_per_val": "kiekis_per_val",
+                "ilgis_mm": "ilgis_mm",
+                "plotis_mm": "plotis_mm",
+                "aukstis_mm": "aukstis_mm",
+                "skersmuo_mm": "skersmuo_mm",
+                "storis_mm": "storis_mm",
+                "kabinimo_budas": "kabinimo_budas",
+                "kabliuku_kiekis": "kabliuku_kiekis",
+                "kabinimo_anga_mm": "kabinimo_anga_mm",
+                "kabinti_per": "kabinti_per",
+                "pakuotes_tipas": "pakuotes_tipas",
+                "vienetai_dezeje": "vienetai_dezeje",
+                "vienetai_paleje": "vienetai_paleje",
+                "pakuotes_pastabos": "pakuotes_pastabos",
+                "testai_druskos_rukas_val": "testai_druskos_rukas_val",
+                "testas_adhezija": "testas_adhezija",
+                "testas_storis_mikronai": "testas_storis_mikronai",
+                "testai_kita": "testai_kita",
+                "ppap_dokumentai": "ppap_dokumentai",
+                "priedai_info": "priedai_info",
+            }
+            for model_field, form_field in mapping.items():
+                val = self.cleaned_data.get(form_field)
+                if val not in (None, ""):
+                    setattr(detale, model_field, val)
+            detale.save()
 
-        # Specifikacija
-        if any([c.get("metalas"), c.get("plotas_m2") is not None, c.get("svoris_kg") is not None, c.get("medziagos_kodas")]):
-            DetaleSpecifikacija = apps.get_model("detaliu_registras", "DetaleSpecifikacija")
-            if DetaleSpecifikacija:
-                spec, _ = DetaleSpecifikacija.objects.get_or_create(detale=detale)
-                if c.get("metalas"): spec.metalas = c["metalas"].strip()
-                if c.get("plotas_m2") is not None: spec.plotas_m2 = c["plotas_m2"]
-                if c.get("svoris_kg") is not None: spec.svoris_kg = c["svoris_kg"]
-                if c.get("medziagos_kodas"): spec.medziagos_kodas = c["medziagos_kodas"].strip()
-                spec.save()
-
-        # Dangos
-        if any([c.get("ktl_ec_name"), c.get("miltelinis_name"), c.get("spalva_ral"), c.get("blizgumas")]):
-            PavirsiuDangos = apps.get_model("detaliu_registras", "PavirsiuDangos")
-            if PavirsiuDangos:
-                pd, _ = PavirsiuDangos.objects.get_or_create(detale=detale)
-                if c.get("ktl_ec_name"): pd.ktl_ec_name = c["ktl_ec_name"].strip()
-                if c.get("miltelinis_name"): pd.miltelinis_name = c["miltelinis_name"].strip()
-                if c.get("spalva_ral"): pd.spalva_ral = c["spalva_ral"].strip()
-                if c.get("blizgumas"): pd.blizgumas = c["blizgumas"].strip()
-                pd.save()
-
-        uzk = Uzklausa(klientas=klientas, projektas=projektas, detale=detale)
+        uzk.detale = detale
         if commit:
             uzk.save()
+
+        # Specifikacija
+        if any(self.cleaned_data.get(k) not in (None, "") for k in
+               ["spec_metalas", "spec_plotas_m2", "spec_svoris_kg", "spec_medziagos_kodas"]):
+            s = _get_or_create_spec(detale)
+            if self.cleaned_data.get("spec_metalas"): s.metalas = self.cleaned_data["spec_metalas"]
+            if self.cleaned_data.get("spec_plotas_m2") not in (None, ""): s.plotas_m2 = self.cleaned_data["spec_plotas_m2"]
+            if self.cleaned_data.get("spec_svoris_kg") not in (None, ""): s.svoris_kg = self.cleaned_data["spec_svoris_kg"]
+            if self.cleaned_data.get("spec_medziagos_kodas"): s.medziagos_kodas = self.cleaned_data["spec_medziagos_kodas"]
+            s.save()
+
+        # Dangos
+        if any(self.cleaned_data.get(k) not in (None, "") for k in
+               ["dang_ktl_ec_name", "dang_miltelinis_name", "dang_spalva_ral", "dang_blizgumas"]):
+            g = _get_or_create_dangos(detale)
+            if self.cleaned_data.get("dang_ktl_ec_name"): g.ktl_ec_name = self.cleaned_data["dang_ktl_ec_name"]
+            if self.cleaned_data.get("dang_miltelinis_name"): g.miltelinis_name = self.cleaned_data["dang_miltelinis_name"]
+            if self.cleaned_data.get("dang_spalva_ral"): g.spalva_ral = self.cleaned_data["dang_spalva_ral"]
+            if self.cleaned_data.get("dang_blizgumas"): g.blizgumas = self.cleaned_data["dang_blizgumas"]
+            g.save()
+
         return uzk
 
+# ---------- Redagavimo forma (tie patys laukai) ----------
+class UzklausaEditForm(DrawingMixin, forms.ModelForm):
+    # tie patys, kad šablonai rodyti gali
+    detale_pavadinimas = forms.CharField(required=False, max_length=255, label="Detalės pavadinimas")
+    detale_brezinio_nr = forms.CharField(required=False, max_length=255, label="Brėžinio nr.")
+    kiekis_metinis = forms.IntegerField(required=False, label="Metinis kiekis")
+    kiekis_menesis = forms.IntegerField(required=False, label="Mėnesio kiekis")
+    kiekis_partijai = forms.IntegerField(required=False, label="Kiekis partijai")
+    kiekis_per_val = forms.IntegerField(required=False, label="Kiekis per val.")
+    ilgis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Ilgis (mm)")
+    plotis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Plotis (mm)")
+    aukstis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Aukštis (mm)")
+    skersmuo_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Skersmuo (mm)")
+    storis_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Storis (mm)")
+    kabinimo_budas = forms.CharField(required=False, max_length=255, label="Kabinimo būdas")
+    kabliuku_kiekis = forms.IntegerField(required=False, label="Kabliukų kiekis")
+    kabinimo_anga_mm = forms.DecimalField(required=False, max_digits=12, decimal_places=2, label="Kabinimo anga (mm)")
+    kabinti_per = forms.CharField(required=False, max_length=255, label="Kabinti per")
+    pakuotes_tipas = forms.CharField(required=False, max_length=255, label="Pakuotės tipas")
+    vienetai_dezeje = forms.IntegerField(required=False, label="Vnt. dėžėje")
+    vienetai_paleje = forms.IntegerField(required=False, label="Vnt. palėje")
+    pakuotes_pastabos = forms.CharField(required=False, max_length=255, label="Pakuotės pastabos")
+    testai_druskos_rukas_val = forms.IntegerField(required=False, label="Druskos rūkas (val.)")
+    testas_adhezija = forms.CharField(required=False, max_length=255, label="Adhezija")
+    testas_storis_mikronai = forms.IntegerField(required=False, label="Storis (µm)")
+    testai_kita = forms.CharField(required=False, max_length=255, label="Kiti testai")
+    ppap_dokumentai = forms.CharField(required=False, max_length=255, label="PPAP dokumentai")
+    priedai_info = forms.CharField(required=False, max_length=255, label="Priedai/info")
 
-# === REDAGAVIMAS: 9 blokų forma ===
-class UzklausaEditForm(forms.ModelForm):
-    # Pagrindinė
-    klientas = forms.ModelChoiceField(
-        label="Klientas", queryset=Klientas.objects.all().order_by("vardas"), required=False
-    )
-    projektas = forms.ModelChoiceField(
-        label="Projektas", queryset=Projektas.objects.all().order_by("pavadinimas"), required=False
-    )
-    detale = forms.ModelChoiceField(
-        label="Detalė", queryset=Detale.objects.all().order_by("pavadinimas"), required=False
-    )
+    spec_metalas = forms.CharField(required=False, max_length=255, label="Metalas")
+    spec_plotas_m2 = forms.DecimalField(required=False, max_digits=12, decimal_places=4, label="Plotas (m²)")
+    spec_svoris_kg = forms.DecimalField(required=False, max_digits=12, decimal_places=4, label="Svoris (kg)")
+    spec_medziagos_kodas = forms.CharField(required=False, max_length=255, label="Medžiagos kodas")
 
-    # Detalės bazė
-    detale_pavadinimas = forms.CharField(label="Detalės pavadinimas", required=False)
-    detale_brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
-
-    # Kiekiai
-    kiekis_metinis = forms.IntegerField(label="Kiekis per metus", required=False)
-    kiekis_menesis = forms.IntegerField(label="Kiekis per mėnesį", required=False)
-    kiekis_partijai = forms.IntegerField(label="Kiekis partijai", required=False)
-    kiekis_per_val = forms.IntegerField(label="Gaminių/val.", required=False)
-
-    # Matmenys
-    ilgis_mm = forms.DecimalField(label="Ilgis (mm)", required=False, decimal_places=2, max_digits=12)
-    plotis_mm = forms.DecimalField(label="Plotis (mm)", required=False, decimal_places=2, max_digits=12)
-    aukstis_mm = forms.DecimalField(label="Aukštis (mm)", required=False, decimal_places=2, max_digits=12)
-    skersmuo_mm = forms.DecimalField(label="Skersmuo (mm)", required=False, decimal_places=2, max_digits=12)
-    storis_mm = forms.DecimalField(label="Storis (mm)", required=False, decimal_places=2, max_digits=12)
-
-    # Specifikacija
-    metalas = forms.CharField(label="Metalas", required=False)
-    plotas_m2 = forms.DecimalField(label="Plotas m²", required=False, decimal_places=4, max_digits=12)
-    svoris_kg = forms.DecimalField(label="Svoris kg", required=False, decimal_places=4, max_digits=12)
-    medziagos_kodas = forms.CharField(label="Medžiagos kodas", required=False)
-
-    # Dangos
-    ktl_ec_name = forms.CharField(label="KTL / e-coating", required=False)
-    miltelinis_name = forms.CharField(label="Miltelinis padengimas", required=False)
-    spalva_ral = forms.CharField(label="RAL / spalva", required=False)
-    blizgumas = forms.CharField(label="Blizgumas / tekstūra", required=False)
-
-    # Kabinimas
-    kabinimo_budas = forms.CharField(label="Kabinimo būdas", required=False)
-    kabliuku_kiekis = forms.IntegerField(label="Kabliukų kiekis", required=False)
-    kabinimo_anga_mm = forms.DecimalField(label="Kabinimo anga (mm)", required=False, decimal_places=2, max_digits=12)
-    kabinti_per = forms.CharField(label="Kabinti per", required=False)
-
-    # Pakuotė
-    pakuotes_tipas = forms.CharField(label="Pakuotės tipas", required=False)
-    vienetai_dezeje = forms.IntegerField(label="Vnt/dėžėje", required=False)
-    vienetai_paleje = forms.IntegerField(label="Vnt/palėje", required=False)
-    pakuotes_pastabos = forms.CharField(label="Spec. žymėjimas", required=False)
-
-    # Testai / Kokybė
-    testai_druskos_rukas_val = forms.IntegerField(label="Druskos rūkas (val.)", required=False)
-    testas_adhezija = forms.CharField(label="Adhezijos testas", required=False)
-    testas_storis_mikronai = forms.IntegerField(label="Storis (µm)", required=False)
-    testai_kita = forms.CharField(label="Kiti reikalavimai", required=False)
-
-    # Dokumentai / Pastabos
-    projekto_aprasymas = forms.CharField(label="Projekto aprašymas", required=False)
-    uzklausos_pastabos = forms.CharField(label="Užklausos pastabos", required=False)
+    dang_ktl_ec_name = forms.CharField(required=False, max_length=255, label="KTL / e-coating")
+    dang_miltelinis_name = forms.CharField(required=False, max_length=255, label="Miltelinis")
+    dang_spalva_ral = forms.CharField(required=False, max_length=64, label="RAL / spalva")
+    dang_blizgumas = forms.CharField(required=False, max_length=128, label="Blizgumas / tekstūra")
 
     class Meta:
         model = Uzklausa
-        fields = []  # valdome ranka
-
-    def _has_concrete_field(self, instance, field_name: str) -> bool:
-        names = [f.name for f in instance._meta.get_fields() if getattr(f, "concrete", False)]
-        return field_name in names
+        fields = ["klientas", "projektas", "detale", "pastabos"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        u: Uzklausa = kwargs.get("instance")
-        if not u:
-            return
-
-        # ryšiai
-        if "klientas" in self.fields:
-            self.fields["klientas"].initial = getattr(u, "klientas", None)
-        if "projektas" in self.fields:
-            self.fields["projektas"].initial = getattr(u, "projektas", None)
-        if "detale" in self.fields:
-            self.fields["detale"].initial = getattr(u, "detale", None)
-
-        d = getattr(u, "detale", None)
+        d = getattr(self.instance, "detale", None)
         if d:
-            # bazė
-            if "detale_pavadinimas" in self.fields:
-                self.fields["detale_pavadinimas"].initial = getattr(d, "pavadinimas", "")
-            if "detale_brezinio_nr" in self.fields:
-                self.fields["detale_brezinio_nr"].initial = getattr(d, "brezinio_nr", "")
-
-            # paprasti Detale laukai
-            for fname in [
+            self.fields["detale_pavadinimas"].initial = d.pavadinimas
+            self.fields["detale_brezinio_nr"].initial = d.brezinio_nr
+            for f in [
                 "kiekis_metinis","kiekis_menesis","kiekis_partijai","kiekis_per_val",
                 "ilgis_mm","plotis_mm","aukstis_mm","skersmuo_mm","storis_mm",
                 "kabinimo_budas","kabliuku_kiekis","kabinimo_anga_mm","kabinti_per",
@@ -278,272 +297,78 @@ class UzklausaEditForm(forms.ModelForm):
                 "testai_druskos_rukas_val","testas_adhezija","testas_storis_mikronai","testai_kita",
                 "ppap_dokumentai","priedai_info",
             ]:
-                if fname in self.fields and hasattr(d, fname):
-                    self.fields[fname].initial = getattr(d, fname)
-
-            # specifikacija
-            spec = getattr(d, "specifikacija", None)
-            if spec:
-                for fname in ["metalas","plotas_m2","svoris_kg","medziagos_kodas"]:
-                    if fname in self.fields and hasattr(spec, fname):
-                        self.fields[fname].initial = getattr(spec, fname)
-
-            # dangos
-            coats = getattr(d, "pavirsiu_dangos", None)
-            if coats:
-                for fname in ["ktl_ec_name","miltelinis_name","spalva_ral","blizgumas"]:
-                    if fname in self.fields and hasattr(coats, fname):
-                        self.fields[fname].initial = getattr(coats, fname)
-
-        # projekto aprašymas
-        p = getattr(u, "projektas", None)
-        if p and hasattr(p, "aprasymas") and "projekto_aprasymas" in self.fields:
-            self.fields["projekto_aprasymas"].initial = getattr(p, "aprasymas")
-
-        # užklausos pastabos (tik jei modelyje yra konkretus laukas)
-        if "uzklausos_pastabos" in self.fields and self._has_concrete_field(u, "pastabos"):
-            val = getattr(u, "pastabos", None)
-            if not isinstance(val, BaseManager):
-                self.fields["uzklausos_pastabos"].initial = val
-        else:
-            self.fields.pop("uzklausos_pastabos", None)
+                self.fields[f].initial = getattr(d, f)
+            if getattr(d, "specifikacija_id", None):
+                s = d.specifikacija
+                self.fields["spec_metalas"].initial = s.metalas
+                self.fields["spec_plotas_m2"].initial = s.plotas_m2
+                self.fields["spec_svoris_kg"].initial = s.svoris_kg
+                self.fields["spec_medziagos_kodas"].initial = s.medziagos_kodas
+            if getattr(d, "pavirsiu_dangos_id", None):
+                g = d.pavirsiu_dangos
+                self.fields["dang_ktl_ec_name"].initial = g.ktl_ec_name
+                self.fields["dang_miltelinis_name"].initial = g.miltelinis_name
+                self.fields["dang_spalva_ral"].initial = g.spalva_ral
+                self.fields["dang_blizgumas"].initial = g.blizgumas
 
     def save(self, commit=True):
-        u: Uzklausa = self.instance
-        c = self.cleaned_data
+        uzk = super().save(commit=False)
+        detale = self.cleaned_data.get("detale") or getattr(self.instance, "detale", None)
+        if detale is None:
+            detale = Detale.objects.create(pavadinimas=self.cleaned_data.get("detale_pavadinimas") or "Detalė")
 
-        # ryšiai
-        if "klientas" in c and c.get("klientas"):
-            u.klientas = c["klientas"]
-        if "projektas" in c and c.get("projektas"):
-            u.projektas = c["projektas"]
-        if "detale" in c and c.get("detale"):
-            u.detale = c["detale"]
-
-        d = getattr(u, "detale", None)
-        if d:
-            # bazė
-            if "detale_pavadinimas" in c and hasattr(d, "pavadinimas"):
-                d.pavadinimas = c["detale_pavadinimas"] or d.pavadinimas
-            if "detale_brezinio_nr" in c and hasattr(d, "brezinio_nr"):
-                d.brezinio_nr = c["detale_brezinio_nr"]
-
-            # paprasti Detale laukai
-            simple_map = {
-                "kiekis_metinis": int, "kiekis_menesis": int, "kiekis_partijai": int, "kiekis_per_val": int,
-                "ilgis_mm": float, "plotis_mm": float, "aukstis_mm": float, "skersmuo_mm": float, "storis_mm": float,
-                "kabinimo_budas": str, "kabliuku_kiekis": int, "kabinimo_anga_mm": float, "kabinti_per": str,
-                "pakuotes_tipas": str, "vienetai_dezeje": int, "vienetai_paleje": int, "pakuotes_pastabos": str,
-                "testai_druskos_rukas_val": int, "testas_adhezija": str, "testas_storis_mikronai": int, "testai_kita": str,
-                "ppap_dokumentai": str, "priedai_info": str,
-            }
-            for fname, _ in simple_map.items():
-                if fname in c and c.get(fname) is not None and hasattr(d, fname):
-                    setattr(d, fname, c[fname])
-
-            # specifikacija
-            if any(c.get(x) not in [None, ""] for x in ["metalas","plotas_m2","svoris_kg","medziagos_kodas"]):
-                DetaleSpecifikacija = apps.get_model("detaliu_registras", "DetaleSpecifikacija")
-                if DetaleSpecifikacija:
-                    spec = getattr(d, "specifikacija", None)
-                    if not spec:
-                        spec, _ = DetaleSpecifikacija.objects.get_or_create(detale=d)
-                    for fname in ["metalas","plotas_m2","svoris_kg","medziagos_kodas"]:
-                        if fname in c and hasattr(spec, fname) and c.get(fname) is not None:
-                            setattr(spec, fname, c[fname])
-                    spec.save()
-
-            # dangos
-            if any(c.get(x) not in [None, ""] for x in ["ktl_ec_name","miltelinis_name","spalva_ral","blizgumas"]):
-                PavirsiuDangos = apps.get_model("detaliu_registras", "PavirsiuDangos")
-                if PavirsiuDangos:
-                    coats = getattr(d, "pavirsiu_dangos", None)
-                    if not coats:
-                        coats, _ = PavirsiuDangos.objects.get_or_create(detale=d)
-                    for fname in ["ktl_ec_name","miltelinis_name","spalva_ral","blizgumas"]:
-                        if fname in c and hasattr(coats, fname) and c.get(fname) is not None:
-                            setattr(coats, fname, c[fname])
-                    coats.save()
-
-            if commit:
-                d.save()
-
-        # projekto aprašymas
-        if "projekto_aprasymas" in c:
-            p = getattr(u, "projektas", None)
-            if p and hasattr(p, "aprasymas"):
-                p.aprasymas = c["projekto_aprasymas"]
-                if commit:
-                    p.save()
-
-        # užklausos pastabos
-        if "uzklausos_pastabos" in c and self._has_concrete_field(u, "pastabos"):
-            val = getattr(u, "pastabos", None)
-            if not isinstance(val, BaseManager):
-                setattr(u, "pastabos", c["uzklausos_pastabos"])
-
-        if commit:
-            u.save()
-        return u
-
-
-# === KŪRIMAS: pilna forma su pasirinkimais ir visais laukais ===
-class UzklausaCreateFullForm(UzklausaEditForm):
-    # Pasirinkti esamą arba įvesti naują
-    klientas = forms.ModelChoiceField(
-        label="Klientas",
-        queryset=Klientas.objects.all().order_by("vardas"),
-        required=False, empty_label="— pasirinkite —",
-    )
-    naujas_klientas = forms.CharField(label="Naujas klientas", required=False)
-
-    projektas = forms.ModelChoiceField(
-        label="Projektas",
-        queryset=Projektas.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— pasirinkite —",
-    )
-    naujas_projektas = forms.CharField(label="Naujas projektas", required=False)
-
-    detale = forms.ModelChoiceField(
-        label="Detalė",
-        queryset=Detale.objects.all().order_by("pavadinimas"),
-        required=False, empty_label="— pasirinkite —",
-    )
-    detales_pavadinimas = forms.CharField(label="Detalės pavadinimas", required=False)
-    detale_brezinio_nr = forms.CharField(label="Brėžinio nr.", required=False)
-
-    class Meta:
-        model = Uzklausa
-        fields = []  # valdom ranka, kaip ir UzklausaEditForm
-
-    def save(self, commit=True):
-        c = self.cleaned_data
-
-        # 1) Klientas
-        klientas = c.get("klientas")
-        if not klientas and (c.get("naujas_klientas") or "").strip():
-            klientas = Klientas.objects.create(vardas=c["naujas_klientas"].strip())
-
-        # 2) Projektas
-        projektas = c.get("projektas")
-        if not projektas and (c.get("naujas_projektas") or "").strip():
-            if not klientas:
-                raise ValidationError("Sukuriant naują projektą būtina nurodyti klientą.")
-            projektas = Projektas.objects.create(
-                pavadinimas=c["naujas_projektas"].strip(),
-                klientas=klientas,
-            )
-
-        # 3) Detalė
-        detale = c.get("detale")
-        if not detale:
-            pavad = (c.get("detales_pavadinimas") or "").strip()
-            brezas = (c.get("detale_brezinio_nr") or "").strip()
-            if not pavad:
-                raise ValidationError("Naujos detalės pavadinimas yra privalomas, jei nepasirenkama esama detalė.")
-            detale = Detale.objects.create(pavadinimas=pavad, brezinio_nr=brezas)
-
-        # 4) Užpildom Detalės laukus iš formos (kiekiai, matmenys, kabinimas, pakuotė, testai, dokumentai)
-        map_fields = [
-            # Kiekiai
-            "kiekis_metinis", "kiekis_menesis", "kiekis_partijai", "kiekis_per_val",
-            # Matmenys
-            "ilgis_mm", "plotis_mm", "aukstis_mm", "skersmuo_mm", "storis_mm",
-            # Specifikacija
-            "metalas", "plotas_m2", "svoris_kg", "medziagos_kodas",
-            # Kabinimas
-            "kabinimo_budas", "kabliuku_kiekis", "kabinimo_anga_mm", "kabinti_per",
-            # Pakuotė
-            "pakuotes_tipas", "vienetai_dezeje", "vienetai_paleje", "pakuotes_pastabos",
-            # Testai / kokybė
-            "testai_druskos_rukas_val", "testas_adhezija", "testas_storis_mikronai", "testai_kita",
-            # Dokumentai
-            "ppap_dokumentai", "priedai_info",
-        ]
-        for fname in map_fields:
-            if fname in self.fields:
-                setattr(detale, fname, c.get(fname))
+        mapping = {
+            "pavadinimas": "detale_pavadinimas",
+            "brezinio_nr": "detale_brezinio_nr",
+            "kiekis_metinis": "kiekis_metinis",
+            "kiekis_menesis": "kiekis_menesis",
+            "kiekis_partijai": "kiekis_partijai",
+            "kiekis_per_val": "kiekis_per_val",
+            "ilgis_mm": "ilgis_mm",
+            "plotis_mm": "plotis_mm",
+            "aukstis_mm": "aukstis_mm",
+            "skersmuo_mm": "skersmuo_mm",
+            "storis_mm": "storis_mm",
+            "kabinimo_budas": "kabinimo_budas",
+            "kabliuku_kiekis": "kabliuku_kiekis",
+            "kabinimo_anga_mm": "kabinimo_anga_mm",
+            "kabinti_per": "kabinti_per",
+            "pakuotes_tipas": "pakuotes_tipas",
+            "vienetai_dezeje": "vienetai_dezeje",
+            "vienetai_paleje": "vienetai_paleje",
+            "pakuotes_pastabos": "pakuotes_pastabos",
+            "testai_druskos_rukas_val": "testai_druskos_rukas_val",
+            "testas_adhezija": "testas_adhezija",
+            "testas_storis_mikronai": "testas_storis_mikronai",
+            "testai_kita": "testai_kita",
+            "ppap_dokumentai": "ppap_dokumentai",
+            "priedai_info": "priedai_info",
+        }
+        for model_field, form_field in mapping.items():
+            val = self.cleaned_data.get(form_field)
+            if val not in (None, ""):
+                setattr(detale, model_field, val)
         detale.save()
 
-        # 5) Dangos (jei naudoji PavirsiuDangos modelį – paliekam kaip EditForm’e)
-        try:
-            from .models import PavirsiuDangos
-        except Exception:
-            PavirsiuDangos = None
-        if PavirsiuDangos:
-            pd, _ = PavirsiuDangos.objects.get_or_create(detale=detale)
-            for f in ["ktl_ec_name", "miltelinis_name", "spalva_ral", "blizgumas"]:
-                if f in self.fields and (c.get(f) or ""):
-                    setattr(pd, f, (c.get(f) or "").strip())
-            pd.save()
+        if any(self.cleaned_data.get(k) not in (None, "") for k in
+               ["spec_metalas", "spec_plotas_m2", "spec_svoris_kg", "spec_medziagos_kodas"]):
+            s = _get_or_create_spec(detale)
+            if self.cleaned_data.get("spec_metalas"): s.metalas = self.cleaned_data["spec_metalas"]
+            if self.cleaned_data.get("spec_plotas_m2") not in (None, ""): s.plotas_m2 = self.cleaned_data["spec_plotas_m2"]
+            if self.cleaned_data.get("spec_svoris_kg") not in (None, ""): s.svoris_kg = self.cleaned_data["spec_svoris_kg"]
+            if self.cleaned_data.get("spec_medziagos_kodas"): s.medziagos_kodas = self.cleaned_data["spec_medziagos_kodas"]
+            s.save()
 
-        uzk = Uzklausa(klientas=klientas, projektas=projektas, detale=detale)
+        if any(self.cleaned_data.get(k) not in (None, "") for k in
+               ["dang_ktl_ec_name", "dang_miltelinis_name", "dang_spalva_ral", "dang_blizgumas"]):
+            g = _get_or_create_dangos(detale)
+            if self.cleaned_data.get("dang_ktl_ec_name"): g.ktl_ec_name = self.cleaned_data["dang_ktl_ec_name"]
+            if self.cleaned_data.get("dang_miltelinis_name"): g.miltelinis_name = self.cleaned_data["dang_miltelinis_name"]
+            if self.cleaned_data.get("dang_spalva_ral"): g.spalva_ral = self.cleaned_data["dang_spalva_ral"]
+            if self.cleaned_data.get("dang_blizgumas"): g.blizgumas = self.cleaned_data["dang_blizgumas"]
+            g.save()
+
+        uzk.detale = detale
         if commit:
             uzk.save()
         return uzk
-
-
-# --- KAINA: pažangios kainodaros forma ---
-class KainaForm(forms.ModelForm):
-    class Meta:
-        model = Kaina
-        fields = [
-            "busena",
-            "suma",
-            "valiuta",
-            "yra_fiksuota",
-            "kiekis_nuo",
-            "kiekis_iki",
-            "fiksuotas_kiekis",
-            "kainos_matas",
-        ]
-        widgets = {
-            "suma": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
-            "kiekis_nuo": forms.NumberInput(attrs={"min": "0"}),
-            "kiekis_iki": forms.NumberInput(attrs={"min": "0"}),
-            "fiksuotas_kiekis": forms.NumberInput(attrs={"min": "0"}),
-        }
-
-    def clean(self):
-        c = super().clean()
-        valiuta = (c.get("valiuta") or "EUR").strip()
-        c["valiuta"] = valiuta.upper() or "EUR"
-
-        suma = c.get("suma")
-        if suma is None:
-            raise ValidationError("Kaina (suma) yra privaloma.")
-        try:
-            suma = (Decimal(suma)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        except Exception:
-            raise ValidationError("Neteisingas kainos formatas.")
-        if suma < Decimal("0.00"):
-            raise ValidationError("Kaina (suma) negali būti neigiama.")
-        c["suma"] = suma
-
-        yra_fiksuota = bool(c.get("yra_fiksuota"))
-        kiekis_nuo = c.get("kiekis_nuo")
-        kiekis_iki = c.get("kiekis_iki")
-        fiksuotas_kiekis = c.get("fiksuotas_kiekis")
-        matas = c.get("kainos_matas")
-
-        if yra_fiksuota:
-            if not fiksuotas_kiekis:
-                raise ValidationError("Pažymėjus „Yra fiksuota“, privalomas „Fiksuotas kiekis“.")
-            if fiksuotas_kiekis is not None and fiksuotas_kiekis <= 0:
-                raise ValidationError("„Fiksuotas kiekis“ turi būti didesnis už 0.")
-            if not matas:
-                raise ValidationError("Pažymėjus „Yra fiksuota“, privalomas „Kainos matas“.")
-            c["kiekis_nuo"] = None
-            c["kiekis_iki"] = None
-        else:
-            if kiekis_nuo is None and kiekis_iki is None and fiksuotas_kiekis is None:
-                raise ValidationError("Nurodykite kiekio intervalą (bent „Kiekis nuo“) arba pažymėkite „Yra fiksuota“.")
-            if (kiekis_nuo is not None and kiekis_nuo < 0) or (kiekis_iki is not None and kiekis_iki < 0):
-                raise ValidationError("Kiekio ribos negali būti neigiamos.")
-            if kiekis_nuo is not None and kiekis_iki is not None and kiekis_nuo > kiekis_iki:
-                raise ValidationError("„Kiekis nuo“ negali būti didesnis už „Kiekis iki“.")
-            c["fiksuotas_kiekis"] = None
-
-        # Viena kaina per užklausą – ši forma visada „aktuali“
-        c["busena"] = "aktuali"
-        return c
