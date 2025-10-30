@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% load static %}
+{% load attr %}
+{% load dict_get %}
+{% load json_utils %}
+
+{% block title %}Pozicijų sąrašas{% endblock %}
+
+{% block page_css %}
+<style>
+  .controls-bar{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .chips{ display:flex; gap:.4rem; flex-wrap:wrap; }
+  .chip{ background:#eee; border-radius:12px; padding:.2rem .6rem; font-size:.85rem; }
+  .chip button{ border:none; background:transparent; cursor:pointer; margin-left:.4rem; }
+
+  .table-wrap{ overflow:auto; }
+  thead.sticky th{ position:sticky; top:0; z-index:2; background:#fafafa; }
+  thead.sticky tr.filters th{ top:32px; z-index:1; }
+  th .th-filter{ width:100%; box-sizing:border-box; }
+  col[hidden]{ display:none; }
+
+  /* Drawer + backdrop */
+  .drawer-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.25);
+    opacity:0; pointer-events:none; transition:opacity .18s ease;
+    z-index:999;
+  }
+  .drawer{
+    position:fixed; top:0; right:-380px; width:360px; height:100%;
+    background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.15);
+    transition:right .18s ease; z-index:1000; display:flex; flex-direction:column;
+  }
+  .drawer.open{ right:0; }
+  .drawer-backdrop.open{ opacity:1; pointer-events:auto; }
+  .drawer-header{ display:flex; justify-content:space-between; align-items:center; padding:.8rem 1rem; border-bottom:1px solid #ddd; }
+  .drawer-body{ padding:1rem; overflow:auto; }
+  .cols-search{ width:100%; margin-bottom:.6rem; }
+  .cols-list{ display:flex; flex-direction:column; gap:.25rem; max-height:calc(100vh - 220px); overflow:auto; }
+
+  /* Donut (spurga) grafikas */
+  .stats-wrap{display:flex;align-items:center;gap:18px;margin:8px 0 12px;}
+  .donut-box{position:relative;width:220px;height:220px;}
+  .donut-box canvas{width:220px;height:220px;}
+  .donut-center{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-weight:700; font-size:22px; text-align:center; pointer-events:none;
+  }
+  .donut-center span{font-weight:500; font-size:12px; opacity:.75}
+  .donut-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .donut-legend li{display:flex;align-items:center;gap:8px;font-size:14px}
+  .donut-legend .dot{width:10px;height:10px;border-radius:50%;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="controls-bar">
+  <input id="q" name="q" type="search" placeholder="Globali paieška..." value="{{ q|default:'' }}" />
+  <button id="btn-cols">Stulpeliai</button>
+  <button id="btn-clear">Išvalyti</button>
+  <label>Rodyti:
+    <select id="page_size">
+      <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+      <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+      <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+      <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+    </select>
+  </label>
+  <div class="chips" id="chips"></div>
+</div>
+
+<!-- Donut (spurga) grafikas -->
+<div class="stats-wrap">
+  <div class="donut-box">
+    <canvas id="statsDonut" width="220" height="220"></canvas>
+    <div class="donut-center" id="donutCenter">0<br><span>įrašų</span></div>
+  </div>
+  <ul class="donut-legend" id="donutLegend"></ul>
+</div>
+
+<div class="table-wrap">
+  <table id="results-table">
+    <colgroup id="colgroup">
+      {% for c in columns_schema %}
+        <col data-key="{{ c.key }}" style="width:{{ c.width }}px" {% if c.key not in visible_cols %}hidden{% endif %}>
+      {% endfor %}
+    </colgroup>
+
+    <thead class="sticky">
+      <tr class="headers">
+        {% for c in columns_schema %}
+          <th data-key="{{ c.key }}" {% if c.key not in visible_cols %}hidden{% endif %}>{{ c.label }}</th>
+        {% endfor %}
+      </tr>
+      <tr class="filters">
+        {% for c in columns_schema %}
+          <th data-key="{{ c.key }}" {% if c.key not in visible_cols %}hidden{% endif %}>
+            {% if c.filter == "text" %}
+              <input class="th-filter" data-key="{{ c.key }}" type="text" placeholder="filtruok..." value="{{ f|dict_get:c.key|default:'' }}">
+            {% elif c.filter == "select" %}
+              <input class="th-filter" data-key="{{ c.key }}" type="search" placeholder="pasirinkimas..." value="{{ f|dict_get:c.key|default:'' }}">
+            {% elif c.filter == "range" %}
+              <input class="th-filter" data-key="{{ c.key }}" type="text" placeholder="min..max, >=10, =15" value="{{ f|dict_get:c.key|default:'' }}">
+            {% elif c.filter == "date" %}
+              <input class="th-filter" data-key="{{ c.key }}" type="text" placeholder="YYYY-MM-DD arba nuo..iki" value="{{ f|dict_get:c.key|default:'' }}">
+            {% endif %}
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+
+    <tbody id="tbody">
+      {% include "pozicijos/_tbody.html" %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Backdrop + Drawer -->
+<div id="drawer-backdrop" class="drawer-backdrop"></div>
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-header">
+    <strong>Stulpeliai</strong>
+    <button id="drawer-close" aria-label="Uždaryti">✖</button>
+  </div>
+  <div class="drawer-body">
+    <input id="cols-search" class="cols-search" type="search" placeholder="Ieškoti stulpelių...">
+    <div style="display:flex; gap:.5rem; margin:.5rem 0;">
+      <button id="cols-all-off">Išjungti visus</button>
+      <button id="cols-default">Numatytieji</button>
+    </div>
+    <div id="cols-list" class="cols-list">
+      {% for c in columns_schema %}
+        <label data-key="{{ c.key }}">
+          <input type="checkbox" class="col-toggle" value="{{ c.key }}" {% if c.key in visible_cols %}checked{% endif %}>
+          {{ c.label }}
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+</aside>
+
+<!-- SCHEMA kaip JSON -->
+<script type="application/json" id="columns-schema">
+  {{ columns_schema|tojson }}
+</script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Pagrindinis JS -->
+<script>
+(function(){
+  const $ = (sel, root=document)=>root.querySelector(sel);
+  const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
+
+  const colgroup = $("#colgroup");
+  const drawer = $("#drawer");
+  const backdrop = $("#drawer-backdrop");
+  const btnCols = $("#btn-cols");
+  const btnClear = $("#btn-clear");
+  const chips = $("#chips");
+  const pageSize = $("#page_size");
+  const q = $("#q");
+  const SCHEMA = JSON.parse(document.getElementById("columns-schema").textContent);
+
+  const KEY_COLS = "pozicijos:visibleCols:" + (location.pathname || "list");
+
+  function getVisibleCols(){
+    const stored = localStorage.getItem(KEY_COLS);
+    if(stored){ try { return JSON.parse(stored) } catch(e){} }
+    return $$("#colgroup col:not([hidden])").map(col=>col.dataset.key);
+  }
+
+  function setVisibleCols(keys){
+    localStorage.setItem(KEY_COLS, JSON.stringify(keys));
+    // colgroup
+    $$("#colgroup col").forEach(col=>{
+      col.toggleAttribute("hidden", !keys.includes(col.dataset.key));
+    });
+    // thead (abi eilutės)
+    $$("thead th").forEach(th=>{
+      const k = th.dataset.key;
+      if(!k) return;
+      th.toggleAttribute("hidden", !keys.includes(k));
+    });
+    // tbody – persikraunam dalį
+    fetchTbody();
+    // checkbox būsenos
+    $$(".col-toggle").forEach(ch => ch.checked = keys.includes(ch.value));
+    // pranešimas DnD snippetui
+    document.dispatchEvent(new CustomEvent('visibility:columns-changed'));
+  }
+
+  // Drawer open/close helpers
+  function openDrawer(){ drawer.classList.add("open"); backdrop.classList.add("open"); }
+  function closeDrawer(){ drawer.classList.remove("open"); backdrop.classList.remove("open"); }
+  function toggleDrawer(){ drawer.classList.contains("open") ? closeDrawer() : openDrawer(); }
+
+  // Events for drawer
+  btnCols?.addEventListener("click", toggleDrawer);
+  $("#drawer-close")?.addEventListener("click", closeDrawer);
+  backdrop?.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeDrawer(); });
+
+  $("#cols-all-off")?.addEventListener("click", ()=>setVisibleCols([]));
+  $("#cols-default")?.addEventListener("click", ()=>{
+    const keys = SCHEMA.filter(c=>c.default).map(c=>c.key);
+    setVisibleCols(keys);
+  });
+  $("#cols-search")?.addEventListener("input", (e)=>{
+    const v = e.target.value.toLowerCase();
+    $$("#cols-list label").forEach(l=>{
+      l.style.display = l.textContent.toLowerCase().includes(v) ? "" : "none";
+    });
+  });
+  $$(".col-toggle").forEach(ch=>{
+    ch.addEventListener("change", ()=>{
+      const cur = new Set(getVisibleCols());
+      if(ch.checked) cur.add(ch.value); else cur.delete(ch.value);
+      setVisibleCols(Array.from(cur));
+    });
+  });
+
+  // === Filtrų event'ai ===
+  function debounce(cb, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>cb(...a), ms); }; }
+  const debouncedFetch = debounce(fetchTbody, 300);
+
+  q?.addEventListener("input", debouncedFetch);
+  pageSize?.addEventListener("change", fetchTbody);
+  $$(".th-filter").forEach(inp=>{
+    inp.addEventListener("input", debouncedFetch);
+  });
+
+  btnClear?.addEventListener("click", ()=>{
+    q.value="";
+    $$(".th-filter").forEach(i=>i.value="");
+    fetchTbody();
+  });
+
+  // Tbody atnaujinimas
+  let inflight;
+  function buildParams(){
+    const p = new URLSearchParams();
+    const cols = getVisibleCols();
+    p.set("cols", cols.join(","));  // leidžiam ir tuščią
+    const g = q.value.trim();
+    if(g) p.set("q", g);
+    $$(".th-filter").forEach(inp=>{
+      const k = inp.dataset.key; if(!k) return;
+      const v = (inp.value||"").trim();
+      if(v) p.set(`f[${k}]`, v);
+    });
+    p.set("page_size", pageSize.value);
+    return p;
+  }
+  function fetchTbody(){
+    const params = buildParams();
+    const url = new URL("{% url 'pozicijos:tbody' %}", location.origin);
+    url.search = params.toString();
+    if(inflight) inflight.abort();
+    inflight = new AbortController();
+    fetch(url, {signal: inflight.signal})
+      .then(r=>r.text())
+      .then(html=>{
+        $("#tbody").innerHTML = html;
+        renderChips();
+        history.replaceState(null, "", "?" + params.toString());
+        fetchStatsAndRender();   // <- po kiekvieno tbody atnaujinimo
+      }).catch(()=>{});
+  }
+
+  function renderChips(){
+    chips.innerHTML = "";
+    if(q.value.trim()){
+      chips.append(chipEl(`q: ${q.value}`, ()=>{ q.value=""; fetchTbody(); }));
+    }
+    $$(".th-filter").forEach(inp=>{
+      const v = (inp.value||"").trim(); if(!v) return;
+      chips.append(chipEl(`${inp.dataset.key}: ${v}`, ()=>{ inp.value=""; fetchTbody(); }));
+    });
+  }
+  function chipEl(text, onX){
+    const el = document.createElement("span");
+    el.className = "chip";
+    el.innerHTML = `${text} <button aria-label="Pašalinti filtrą">×</button>`;
+    el.querySelector("button").addEventListener("click", onX);
+    return el;
+  }
+
+  // ---- Donut chart (spurga) ----
+  let donut;
+  const PALETTE=["#2563eb","#14b8a6","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#10b981","#f97316","#22c55e","#a855f7","#eab308","#3b82f6"];
+
+  function ensureDonut(){
+    const ctx=document.getElementById("statsDonut");
+    if(!ctx) return null;
+    if(donut) return donut;
+    donut=new Chart(ctx,{type:"doughnut",data:{labels:[],datasets:[{data:[],backgroundColor:[]}]},
+      options:{responsive:false,cutout:"68%",plugins:{legend:{display:false},tooltip:{enabled:true}}}});
+    return donut;
+  }
+  function renderLegend(labels,values){
+    const ul=document.getElementById("donutLegend"); ul.innerHTML="";
+    labels.forEach((lab,i)=>{
+      const li=document.createElement("li"); const dot=document.createElement("span");
+      dot.className="dot"; dot.style.backgroundColor=PALETTE[i%PALETTE.length];
+      const txt=document.createElement("span"); txt.textContent=`${lab}: ${values[i]}`;
+      li.append(dot,txt); ul.append(li);
+    });
+  }
+  function updateCenter(total){
+    const el=document.getElementById("donutCenter"); if(el) el.innerHTML=`${total}<br><span>įrašų</span>`;
+  }
+  function fetchStatsAndRender(){
+    const params=buildParams();
+    const url=new URL("{% url 'pozicijos:stats' %}", location.origin);
+    url.search=params.toString();
+    fetch(url).then(r=>r.json()).then(({labels,values})=>{
+      const ch=ensureDonut(); if(!ch) return;
+      ch.data.labels=labels;
+      ch.data.datasets[0].data=values;
+      ch.data.datasets[0].backgroundColor=labels.map((_,i)=>PALETTE[i%PALETTE.length]);
+      ch.update();
+      renderLegend(labels,values);
+      updateCenter(values.reduce((a,b)=>a+b,0));
+    }).catch(()=>{});
+  }
+
+  // Init
+  setVisibleCols(getVisibleCols());
+  renderChips();
+  fetchStatsAndRender();  // <- pirmas užkrovimas
+})();
+</script>
+
+{# DnD pertempimo snippet'as – būtinai po pagrindinio <script> #}
+{% include "pozicijos/snippets/columns_dnd.html" %}
+
+{% endblock %}

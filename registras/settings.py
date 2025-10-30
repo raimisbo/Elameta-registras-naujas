@@ -26,6 +26,7 @@ INSTALLED_APPS = [
 
     # local
     'detaliu_registras',
+    'pozicijos',
 ]
 
 MIDDLEWARE = [

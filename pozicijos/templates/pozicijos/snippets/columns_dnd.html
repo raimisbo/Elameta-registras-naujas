@@ -1,0 +1,118 @@
+{# pozicijos/snippets/columns_dnd.html #}
+<style>
+  .th-dragging { opacity:.6; }
+  .th-drop-target { outline:2px dashed #888; outline-offset:-4px; }
+</style>
+
+<script>
+(function(){
+  const table = document.querySelector('#results-table');
+  if(!table || !table.tHead || !table.tBodies.length) return;
+
+  const colgroup = table.querySelector('colgroup');
+  const KEY = 'colOrder:' + (table.id || 'results-table') + ':' + (location.pathname || 'default');
+
+  function colKey(th, idx){
+    const k = th.getAttribute('data-key')
+      || th.getAttribute('data-col-key')
+      || th.textContent.trim().toLowerCase();
+    return k || ('col_' + idx);
+  }
+
+  function currentOrder(){
+    const ths = Array.from(table.tHead.querySelectorAll('tr.headers th'));
+    return ths.map((th,i)=>colKey(th,i));
+  }
+
+  function applyOrder(order){
+    // Reorder colgroup
+    const cols = Array.from(colgroup.children);
+    const mapCol = new Map(cols.map(c=>[c.dataset.key, c]));
+    order.forEach((k,i)=>{
+      const el = mapCol.get(k);
+      if(el) colgroup.appendChild(el);
+    });
+    // Reorder header row
+    const headRow = table.tHead.querySelector('tr.headers');
+    const headCells = Array.from(headRow.children);
+    const mapHead = new Map(headCells.map(th=>[th.dataset.key, th]));
+    order.forEach((k)=>{ const el = mapHead.get(k); if(el) headRow.appendChild(el); });
+
+    // Reorder filters row
+    const fltRow = table.tHead.querySelector('tr.filters');
+    const fltCells = Array.from(fltRow.children);
+    const mapFlt = new Map(fltCells.map(th=>[th.dataset.key, th]));
+    order.forEach((k)=>{ const el = mapFlt.get(k); if(el) fltRow.appendChild(el); });
+
+    // Reorder body cells
+    const rows = table.tBodies[0].rows;
+    for(const tr of rows){
+      const tds = Array.from(tr.children);
+      const mapTd = new Map(tds.map(td=>[td.dataset.key, td]));
+      order.forEach((k)=>{ const el = mapTd.get(k); if(el) tr.appendChild(el); });
+    }
+  }
+
+  // Load saved order
+  try{
+    const saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+    if(saved && saved.length){
+      applyOrder(saved);
+    }
+  }catch(e){}
+
+  // DnD events
+  let dragTH = null;
+  const headTHs = Array.from(table.tHead.querySelectorAll('tr.headers th'));
+  headTHs.forEach(th=>{
+    th.setAttribute('draggable', 'true');
+    th.addEventListener('dragstart', e=>{
+      dragTH = th;
+      th.classList.add('th-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', th.dataset.key || ''); }catch(_){}
+    });
+    th.addEventListener('dragenter', e=>{
+      if(!dragTH || th===dragTH) return;
+      th.classList.add('th-drop-target');
+    });
+    th.addEventListener('dragleave', e=>{
+      th.classList.remove('th-drop-target');
+    });
+    th.addEventListener('dragover', e=>{
+      if(!dragTH) return;
+      e.preventDefault(); // allow drop
+    });
+    th.addEventListener('drop', e=>{
+      e.preventDefault();
+      th.classList.remove('th-drop-target');
+      if(!dragTH || th===dragTH) return;
+
+      // compute new order
+      const ths = Array.from(table.tHead.querySelectorAll('tr.headers th'));
+      const order = ths.map((c,i)=>colKey(c,i));
+      const from = order.indexOf(colKey(dragTH));
+      const to   = order.indexOf(colKey(th));
+      if(from<0 || to<0 || from===to) return;
+
+      const moved = order.splice(from,1)[0];
+      order.splice(to,0,moved);
+
+      applyOrder(order);
+      localStorage.setItem(KEY, JSON.stringify(order));
+    });
+    th.addEventListener('dragend', ()=>{
+      th.classList.remove('th-dragging');
+      dragTH = null;
+    });
+  });
+
+  // Kai keičiasi matomumas (Stulpeliai), tiesiog pertaikom tvarką, jei yra išsaugota
+  document.addEventListener('visibility:columns-changed', ()=>{
+    try{
+      const saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if(saved && saved.length) applyOrder(saved);
+    }catch(e){}
+  });
+})();
+</script>

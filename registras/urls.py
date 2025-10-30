@@ -28,6 +28,7 @@ urlpatterns = [
         "detaliu_registras/",
         include(("detaliu_registras.urls_history", "detaliu_registras_history"), namespace="detaliu_registras_history"),
     ),
+    path("pozicijos/", include(("pozicijos.urls", "pozicijos"), namespace="pozicijos")),
 ]
 
 if settings.DEBUG:

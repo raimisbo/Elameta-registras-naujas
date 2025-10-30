@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Pozicija {{ pozicija.poz_kodas }}{% endblock %}
+
+{% block content %}
+<h2>Pozicijos duomenys</h2>
+
+<div class="pozicija-card">
+  <section>
+    <h3>Pagrindiniai</h3>
+    <p><b>Kodas:</b> {{ pozicija.poz_kodas }}</p>
+    <p><b>Pavadinimas:</b> {{ pozicija.poz_pavad }}</p>
+    <p><b>Klientas:</b> {{ pozicija.klientas }}</p>
+    <p><b>Projektas:</b> {{ pozicija.projektas }}</p>
+  </section>
+
+  <section>
+    <h3>Detalė</h3>
+    <p><b>Metalas:</b> {{ pozicija.metalas }}</p>
+    <p><b>Plotas:</b> {{ pozicija.plotas }}</p>
+    <p><b>Svoris:</b> {{ pozicija.svoris }}</p>
+  </section>
+
+  <section>
+    <h3>Kabinimas</h3>
+    <p><b>Būdas:</b> {{ pozicija.kabinimo_budas }}</p>
+    <p><b>Kabinimas rėme (x-y-z):</b> {{ pozicija.kabinimas_reme }}</p>
+    <p><b>Detalių kiekis rėme:</b> {{ pozicija.detaliu_kiekis_reme }}</p>
+    <p><b>Faktinis kiekis:</b> {{ pozicija.faktinis_kiekis_reme }}</p>
+  </section>
+
+  <section>
+    <h3>Dažymas</h3>
+    <p><b>Paruošimas:</b> {{ pozicija.paruosimas }}</p>
+    <p><b>Padengimas:</b> {{ pozicija.padengimas }}</p>
+    <p><b>Standartas:</b> {{ pozicija.padengimo_standartas }}</p>
+    <p><b>Spalva:</b> {{ pozicija.spalva }}</p>
+    <p><b>Maskavimas:</b> {{ pozicija.maskavimas }}</p>
+    <p><b>Testai/Kokybė:</b> {{ pozicija.testai_kokybe }}</p>
+  </section>
+
+  <section>
+    <h3>Pakavimas</h3>
+    <p><b>Pakavimas:</b> {{ pozicija.pakavimas }}</p>
+    <p><b>Instrukcija:</b> {{ pozicija.instrukcija }}</p>
+    <p><b>Dienos norma:</b> {{ pozicija.pakavimo_dienos_norma }}</p>
+    <p><b>Po KTL:</b> {{ pozicija.pak_po_ktl }}</p>
+    <p><b>Po miltelinio:</b> {{ pozicija.pak_po_milt }}</p>
+  </section>
+
+  <section>
+    <h3>Kaina</h3>
+    <p><b>Kaina EUR:</b> {{ pozicija.kaina_eur }}</p>
+  </section>
+
+  <section>
+    <h3>Pastabos</h3>
+    <p>{{ pozicija.pastabos|default:"–" }}</p>
+  </section>
+</div>
+
+<p><a href="{% url 'pozicijos:list' %}">← Grįžti į sąrašą</a></p>
+{% endblock %}
