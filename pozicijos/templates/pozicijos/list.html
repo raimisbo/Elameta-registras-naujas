@@ -8,18 +8,67 @@
 
 {% block page_css %}
 <style>
+  /* === Viršutinė įrankių juosta === */
   .controls-bar{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
   .chips{ display:flex; gap:.4rem; flex-wrap:wrap; }
   .chip{ background:#eee; border-radius:12px; padding:.2rem .6rem; font-size:.85rem; }
   .chip button{ border:none; background:transparent; cursor:pointer; margin-left:.4rem; }
 
-  .table-wrap{ overflow:auto; }
-  thead.sticky th{ position:sticky; top:0; z-index:2; background:#fafafa; }
-  thead.sticky tr.filters th{ top:32px; z-index:1; }
+  /* === Lentelės konteineris (scroll + sticky) === */
+  .table-wrap {
+    position: relative;
+    max-height: calc(100vh - 240px);
+    overflow: auto;
+    border: 1px solid #e3e3e3;
+    border-radius: 6px;
+  }
+
+  /* === Sticky header su mini efektu === */
+  #results-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+  }
+
+  #results-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: #fff;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.08);
+    transition: background 0.25s;
+  }
+
+  #results-table thead.stuck th {
+    background: linear-gradient(to bottom, #fff, #f9f9f9);
+  }
+
+  #results-table thead tr.filters th {
+    top: 34px;
+    z-index: 5;
+    background: #fafafa;
+  }
+
   th .th-filter{ width:100%; box-sizing:border-box; }
   col[hidden]{ display:none; }
 
-  /* Drawer + backdrop */
+  /* === Sticky pirmas matomas stulpelis === */
+  #results-table thead th.sticky-col{
+    position: sticky;
+    left: 0;
+    z-index: 8;
+    background: linear-gradient(to right, #fff 80%, rgba(255,255,255,0.9));
+    backdrop-filter: blur(2px);
+  }
+  #results-table tbody td.sticky-col{
+    position: sticky;
+    left: 0;
+    z-index: 7;
+    background: linear-gradient(to right, #fff 80%, rgba(255,255,255,0.9));
+  }
+
+  /* === Drawer + backdrop === */
   .drawer-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.25);
     opacity:0; pointer-events:none; transition:opacity .18s ease;
@@ -37,7 +86,7 @@
   .cols-search{ width:100%; margin-bottom:.6rem; }
   .cols-list{ display:flex; flex-direction:column; gap:.25rem; max-height:calc(100vh - 220px); overflow:auto; }
 
-  /* Donut (spurga) grafikas */
+  /* === Donut (spurga) grafikas === */
   .stats-wrap{display:flex;align-items:center;gap:18px;margin:8px 0 12px;}
   .donut-box{position:relative;width:220px;height:220px;}
   .donut-box canvas{width:220px;height:220px;}
@@ -115,7 +164,7 @@
   </table>
 </div>
 
-<!-- Backdrop + Drawer -->
+<!-- Drawer -->
 <div id="drawer-backdrop" class="drawer-backdrop"></div>
 <aside id="drawer" class="drawer" aria-hidden="true">
   <div class="drawer-header">
@@ -126,7 +175,9 @@
     <input id="cols-search" class="cols-search" type="search" placeholder="Ieškoti stulpelių...">
     <div style="display:flex; gap:.5rem; margin:.5rem 0;">
       <button id="cols-all-off">Išjungti visus</button>
+      <button id="cols-all-on">Pažymėti visus</button>
       <button id="cols-default">Numatytieji</button>
+      <button id="cols-reset-order">↺ Atstatyti tvarką</button>
     </div>
     <div id="cols-list" class="cols-list">
       {% for c in columns_schema %}
@@ -139,7 +190,7 @@
   </div>
 </aside>
 
-<!-- SCHEMA kaip JSON -->
+<!-- SCHEMA JSON -->
 <script type="application/json" id="columns-schema">
   {{ columns_schema|tojson }}
 </script>
@@ -147,176 +198,155 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Pagrindinis JS -->
+<!-- === VISAS JS BLOKAS === -->
 <script>
 (function(){
-  const $ = (sel, root=document)=>root.querySelector(sel);
-  const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
-
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+  const table = $("#results-table");
   const colgroup = $("#colgroup");
-  const drawer = $("#drawer");
-  const backdrop = $("#drawer-backdrop");
-  const btnCols = $("#btn-cols");
-  const btnClear = $("#btn-clear");
-  const chips = $("#chips");
-  const pageSize = $("#page_size");
-  const q = $("#q");
+  const drawer = $("#drawer"), backdrop=$("#drawer-backdrop");
+  const btnCols=$("#btn-cols"), btnClear=$("#btn-clear");
+  const chips=$("#chips"), pageSize=$("#page_size"), q=$("#q");
   const SCHEMA = JSON.parse(document.getElementById("columns-schema").textContent);
-
-  const KEY_COLS = "pozicijos:visibleCols:" + (location.pathname || "list");
+  const KEY_COLS="pozicijos:visibleCols:"+(location.pathname||"list");
 
   function getVisibleCols(){
-    const stored = localStorage.getItem(KEY_COLS);
-    if(stored){ try { return JSON.parse(stored) } catch(e){} }
-    return $$("#colgroup col:not([hidden])").map(col=>col.dataset.key);
+    const s=localStorage.getItem(KEY_COLS);
+    if(s){ try{return JSON.parse(s);}catch(e){} }
+    return $$("#colgroup col:not([hidden])").map(c=>c.dataset.key);
   }
 
   function setVisibleCols(keys){
-    localStorage.setItem(KEY_COLS, JSON.stringify(keys));
-    // colgroup
-    $$("#colgroup col").forEach(col=>{
-      col.toggleAttribute("hidden", !keys.includes(col.dataset.key));
-    });
-    // thead (abi eilutės)
+    localStorage.setItem(KEY_COLS,JSON.stringify(keys));
+    $$("#colgroup col").forEach(col=>col.toggleAttribute("hidden",!keys.includes(col.dataset.key)));
     $$("thead th").forEach(th=>{
-      const k = th.dataset.key;
-      if(!k) return;
-      th.toggleAttribute("hidden", !keys.includes(k));
+      const k=th.dataset.key; if(!k)return;
+      th.toggleAttribute("hidden",!keys.includes(k));
     });
-    // tbody – persikraunam dalį
     fetchTbody();
-    // checkbox būsenos
-    $$(".col-toggle").forEach(ch => ch.checked = keys.includes(ch.value));
-    // pranešimas DnD snippetui
+    $$(".col-toggle").forEach(ch=>ch.checked=keys.includes(ch.value));
     document.dispatchEvent(new CustomEvent('visibility:columns-changed'));
   }
 
-  // Drawer open/close helpers
-  function openDrawer(){ drawer.classList.add("open"); backdrop.classList.add("open"); }
-  function closeDrawer(){ drawer.classList.remove("open"); backdrop.classList.remove("open"); }
-  function toggleDrawer(){ drawer.classList.contains("open") ? closeDrawer() : openDrawer(); }
+  // === Drawer ===
+  function openDrawer(){drawer.classList.add("open");backdrop.classList.add("open");}
+  function closeDrawer(){drawer.classList.remove("open");backdrop.classList.remove("open");}
+  btnCols?.addEventListener("click",()=>drawer.classList.toggle("open"));
+  $("#drawer-close")?.addEventListener("click",closeDrawer);
+  backdrop?.addEventListener("click",closeDrawer);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
 
-  // Events for drawer
-  btnCols?.addEventListener("click", toggleDrawer);
-  $("#drawer-close")?.addEventListener("click", closeDrawer);
-  backdrop?.addEventListener("click", closeDrawer);
-  document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeDrawer(); });
-
-  $("#cols-all-off")?.addEventListener("click", ()=>setVisibleCols([]));
-  $("#cols-default")?.addEventListener("click", ()=>{
-    const keys = SCHEMA.filter(c=>c.default).map(c=>c.key);
+  $("#cols-all-off")?.addEventListener("click",()=>setVisibleCols([]));
+  $("#cols-all-on")?.addEventListener("click",()=>setVisibleCols(SCHEMA.map(c=>c.key)));
+  $("#cols-default")?.addEventListener("click",()=>{
+    const keys=SCHEMA.filter(c=>c.default).map(c=>c.key);
     setVisibleCols(keys);
   });
-  $("#cols-search")?.addEventListener("input", (e)=>{
-    const v = e.target.value.toLowerCase();
+
+  $("#cols-search")?.addEventListener("input",e=>{
+    const v=e.target.value.toLowerCase();
     $$("#cols-list label").forEach(l=>{
-      l.style.display = l.textContent.toLowerCase().includes(v) ? "" : "none";
+      l.style.display=l.textContent.toLowerCase().includes(v)?"":"none";
     });
   });
+
   $$(".col-toggle").forEach(ch=>{
-    ch.addEventListener("change", ()=>{
-      const cur = new Set(getVisibleCols());
-      if(ch.checked) cur.add(ch.value); else cur.delete(ch.value);
-      setVisibleCols(Array.from(cur));
+    ch.addEventListener("change",()=>{
+      const cur=new Set(getVisibleCols());
+      if(ch.checked)cur.add(ch.value);else cur.delete(ch.value);
+      setVisibleCols([...cur]);
     });
   });
 
-  // === Filtrų event'ai ===
-  function debounce(cb, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>cb(...a), ms); }; }
-  const debouncedFetch = debounce(fetchTbody, 300);
+  // === Filtrai ir gyva paieška ===
+  function debounce(fn,ms=300){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}}
+  const debouncedFetch=debounce(fetchTbody,300);
 
-  q?.addEventListener("input", debouncedFetch);
-  pageSize?.addEventListener("change", fetchTbody);
-  $$(".th-filter").forEach(inp=>{
-    inp.addEventListener("input", debouncedFetch);
-  });
+  q?.addEventListener("input",debouncedFetch);
+  pageSize?.addEventListener("change",fetchTbody);
+  $$(".th-filter").forEach(inp=>inp.addEventListener("input",debouncedFetch));
 
-  btnClear?.addEventListener("click", ()=>{
-    q.value="";
-    $$(".th-filter").forEach(i=>i.value="");
+  btnClear?.addEventListener("click",()=>{
+    q.value="";$$(".th-filter").forEach(i=>i.value="");
     fetchTbody();
   });
 
-  // Tbody atnaujinimas
+  // === Tbody atnaujinimas ===
   let inflight;
   function buildParams(){
-    const p = new URLSearchParams();
-    const cols = getVisibleCols();
-    p.set("cols", cols.join(","));  // leidžiam ir tuščią
-    const g = q.value.trim();
-    if(g) p.set("q", g);
+    const p=new URLSearchParams();
+    const cols=getVisibleCols();
+    p.set("cols",cols.join(","));
+    const g=q.value.trim(); if(g)p.set("q",g);
     $$(".th-filter").forEach(inp=>{
-      const k = inp.dataset.key; if(!k) return;
-      const v = (inp.value||"").trim();
-      if(v) p.set(`f[${k}]`, v);
+      const k=inp.dataset.key,v=inp.value.trim();
+      if(v)p.set(`f[${k}]`,v);
     });
-    p.set("page_size", pageSize.value);
+    p.set("page_size",pageSize.value);
     return p;
   }
+
   function fetchTbody(){
-    const params = buildParams();
-    const url = new URL("{% url 'pozicijos:tbody' %}", location.origin);
-    url.search = params.toString();
-    if(inflight) inflight.abort();
-    inflight = new AbortController();
-    fetch(url, {signal: inflight.signal})
+    const params=buildParams();
+    const url=new URL("{% url 'pozicijos:tbody' %}",location.origin);
+    url.search=params.toString();
+    if(inflight)inflight.abort();
+    inflight=new AbortController();
+    fetch(url,{signal:inflight.signal})
       .then(r=>r.text())
       .then(html=>{
-        $("#tbody").innerHTML = html;
+        $("#tbody").innerHTML=html;
         renderChips();
-        history.replaceState(null, "", "?" + params.toString());
-        fetchStatsAndRender();   // <- po kiekvieno tbody atnaujinimo
+        history.replaceState(null,"","?"+params.toString());
+        fetchStatsAndRender();
+        document.dispatchEvent(new Event('tbody:reloaded'));
       }).catch(()=>{});
   }
 
   function renderChips(){
-    chips.innerHTML = "";
-    if(q.value.trim()){
-      chips.append(chipEl(`q: ${q.value}`, ()=>{ q.value=""; fetchTbody(); }));
-    }
+    chips.innerHTML="";
+    if(q.value.trim())chips.append(chipEl(`q: ${q.value}`,()=>{q.value="";fetchTbody();}));
     $$(".th-filter").forEach(inp=>{
-      const v = (inp.value||"").trim(); if(!v) return;
-      chips.append(chipEl(`${inp.dataset.key}: ${v}`, ()=>{ inp.value=""; fetchTbody(); }));
+      const v=inp.value.trim();if(!v)return;
+      chips.append(chipEl(`${inp.dataset.key}: ${v}`,()=>{inp.value="";fetchTbody();}));
     });
   }
-  function chipEl(text, onX){
-    const el = document.createElement("span");
-    el.className = "chip";
-    el.innerHTML = `${text} <button aria-label="Pašalinti filtrą">×</button>`;
-    el.querySelector("button").addEventListener("click", onX);
+  function chipEl(text,onX){
+    const el=document.createElement("span");
+    el.className="chip";
+    el.innerHTML=`${text} <button>×</button>`;
+    el.querySelector("button").addEventListener("click",onX);
     return el;
   }
 
-  // ---- Donut chart (spurga) ----
+  // === Donut (Chart.js) ===
   let donut;
   const PALETTE=["#2563eb","#14b8a6","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#10b981","#f97316","#22c55e","#a855f7","#eab308","#3b82f6"];
-
   function ensureDonut(){
-    const ctx=document.getElementById("statsDonut");
-    if(!ctx) return null;
-    if(donut) return donut;
+    const ctx=$("#statsDonut"); if(!ctx)return null;
+    if(donut)return donut;
     donut=new Chart(ctx,{type:"doughnut",data:{labels:[],datasets:[{data:[],backgroundColor:[]}]},
       options:{responsive:false,cutout:"68%",plugins:{legend:{display:false},tooltip:{enabled:true}}}});
     return donut;
   }
   function renderLegend(labels,values){
-    const ul=document.getElementById("donutLegend"); ul.innerHTML="";
+    const ul=$("#donutLegend");ul.innerHTML="";
     labels.forEach((lab,i)=>{
-      const li=document.createElement("li"); const dot=document.createElement("span");
-      dot.className="dot"; dot.style.backgroundColor=PALETTE[i%PALETTE.length];
-      const txt=document.createElement("span"); txt.textContent=`${lab}: ${values[i]}`;
-      li.append(dot,txt); ul.append(li);
+      const li=document.createElement("li");
+      li.innerHTML=`<span class="dot" style="background:${PALETTE[i%PALETTE.length]}"></span>${lab}: ${values[i]}`;
+      ul.append(li);
     });
   }
   function updateCenter(total){
-    const el=document.getElementById("donutCenter"); if(el) el.innerHTML=`${total}<br><span>įrašų</span>`;
+    $("#donutCenter").innerHTML=`${total}<br><span>įrašų</span>`;
   }
   function fetchStatsAndRender(){
     const params=buildParams();
-    const url=new URL("{% url 'pozicijos:stats' %}", location.origin);
+    const url=new URL("{% url 'pozicijos:stats' %}",location.origin);
     url.search=params.toString();
     fetch(url).then(r=>r.json()).then(({labels,values})=>{
-      const ch=ensureDonut(); if(!ch) return;
+      const ch=ensureDonut();if(!ch)return;
       ch.data.labels=labels;
       ch.data.datasets[0].data=values;
       ch.data.datasets[0].backgroundColor=labels.map((_,i)=>PALETTE[i%PALETTE.length]);
@@ -326,14 +356,53 @@
     }).catch(()=>{});
   }
 
-  // Init
+  // === Sticky pirmas matomas stulpelis ===
+  function firstVisibleColIndex(){
+    const ths=Array.from(table.querySelectorAll('thead th'));
+    for(let i=0;i<ths.length;i++){
+      const th=ths[i];
+      const cs=getComputedStyle(th);
+      const hidden=(cs.display==='none')||(th.offsetParent===null)||(th.getBoundingClientRect().width===0);
+      if(!hidden)return i;
+    }
+    return -1;
+  }
+  function clearSticky(){table.querySelectorAll('.sticky-col').forEach(e=>e.classList.remove('sticky-col'));}
+  function applySticky(){
+    clearSticky();
+    const idx=firstVisibleColIndex();
+    if(idx<0)return;
+    const nth=idx+1;
+    const th=table.querySelector(`thead tr > th:nth-child(${nth})`);
+    if(th)th.classList.add('sticky-col');
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      const td=tr.querySelector(`:scope > td:nth-child(${nth})`);
+      if(td)td.classList.add('sticky-col');
+    });
+  }
+  window.applySticky=applySticky;
+
+  const thead=table.tHead,tbody=table.tBodies[0];
+  if(thead)new MutationObserver(()=>applySticky()).observe(thead,{childList:true,subtree:true});
+  if(tbody)new MutationObserver(()=>applySticky()).observe(tbody,{childList:true});
+  window.addEventListener('poz:cols-changed',applySticky);
+
+  // Header gradient kai skrolinama
+  const wrap=document.querySelector('.table-wrap');
+  if(wrap){
+    wrap.addEventListener('scroll',()=>{
+      const th=table.querySelector('thead');
+      if(wrap.scrollTop>0)th.classList.add('stuck');else th.classList.remove('stuck');
+    });
+  }
+
+  // INIT
   setVisibleCols(getVisibleCols());
   renderChips();
-  fetchStatsAndRender();  // <- pirmas užkrovimas
+  fetchStatsAndRender();
 })();
 </script>
 
-{# DnD pertempimo snippet'as – būtinai po pagrindinio <script> #}
-{% include "pozicijos/snippets/columns_dnd.html" %}
-
+<!-- DnD -->
+{% include "snippets/columns_dnd_shared.html" with table_id="results-table" page_key="pozicijos" %}
 {% endblock %}

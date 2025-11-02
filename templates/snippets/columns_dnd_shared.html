@@ -1,0 +1,177 @@
+{# DnD su animacija + stabilus eiliškumas + Reset. #}
+
+<style>
+  .th-draggable{user-select:none;cursor:grab;transition:all .2s ease;}
+  .th-dragging{
+    opacity:.75;
+    cursor:grabbing;
+    box-shadow:0 0 12px rgba(0,0,0,0.25);
+    background:linear-gradient(to bottom,#fff,#f3f3f3);
+    transform:scale(1.04);
+    transition:all .15s ease;
+  }
+  .th-drop-target{
+    outline:2px dashed #bbb;
+    outline-offset:-3px;
+    background:rgba(200,200,200,.15);
+  }
+  /* Švelnus pojūtis judant */
+  #results-table th, #results-table td { transition: transform .18s ease; }
+</style>
+
+<script>
+(function(){
+  const TABLE_ID = "{{ table_id|default:'results-table' }}";
+  const PAGE_KEY = "{{ page_key|default:'default' }}";
+  const table = document.getElementById(TABLE_ID);
+  if(!table || !table.tHead || !table.tBodies.length) return;
+
+  const headerRow = table.tHead.rows[0];
+  const tbody = table.tBodies[0];
+  const colgroup = table.querySelector('colgroup');
+  const STORE_KEY = 'colOrder:'+PAGE_KEY;
+  const DEFAULT_ORDER = Array.from(headerRow.cells).map(th=>th.dataset.key);
+
+  // --- Išsaugo / pritaiko tvarką ---
+  function saveOrder(){
+    const order = Array.from(headerRow.cells).map(th => th.dataset.key || '');
+    localStorage.setItem(STORE_KEY, JSON.stringify(order));
+  }
+
+  // Stabilus pritaikymas: kiekvieną kartą randam "dabartinį" indeksą DOM'e
+  function applyOrder(orderKeys){
+    if(!orderKeys || !orderKeys.length) return;
+
+    orderKeys.forEach((key, desiredIdx)=>{
+      const thsNow = Array.from(headerRow.cells);
+      const curIdx = thsNow.findIndex(th => th.dataset.key === key);
+      if(curIdx < 0 || curIdx === desiredIdx) return;
+
+      // 1) TH
+      headerRow.insertBefore(thsNow[curIdx], thsNow[desiredIdx] || null);
+
+      // 2) COLGROUP
+      if(colgroup){
+        const colsNow = Array.from(colgroup.children);
+        if(colsNow[curIdx]) colgroup.insertBefore(colsNow[curIdx], colsNow[desiredIdx] || null);
+      }
+
+      // 3) Kiekvienos eilės TD
+      Array.from(tbody.rows).forEach(tr=>{
+        const tdsNow = Array.from(tr.cells);
+        if(tdsNow[curIdx]) tr.insertBefore(tdsNow[curIdx], tdsNow[desiredIdx] || null);
+      });
+    });
+
+    if(window.applySticky) try{ window.applySticky(); }catch(e){}
+  }
+
+  function resetOrder(){
+    localStorage.removeItem(STORE_KEY);
+    applyOrder(DEFAULT_ORDER);
+    if(window.applySticky) try{ window.applySticky(); }catch(e){}
+  }
+
+  // --- DnD ---
+  Array.from(headerRow.cells).forEach(th=>{
+    th.classList.add('th-draggable');
+    th.setAttribute('draggable', 'true');
+  });
+
+  let dragIndex=-1;
+  headerRow.addEventListener('dragstart', e=>{
+    const th = e.target.closest('th');
+    if(!th) return;
+    dragIndex = Array.from(headerRow.cells).indexOf(th);
+    th.classList.add('th-dragging');
+    e.dataTransfer.effectAllowed='move';
+  });
+
+  headerRow.addEventListener('dragend', e=>{
+    const th = e.target.closest('th');
+    if(th) th.classList.remove('th-dragging');
+    headerRow.querySelectorAll('.th-drop-target').forEach(x=>x.classList.remove('th-drop-target'));
+  });
+
+  headerRow.addEventListener('dragover', e=>{
+    e.preventDefault();
+    const th = e.target.closest('th');
+    if(!th) return;
+    headerRow.querySelectorAll('.th-drop-target').forEach(x=>x.classList.remove('th-drop-target'));
+    th.classList.add('th-drop-target');
+  });
+
+  headerRow.addEventListener('dragleave', e=>{
+    const th = e.target.closest('th');
+    if(th) th.classList.remove('th-drop-target');
+  });
+
+  headerRow.addEventListener('drop', e=>{
+    e.preventDefault();
+    const target = e.target.closest('th');
+    if(!target || dragIndex<0) return;
+    headerRow.querySelectorAll('.th-drop-target').forEach(x=>x.classList.remove('th-drop-target'));
+
+    const from = dragIndex;
+    const to = Array.from(headerRow.cells).indexOf(target);
+    if(from===to || from<0 || to<0) return;
+
+    const ths = Array.from(headerRow.cells);
+    headerRow.insertBefore(ths[from], ths[to]);
+
+    if(colgroup){
+      const cols = Array.from(colgroup.children);
+      if(cols[from]) colgroup.insertBefore(cols[from], cols[to]);
+    }
+
+    Array.from(tbody.rows).forEach(tr=>{
+      const tds = Array.from(tr.cells);
+      if(tds[from]) tr.insertBefore(tds[from], tds[to]);
+    });
+
+    dragIndex=-1;
+    saveOrder();
+    if(window.applySticky) window.applySticky();
+    window.dispatchEvent(new CustomEvent('poz:cols-changed'));
+  });
+
+  // --- Reset: mygtukas Drawer'yje + mygtukas "Išvalyti" ---
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const btnReset = document.getElementById("cols-reset-order");
+    if(btnReset) btnReset.addEventListener("click", resetOrder);
+
+    const btnClear = document.getElementById("btn-clear");
+    if(btnClear){
+      btnClear.addEventListener("click", ()=>{
+        // atstato stulpelių tvarką kartu su filtrų išvalymu
+        resetOrder();
+      });
+    }
+  });
+
+  // --- Reaguojame į matomumo ar tbody persikrovimo įvykius ---
+  document.addEventListener('visibility:columns-changed', ()=>{
+    try{
+      const order = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+      if(order && order.length) applyOrder(order);
+    }catch(e){}
+  });
+
+  document.addEventListener('tbody:reloaded', ()=>{
+    try{
+      const order = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+      applyOrder(order && order.length ? order : DEFAULT_ORDER);
+    }catch(e){
+      applyOrder(DEFAULT_ORDER);
+    }
+  });
+
+  // --- Pritaikom startinę tvarką ---
+  try{
+    const order = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    if(order && order.length) applyOrder(order);
+  }catch(e){}
+
+  if(window.applySticky) try{ window.applySticky(); }catch(e){}
+})();
+</script>
