@@ -11,7 +11,7 @@ urlpatterns = [
     path(
         "",
         RedirectView.as_view(
-            pattern_name="detaliu_registras:uzklausa_list",
+            pattern_name="pozicijos:list",
             permanent=False,
         ),
         name="home_redirect",

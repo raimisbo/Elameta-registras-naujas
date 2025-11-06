@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Trinti poziciją{% endblock %}
+
+{% block content %}
+<div style="max-width:600px;margin:auto;background:#fff;padding:20px;border-radius:8px;border:1px solid #ddd;">
+  <h2 style="margin-bottom:12px;">Ar tikrai norite ištrinti šią poziciją?</h2>
+  <p><strong>{{ object.poz_kodas }}</strong> — {{ object.poz_pavad }}</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">🗑️ Taip, trinti</button>
+    <a href="{% url 'pozicijos:list' %}" class="btn">Atšaukti</a>
+  </form>
+</div>
+{% endblock %}

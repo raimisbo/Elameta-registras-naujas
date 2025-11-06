@@ -3,16 +3,10 @@
 <tr onclick="location.href='{% url 'pozicijos:detail' it.id %}'" style="cursor:pointer;">
   {% for c in columns_schema %}
     {% if c.key in visible_cols %}
-      <td data-key="{{ c.key }}">
-        {% if c.key == "brez_count" %}
-          — {# vietoje rodyk 📄×N kai turėsim Brėžiniai modelį #}
-        {% else %}
-          {{ it|attr:c.key }}
-        {% endif %}
-      </td>
+      <td data-key="{{ c.key }}">{{ it|attr:c.key }}</td>
     {% endif %}
   {% endfor %}
 </tr>
 {% empty %}
-<tr><td colspan="99">Nėra duomenų.</td></tr>
+<tr><td colspan="{{ visible_cols|length }}">Nėra įrašų.</td></tr>
 {% endfor %}

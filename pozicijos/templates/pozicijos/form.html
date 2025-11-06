@@ -1,0 +1,61 @@
+{# templates/pozicijos/form.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if object %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}{% endblock %}
+
+{% block content %}
+<h1>{% if object %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}</h1>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="form-grid">
+    {% for field in form %}
+      <div class="form-group">
+        <label for="{{ field.id_for_label }}">
+          {{ field.label }}{% if field.field.required %} *{% endif %}
+        </label>
+        {{ field }}
+        {% if field.help_text %}<small class="help">{{ field.help_text }}</small>{% endif %}
+        {% if field.errors %}
+          <div class="errorlist">{{ field.errors }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Išsaugoti</button>
+    <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal</a>
+  </div>
+</form>
+
+<style>
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+.errorlist {
+  color: #b91c1c;
+  font-size: .8rem;
+}
+</style>
+{% endblock %}
