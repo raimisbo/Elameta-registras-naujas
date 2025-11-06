@@ -8,17 +8,16 @@
 
 {% block page_css %}
 <style>
-  /* paslepiam viršutinę projekto juostą tik šiame puslapyje */
   header, .navbar, .topbar {
     display: none !important;
   }
 
   .top-wrap {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: .75rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:1rem;
+    margin-bottom:.75rem;
   }
   .controls-block { display:flex; flex-direction:column; gap:.35rem; }
   .controls-bar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
@@ -29,17 +28,15 @@
   .chip{background:#e2e8f0; padding:2px 6px; border-radius:4px; display:inline-flex; gap:4px; align-items:center; font-size:.8rem;}
   .chip button{border:0; background:transparent; cursor:pointer;}
 
-  /* grafikas dešinėje */
   .graph-box{min-width:240px;}
   .donut-box{position:relative; width:220px; height:220px;}
   .donut-box canvas{width:220px!important; height:220px!important;}
-  .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; font-size:22px; pointer-events:none; text-align:center;}
-  .donut-center span{font-weight:500; font-size:12px; opacity:.7;}
+  .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; font-weight:700; font-size:22px; pointer-events:none; text-align:center;}
+  .donut-center span{font-size:12px; opacity:.7;}
   .donut-legend{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:220px; overflow:auto;}
   .donut-legend li{display:flex; align-items:center; gap:8px; font-size:14px;}
   .donut-legend .dot{width:10px; height:10px; border-radius:50%;}
 
-  /* lentelė – NAUJAS ID, kad base.html neliestų */
   .table-wrap{
     overflow:auto;
     max-height:calc(100vh - 180px);
@@ -51,12 +48,8 @@
     border-collapse:separate;
     border-spacing:0;
   }
-  #pozicijos-table thead tr.headers th{
-    background:#f4f4f4;
-  }
-  #pozicijos-table thead tr.filters th{
-    background:#fafafa;
-  }
+  #pozicijos-table thead tr.headers th{background:#f4f4f4;}
+  #pozicijos-table thead tr.filters th{background:#fafafa;}
   #pozicijos-table thead th{
     position:sticky;
     top:0;
@@ -77,7 +70,6 @@
   #pozicijos-table tbody tr:nth-child(even) td{background:#f8f8f8;}
   .th-filter{width:100%; box-sizing:border-box;}
 
-  /* stulpelių stalčius */
   .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.2s;}
   .drawer-backdrop.open{opacity:1; pointer-events:auto;}
   .drawer{position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.25); transition:.2s; display:flex; flex-direction:column; z-index:100;}
@@ -86,20 +78,30 @@
   .drawer-body{padding:.75rem .75rem; overflow:auto; display:flex; flex-direction:column; gap:.5rem;}
   .cols-search{width:100%; padding:.25rem .5rem; margin-bottom:.25rem;}
 
-  /* mūsų sticky – jau ant NAUJO ID */
+  #cols-list {
+    display: flex;
+    flex-direction:column;
+    gap: .35rem;
+  }
+  #cols-list label {
+    display: flex;
+    gap: .4rem;
+    align-items:center;
+  }
+
   #pozicijos-table thead tr.headers th.sticky-col-header{
-    position:sticky;
+    position:sticky !important;
     top:0;
     left:0;
     z-index:200;
-    background:#f4f4f4;
+    background:#f4f4f4 !important;
   }
   #pozicijos-table thead tr.filters th.sticky-col-filter{
-    position:sticky;
+    position:sticky !important;
     top:34px;
     left:0;
     z-index:190;
-    background:#fafafa;
+    background:#fafafa !important;
   }
   #pozicijos-table tbody td.sticky-col-cell{
     position:sticky;
@@ -140,7 +142,7 @@
   </div>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" id="pozicijos-wrap">
   <table id="pozicijos-table">
     <colgroup id="pozicijos-colgroup">
       {% for c in columns_schema %}
@@ -175,7 +177,6 @@
   </table>
 </div>
 
-<!-- stulpelių stalčius -->
 <div id="drawer-backdrop" class="drawer-backdrop"></div>
 <aside id="drawer" class="drawer">
   <div class="drawer-header">
@@ -184,11 +185,11 @@
   </div>
   <div class="drawer-body">
     <input id="cols-search" class="cols-search" type="search" placeholder="Ieškoti stulpelių...">
-    <div style="display:flex;gap:.5rem;margin:.25rem 0 .5rem;">
+    <div style="display:flex; gap:.5rem; margin:.25rem 0 .5rem;">
       <button id="cols-all-off" type="button">Išjungti visus</button>
       <button id="cols-all-on" type="button">Pažymėti visus</button>
       <button id="cols-default" type="button">Numatytieji</button>
-      <button id="cols-reset-order" type="button">↺ Atstatyti tvarką</button>
+      <button id="cols-reset" type="button">↺ Atstatyti tvarką</button>
     </div>
     <div id="cols-list">
       {% for c in columns_schema %}
@@ -216,6 +217,7 @@
   const DND_KEY  = "dnd-order:pozicijos";
 
   const table    = $("#pozicijos-table");
+  const wrap     = $("#pozicijos-wrap");
   const q        = $("#q");
   const pageSize = $("#page_size");
   const chips    = $("#chips");
@@ -223,24 +225,31 @@
   const backdrop = $("#drawer-backdrop");
   const btnClear = $("#btn-clear");
 
+  // Numatytieji pagal PAVADINIMĄ
+  const DEFAULT_LABELS = ["Klientas", "Projektas", "Kodas", "Pavadinimas", "Kaina", "Pastabos"];
+
   const PALETTE  = ["#0ea5e9","#22c55e","#f97316","#e11d48","#6366f1","#14b8a6","#facc15","#8b5cf6","#6b7280","#f43f5e","#a855f7","#10b981"];
+
+  function getDefaultColsFromSchema() {
+    return SCHEMA
+      .filter(c => DEFAULT_LABELS.includes(c.label))
+      .map(c => c.key);
+  }
 
   function getVisibleCols(){
     const s = localStorage.getItem(KEY_COLS);
-    if (!s) return SCHEMA.filter(c=>c.default).map(c=>c.key);
-    try { return JSON.parse(s); } catch(e) { return SCHEMA.filter(c=>c.default).map(c=>c.key); }
+    if (!s) return getDefaultColsFromSchema();
+    try { return JSON.parse(s); } catch(e) { return getDefaultColsFromSchema(); }
   }
   function setVisibleCols(keys){
     localStorage.setItem(KEY_COLS, JSON.stringify(keys));
     $$("#pozicijos-colgroup col").forEach(col => {
-      const k = col.dataset.key;
-      if (!k) return;
+      const k = col.dataset.key; if (!k) return;
       if (keys.includes(k)) col.removeAttribute("hidden");
       else col.setAttribute("hidden","");
     });
     $$("#pozicijos-table thead th").forEach(th => {
-      const k = th.dataset.key;
-      if (!k) return;
+      const k = th.dataset.key; if (!k) return;
       if (keys.includes(k)) th.removeAttribute("hidden");
       else th.setAttribute("hidden","");
     });
@@ -249,7 +258,7 @@
     document.dispatchEvent(new CustomEvent("visibility:columns-changed"));
   }
 
-  /* stalčius */
+  // stalčius
   $("#btn-cols")?.addEventListener("click", () => { drawer.classList.add("open"); backdrop.classList.add("open"); });
   $("#drawer-close")?.addEventListener("click", () => { drawer.classList.remove("open"); backdrop.classList.remove("open"); });
   backdrop?.addEventListener("click", () => { drawer.classList.remove("open"); backdrop.classList.remove("open"); });
@@ -257,9 +266,12 @@
 
   $("#cols-all-off")?.addEventListener("click", () => setVisibleCols([]));
   $("#cols-all-on")?.addEventListener("click", () => setVisibleCols(SCHEMA.map(c=>c.key)));
-  $("#cols-default")?.addEventListener("click", () => setVisibleCols(SCHEMA.filter(c=>c.default).map(c=>c.key)));
-  $("#cols-reset-order")?.addEventListener("click", () => {
+  $("#cols-default")?.addEventListener("click", () => {
+    setVisibleCols(getDefaultColsFromSchema());
+  });
+  $("#cols-reset")?.addEventListener("click", () => {
     localStorage.removeItem(DND_KEY);
+    localStorage.removeItem(KEY_COLS);
     location.reload();
   });
   $("#cols-search")?.addEventListener("input", e => {
@@ -274,7 +286,7 @@
     });
   });
 
-  /* AJAX tbody */
+  // AJAX tbody
   let inflight;
   function buildParams(){
     const p = new URLSearchParams();
@@ -310,6 +322,7 @@
         history.replaceState(null, "", "?" + params.toString());
         fetchStatsAndRender();
         document.dispatchEvent(new Event("tbody:reloaded"));
+
         if (isInput && active) {
           active.focus();
           if (selStart !== null && selEnd !== null) active.setSelectionRange(selStart, selEnd);
@@ -336,12 +349,12 @@
     if (!chips) return;
     chips.innerHTML = "";
     if (q && q.value.trim()){
-      chips.append(chipEl("q: " + q.value, () => { q.value = ""; fetchTbody(); }));
+      chips.append(chipEl("q: " + q.value, () => { q.value=""; fetchTbody(); }));
     }
     $$(".th-filter").forEach(inp => {
       const v = inp.value.trim();
       if (!v) return;
-      chips.append(chipEl(inp.dataset.key + ": " + v, () => { inp.value = ""; fetchTbody(); }));
+      chips.append(chipEl(inp.dataset.key + ": " + v, () => { inp.value=""; fetchTbody(); }));
     });
   }
   function chipEl(text, onX){
@@ -352,7 +365,7 @@
     return el;
   }
 
-  /* DONUT */
+  // donut
   let donutChart = null;
   function ensureDonut(){
     if (donutChart) return donutChart;
@@ -375,7 +388,7 @@
     });
   }
   function updateCenter(total){
-    $("#donutCenter").innerHTML = (total||0) + "<br><span>įrašų</span>";
+    document.getElementById("donutCenter").innerHTML = (total||0) + "<br><span>įrašų</span>";
   }
   function fetchStatsAndRender(){
     const params = buildParams();
@@ -415,56 +428,65 @@
       });
   }
 
-  /* STICKY – ant NAUJO ID, todėl base.html nesisikisa */
-  function applySticky(){
-    if (!table) return;
-    table.querySelectorAll(".sticky-col-header,.sticky-col-filter,.sticky-col-cell").forEach(el=>{
-      el.classList.remove("sticky-col-header","sticky-col-filter","sticky-col-cell");
-      el.style.left = "";
-    });
+  // sticky
+  function detectAndApplySticky(){
+    const tbl = table;
+    const container = wrap;
+    if (!tbl || !container) return;
 
-    const headerRow = table.querySelector("thead tr.headers");
-    const filterRow = table.querySelector("thead tr.filters");
+    tbl.querySelectorAll(".sticky-col-header,.sticky-col-filter,.sticky-col-cell")
+      .forEach(el => {
+        el.classList.remove("sticky-col-header","sticky-col-filter","sticky-col-cell");
+        el.style.left = "";
+        el.style.backgroundColor = "";
+      });
+
+    const headerRow = tbl.querySelector("thead tr.headers");
+    const filterRow = tbl.querySelector("thead tr.filters");
     if (!headerRow) return;
 
-    const headerCells = Array.from(headerRow.children);
-    let firstIdx = -1;
-    headerCells.forEach((th,i)=>{
-      if (firstIdx === -1 && !th.hasAttribute("hidden") && th.offsetParent !== null) {
-        firstIdx = i;
-      }
-    });
-    if (firstIdx === -1) return;
-    const nth = firstIdx + 1;
+    const containerRect = container.getBoundingClientRect();
+    const headersTop = headerRow.getBoundingClientRect().top + 1;
 
-    const h = headerRow.querySelector(`th:nth-child(${nth})`);
-    if (h) {
-      h.classList.add("sticky-col-header");
-      h.style.left = "0px";
+    let th = document.elementFromPoint(containerRect.left + 1, headersTop);
+    while (th && th.tagName !== "TH") th = th.parentElement;
+
+    if (!th || th.hasAttribute("hidden")) {
+      const vis = Array.from(headerRow.querySelectorAll("th")).filter(h => !h.hasAttribute("hidden") && h.offsetParent !== null);
+      if (!vis.length) return;
+      th = vis[0];
     }
+
+    const key = th.dataset.key;
+    if (!key) return;
+
+    th.classList.add("sticky-col-header");
+
     if (filterRow) {
-      const f = filterRow.querySelector(`th:nth-child(${nth})`);
-      if (f) {
-        f.classList.add("sticky-col-filter");
-        f.style.left = "0px";
-      }
+      const fth = filterRow.querySelector(`th[data-key="${key}"]`);
+      if (fth) fth.classList.add("sticky-col-filter");
     }
-    table.querySelectorAll(`tbody tr td:nth-child(${nth})`).forEach(td=>{
+
+    tbl.querySelectorAll("tbody tr").forEach(tr => {
+      const td = tr.querySelector(`td[data-key="${key}"]`);
+      if (!td) return;
       const bg = getComputedStyle(td).backgroundColor;
       td.classList.add("sticky-col-cell");
-      td.style.left = "0px";
       td.style.backgroundColor = bg;
     });
   }
+  // kad DnD galėtų iškviesti
+  window.applySticky = detectAndApplySticky;
 
-  document.addEventListener("visibility:columns-changed", applySticky);
-  document.addEventListener("tbody:reloaded", applySticky);
+  document.addEventListener("visibility:columns-changed", detectAndApplySticky);
+  document.addEventListener("tbody:reloaded", detectAndApplySticky);
+  document.addEventListener("DOMContentLoaded", () => {
+    setVisibleCols(getVisibleCols());
+    renderChips();
+    fetchStatsAndRender();
+    detectAndApplySticky();
+  });
 
-  /* INIT */
-  setVisibleCols(getVisibleCols());
-  renderChips();
-  fetchStatsAndRender();
-  applySticky();
 })();
 </script>
 
