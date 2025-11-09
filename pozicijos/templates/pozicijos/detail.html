@@ -7,7 +7,7 @@
 
 <p>
   <a href="{% url 'pozicijos:edit' pozicija.pk %}" class="btn btn-primary">Redaguoti poziciją</a>
-  <a href="{% url 'pozicijos:kainos' pozicija.pk %}" class="btn btn-secondary">Kainos istorija</a>
+  <a href="{% url 'pozicijos:kainos' pozicija.pk %}" class="btn btn-secondary">Kainos</a>
   <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal į sąrašą</a>
 </p>
 
@@ -24,6 +24,41 @@
     <tr><th>Pastabos</th><td>{{ pozicija.pastabos|linebreaksbr }}</td></tr>
   </tbody>
 </table>
+
+<h2 style="margin-top:1rem;">Brėžiniai</h2>
+
+<form action="{% url 'pozicijos:brezinys_upload' pozicija.pk %}" method="post" enctype="multipart/form-data" style="margin-bottom:.75rem;">
+  {% csrf_token %}
+  {{ brezinys_form.pavadinimas }} {{ brezinys_form.failas }}
+  <button type="submit" class="btn btn-primary">Įkelti</button>
+</form>
+
+{% if breziniai %}
+  <div style="display:flex; gap:.75rem; flex-wrap:wrap;">
+    {% for b in breziniai %}
+      <div style="width:150px; border:1px solid #eee; border-radius:6px; overflow:hidden; background:#fff;">
+        <div style="width:150px; height:120px; display:flex; align-items:center; justify-content:center; background:#f8fafc;">
+          {% if b.is_image %}
+            <a href="{{ b.failas.url }}" target="_blank" title="{{ b.pavadinimas }}">
+              <img src="{{ b.failas.url }}" alt="{{ b.pavadinimas }}" style="max-width:150px; max-height:120px; display:block;">
+            </a>
+          {% else %}
+            <a href="{{ b.failas.url }}" target="_blank">{{ b.failas.name|slice:"-20:" }}</a>
+          {% endif %}
+        </div>
+        <div style="padding:4px 6px; display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
+          <span style="font-size:.7rem; word-break:break-word;">{{ b.pavadinimas|default:"(be pavadinimo)" }}</span>
+          <form action="{% url 'pozicijos:brezinys_delete' pozicija.pk b.pk %}" method="post" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" style="border:0; background:none; color:#b91c1c; font-size:.7rem; cursor:pointer;">✖</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>Brėžinių nėra.</p>
+{% endif %}
 
 <h2 style="margin-top:1rem;">Paskutinės kainos</h2>
 {% if kainos %}

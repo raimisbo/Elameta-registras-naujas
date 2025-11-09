@@ -50,10 +50,10 @@ class Pozicija(models.Model):
     def __str__(self):
         return f"{self.poz_kodas} – {self.poz_pavad or ''}"
 
-    # šitie du buvo tavo columns.py – paliekam kaip property
     @property
     def brez_count(self):
-        return ""
+        # kiek brėžinių yra
+        return self.breziniai.count()
 
     @property
     def dok_count(self):
@@ -61,10 +61,6 @@ class Pozicija(models.Model):
 
 
 class PozicijosKaina(models.Model):
-    """
-    Tai – sena tavo 'Kaina' versija, tik pririšta prie Pozicija.
-    Leidžia turėti kelias kainas su būsenom ir kiekiais.
-    """
     MATAS_CHOICES = [
         ("vnt.", "vnt."),
         ("kg", "kg"),
@@ -98,3 +94,31 @@ class PozicijosKaina(models.Model):
 
     def __str__(self):
         return f"{self.pozicija} – {self.suma} {self.kainos_matas}"
+
+
+class PozicijosBrezinys(models.Model):
+    """
+    Vienas pozicijos brėžinys / failas.
+    """
+    pozicija = models.ForeignKey(
+        Pozicija,
+        on_delete=models.CASCADE,
+        related_name="breziniai",
+    )
+    pavadinimas = models.CharField("Pavadinimas", max_length=255, blank=True)
+    failas = models.FileField(
+        "Brėžinys",
+        upload_to="pozicijos/breziniai/%Y/%m/",
+    )
+    uploaded = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded"]
+
+    def __str__(self):
+        return self.pavadinimas or self.failas.name
+
+    @property
+    def is_image(self):
+        name = (self.failas.name or "").lower()
+        return name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"))

@@ -1,15 +1,17 @@
 # pozicijos/views.py
 from django.db.models import Q, Count
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.core.exceptions import FieldError
 
 from .models import Pozicija
-from .forms import PozicijaForm, PozicijosKainaFormSet
+from .forms import (
+    PozicijaForm,
+    PozicijosKainaFormSet,
+    PozicijosBrezinysForm,
+)
 from .schemas.columns import COLUMNS  # tavo columns.py
 
-
-# ---- pagalbinės ----
 
 def _get_visible_cols(request):
     cols_param = request.GET.get("cols")
@@ -19,30 +21,24 @@ def _get_visible_cols(request):
 
 
 def apply_filters(qs, request):
-    """
-    Globali paieška ir stulpelių filtrai.
-    Filtruojam tik pagal tuos laukus, kurie yra modelyje.
-    """
     model_fields = {f.name for f in Pozicija._meta.get_fields()}
 
-    # globali
     g = (request.GET.get("q") or "").strip()
     if g:
-      q_obj = Q()
-      for col in COLUMNS:
-          if not col.get("searchable"):
-              continue
-          key = col["key"]
-          if key not in model_fields:
-              continue
-          q_obj |= Q(**{f"{key}__icontains": g})
-      if q_obj:
-          try:
-              qs = qs.filter(q_obj)
-          except FieldError:
-              pass
+        q_obj = Q()
+        for col in COLUMNS:
+            if not col.get("searchable"):
+                continue
+            key = col["key"]
+            if key not in model_fields:
+                continue
+            q_obj |= Q(**{f"{key}__icontains": g})
+        if q_obj:
+            try:
+                qs = qs.filter(q_obj)
+            except FieldError:
+                pass
 
-    # stulpelių filtrai
     for key, value in request.GET.items():
         if not key.startswith("f[") or not key.endswith("]"):
             continue
@@ -84,8 +80,6 @@ def apply_filters(qs, request):
 
     return qs
 
-
-# ---- sąrašas ----
 
 def pozicijos_list(request):
     visible_cols = _get_visible_cols(request)
@@ -149,17 +143,19 @@ def pozicijos_stats(request):
     return JsonResponse({"labels": labels, "values": values, "total": total})
 
 
-# ---- CRUD ----
-
 def pozicija_detail(request, pk):
     pozicija = get_object_or_404(Pozicija, pk=pk)
-    kainos = pozicija.kainos.all()  # visos kainos šiai pozicijai
+    kainos = pozicija.kainos.all()
+    breziniai = pozicija.breziniai.all()
+    brezinys_form = PozicijosBrezinysForm()
     return render(
         request,
         "pozicijos/detail.html",
         {
             "pozicija": pozicija,
             "kainos": kainos,
+            "breziniai": breziniai,
+            "brezinys_form": brezinys_form,
         },
     )
 
@@ -187,8 +183,6 @@ def pozicija_edit(request, pk):
     return render(request, "pozicijos/form.html", {"form": form, "pozicija": obj})
 
 
-# ---- KAINOS kaip sename projekte ----
-
 def pozicijos_kainos_redaguoti(request, pk):
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
@@ -196,7 +190,6 @@ def pozicijos_kainos_redaguoti(request, pk):
         formset = PozicijosKainaFormSet(request.POST, instance=pozicija)
         if formset.is_valid():
             formset.save()
-            # paskutinę aktualią užkeliame į pozicijos kaina_eur
             last = pozicija.kainos.filter(busena="aktuali").order_by("-created").first()
             if last:
                 pozicija.kaina_eur = last.suma
@@ -213,3 +206,28 @@ def pozicijos_kainos_redaguoti(request, pk):
             "formset": formset,
         },
     )
+
+
+# ---- brėžinių upload / delete ----
+
+def pozicija_brezinys_upload(request, pk):
+    pozicija = get_object_or_404(Pozicija, pk=pk)
+    if request.method != "POST":
+        return HttpResponseForbidden("POST only")
+
+    form = PozicijosBrezinysForm(request.POST, request.FILES)
+    if form.is_valid():
+        brezinys = form.save(commit=False)
+        brezinys.pozicija = pozicija
+        brezinys.save()
+    return redirect("pozicijos:detail", pk=pozicija.pk)
+
+
+def pozicija_brezinys_delete(request, pk, brezinys_id):
+    pozicija = get_object_or_404(Pozicija, pk=pk)
+    brezinys = pozicija.breziniai.filter(pk=brezinys_id).first()
+    if not brezinys:
+        return redirect("pozicijos:detail", pk=pozicija.pk)
+    if request.method == "POST":
+        brezinys.delete()
+    return redirect("pozicijos:detail", pk=pozicija.pk)

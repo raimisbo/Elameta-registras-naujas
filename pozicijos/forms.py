@@ -2,7 +2,7 @@
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models import Pozicija, PozicijosKaina
+from .models import Pozicija, PozicijosKaina, PozicijosBrezinys
 
 
 class PozicijaForm(forms.ModelForm):
@@ -58,3 +58,9 @@ PozicijosKainaFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+
+class PozicijosBrezinysForm(forms.ModelForm):
+    class Meta:
+        model = PozicijosBrezinys
+        fields = ["pavadinimas", "failas"]
