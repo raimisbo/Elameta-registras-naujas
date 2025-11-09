@@ -1,5 +1,6 @@
 # pozicijos/models.py
 from django.db import models
+import os
 
 
 class Pozicija(models.Model):
@@ -34,7 +35,6 @@ class Pozicija(models.Model):
     pak_po_ktl = models.CharField("Pakavimas po KTL", max_length=255, null=True, blank=True)
     pak_po_milt = models.CharField("Pakavimas po miltelinio", max_length=255, null=True, blank=True)
 
-    # dabartinė kaina (parodoma sąraše / peržiūroje)
     kaina_eur = models.DecimalField("Dabartinė kaina (EUR)", max_digits=12, decimal_places=2, null=True, blank=True)
 
     pastabos = models.TextField("Pastabos", null=True, blank=True)
@@ -52,7 +52,6 @@ class Pozicija(models.Model):
 
     @property
     def brez_count(self):
-        # kiek brėžinių yra
         return self.breziniai.count()
 
     @property
@@ -97,9 +96,6 @@ class PozicijosKaina(models.Model):
 
 
 class PozicijosBrezinys(models.Model):
-    """
-    Vienas pozicijos brėžinys / failas.
-    """
     pozicija = models.ForeignKey(
         Pozicija,
         on_delete=models.CASCADE,
@@ -121,4 +117,17 @@ class PozicijosBrezinys(models.Model):
     @property
     def is_image(self):
         name = (self.failas.name or "").lower()
-        return name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"))
+        return name.endswith((
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+            ".bmp",
+        ))
+
+    def delete(self, using=None, keep_parents=False):
+        """
+        Ištrinam ir DB įrašą, ir patį failą iš media/.
+        """
+        storage = self.failas.storage
+        name = self.failas.name
+        super().delete(using=using, keep_parents=keep_parents)
+        if name and storage.exists(name):
+            storage.delete(name)
