@@ -1,0 +1,203 @@
+{# pozicijos/templates/pozicijos/proposal_pdf.html #}
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8">
+  <title>Pasiūlymas {{ pozicija.poz_kodas }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      color: #0f172a;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 10px;
+    }
+    .logo img {
+      max-height: 45px;
+    }
+    .company {
+      text-align: right;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 6px 0;
+    }
+    .meta {
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+    .section-title {
+      font-weight: 600;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3px;
+    }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    table.data th,
+    table.data td {
+      text-align: left;
+      padding: 4px 4px;
+      border: 1px solid #e5e7eb;
+      font-size: 11px;
+    }
+    table.data th {
+      background: #f8fafc;
+      width: 26%;
+    }
+    .kainos-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+    }
+    .kainos-table th,
+    .kainos-table td {
+      border: 1px solid #e5e7eb;
+      padding: 3px 4px;
+      font-size: 11px;
+    }
+    .breziniai-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .brez {
+      width: 48%;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 4px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .brez img {
+      max-width: 100%;
+      max-height: 240px;
+    }
+    .brez small {
+      display: block;
+      margin-top: 3px;
+      font-size: 10px;
+    }
+    .footer {
+      margin-top: 16px;
+      font-size: 10px;
+      color: #6b7280;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">
+      <!-- logo iš media/ -->
+      <img src="{{ base_url }}media/logo.png" alt="Logo">
+    </div>
+    <div class="company">
+      <strong>UAB „Tavo įmonė“</strong><br>
+      Įm. k. 123456789<br>
+      PVM LT123456789<br>
+      Tel. +370 000 00000<br>
+      El. paštas: info@imone.lt
+    </div>
+  </div>
+
+  <h1>Pasiūlymas: {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</h1>
+  <div class="meta">
+    Klientas: {{ pozicija.klientas|default:"—" }}<br>
+    Projektas: {{ pozicija.projektas|default:"—" }}<br>
+    Data: {{ pozicija.created|date:"Y-m-d" }}
+  </div>
+
+  <div class="section-title">Pozicijos duomenys</div>
+  <table class="data">
+    <tbody>
+      <tr><th>Kodas</th><td>{{ pozicija.poz_kodas }}</td></tr>
+      <tr><th>Pavadinimas</th><td>{{ pozicija.poz_pavad }}</td></tr>
+      <tr><th>Metalas</th><td>{{ pozicija.metalas|default:"—" }}</td></tr>
+      <tr><th>Padengimas</th><td>{{ pozicija.padengimas|default:"—" }}</td></tr>
+      <tr><th>Spalva</th><td>{{ pozicija.spalva|default:"—" }}</td></tr>
+      <tr><th>Paruošimas</th><td>{{ pozicija.paruosimas|default:"—" }}</td></tr>
+      <tr><th>Pakavimas</th><td>{{ pozicija.pakavimas|default:"—" }}</td></tr>
+      {% if pozicija.pastabos %}
+      <tr><th>Pastabos</th><td>{{ pozicija.pastabos|linebreaksbr }}</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="section-title">Kainos</div>
+  {% if kainos %}
+    <table class="kainos-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Suma</th>
+          <th>Matas</th>
+          <th>Būsena</th>
+          <th>Kiekis</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kainos %}
+          <tr>
+            <td>{{ k.created|date:"Y-m-d" }}</td>
+            <td>{{ k.suma }}</td>
+            <td>{{ k.kainos_matas }}</td>
+            <td>{{ k.busena }}</td>
+            <td>
+              {% if k.kiekis_nuo or k.kiekis_iki %}
+                {{ k.kiekis_nuo|default:"" }} – {{ k.kiekis_iki|default:"" }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Kainų nėra.</p>
+  {% endif %}
+
+  <div class="section-title">Brėžiniai ir dokumentai</div>
+  {% if breziniai %}
+    <div class="breziniai-wrap">
+      {% for b in breziniai %}
+        <div class="brez">
+          {% if b.is_image %}
+            <img src="{{ base_url }}{{ b.failas.url|lstrip:'/' }}" alt="{{ b.pavadinimas }}">
+          {% else %}
+            <small>{{ b.failas.name }}</small>
+          {% endif %}
+          <small>{{ b.pavadinimas|default:"" }}</small>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>Brėžinių nepridėta.</p>
+  {% endif %}
+
+  <div class="footer">
+    Pasiūlymas sugeneruotas automatiškai iš pozicijos duomenų.
+  </div>
+
+</body>
+</html>

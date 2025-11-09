@@ -1,8 +1,28 @@
 # pozicijos/views.py
-from django.db.models import Q, Count
-from django.http import JsonResponse, HttpResponseForbidden
-from django.shortcuts import render, get_object_or_404, redirect
+import os
+from io import BytesIO
+
+from django.conf import settings
 from django.core.exceptions import FieldError
+from django.db.models import Q, Count
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    Image,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
 
 from .models import Pozicija
 from .forms import (
@@ -13,16 +33,19 @@ from .forms import (
 from .schemas.columns import COLUMNS  # tavo columns.py
 
 
+
 def _get_visible_cols(request):
     cols_param = request.GET.get("cols")
     if cols_param:
         return [c for c in cols_param.split(",") if c]
+    # jei nieko neatsiuntė – imam tuos, kurie pažymėti kaip default
     return [c["key"] for c in COLUMNS if c.get("default")]
 
 
 def apply_filters(qs, request):
     model_fields = {f.name for f in Pozicija._meta.get_fields()}
 
+    # globali paieška
     g = (request.GET.get("q") or "").strip()
     if g:
         q_obj = Q()
@@ -39,6 +62,7 @@ def apply_filters(qs, request):
             except FieldError:
                 pass
 
+    # stulpelių filtrai
     for key, value in request.GET.items():
         if not key.startswith("f[") or not key.endswith("]"):
             continue
@@ -112,8 +136,8 @@ def pozicijos_tbody(request):
 
     f_vals = {}
     for key, value in request.GET.items():
-        if key.startswith("f[") and key.endswith("]"):
-            f_vals[key[2:-1]] = value
+      if key.startswith("f[") and key.endswith("]"):
+        f_vals[key[2:-1]] = value
 
     return render(
         request,
@@ -208,8 +232,6 @@ def pozicijos_kainos_redaguoti(request, pk):
     )
 
 
-# ---- brėžinių upload / delete ----
-
 def pozicija_brezinys_upload(request, pk):
     pozicija = get_object_or_404(Pozicija, pk=pk)
     if request.method != "POST":
@@ -231,3 +253,174 @@ def pozicija_brezinys_delete(request, pk, brezinys_id):
     if request.method == "POST":
         brezinys.delete()
     return redirect("pozicijos:detail", pk=pozicija.pk)
+
+
+def pozicija_pdf(request, pk):
+    pozicija = get_object_or_404(Pozicija, pk=pk)
+    breziniai = pozicija.breziniai.all()
+    kainos = pozicija.kainos.all()
+
+    # bandome registruoti LT šriftą
+    font_name = "Helvetica"
+    font_path = os.path.join(settings.MEDIA_ROOT, "fonts", "DejaVuSans.ttf")
+    if os.path.exists(font_path):
+        pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
+        font_name = "DejaVuSans"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="TitleLT", parent=styles["Heading1"], fontName=font_name))
+    styles.add(ParagraphStyle(name="NormalLT", parent=styles["Normal"], fontName=font_name, fontSize=10, leading=12))
+    styles.add(ParagraphStyle(name="SmallLT", parent=styles["Normal"], fontName=font_name, fontSize=9, leading=11))
+    styles.add(ParagraphStyle(name="SectionLT", parent=styles["Heading2"], fontName=font_name, fontSize=11, leading=13, spaceBefore=6, spaceAfter=3))
+
+    story = []
+
+    # HEADER
+    logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
+    if os.path.exists(logo_path):
+        header_left = Image(logo_path, width=35 * mm, height=15 * mm)
+    else:
+        header_left = Paragraph(" ", styles["NormalLT"])
+
+    header_right = Paragraph(
+        "<b>UAB „Tavo įmonė“</b><br/>Įm. k. 123456789<br/>PVM LT123456789<br/>info@imone.lt",
+        styles["SmallLT"],
+    )
+
+    header_tbl = Table([[header_left, header_right]], colWidths=[70 * mm, 90 * mm])
+    header_tbl.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.25, colors.grey),
+            ]
+        )
+    )
+    story.append(header_tbl)
+    story.append(Spacer(1, 6))
+
+    # PAVADINIMAS
+    title_txt = f"Pasiūlymas: {pozicija.poz_kodas or ''} – {pozicija.poz_pavad or ''}"
+    story.append(Paragraph(title_txt, styles["TitleLT"]))
+    story.append(Spacer(1, 4))
+
+    # META
+    meta_html = (
+        f"Klientas: {pozicija.klientas or '—'}<br/>"
+        f"Projektas: {pozicija.projektas or '—'}<br/>"
+        f"Data: {(pozicija.created.strftime('%Y-%m-%d') if pozicija.created else '—')}"
+    )
+    story.append(Paragraph(meta_html, styles["NormalLT"]))
+    story.append(Spacer(1, 6))
+
+    # POZICIJOS DUOMENYS
+    story.append(Paragraph("Pozicijos duomenys", styles["SectionLT"]))
+
+    poz_data = [
+        ["Kodas", pozicija.poz_kodas or "—"],
+        ["Pavadinimas", pozicija.poz_pavad or "—"],
+        ["Metalas", getattr(pozicija, "metalas", None) or "—"],
+        ["Padengimas", getattr(pozicija, "padengimas", None) or "—"],
+        ["Spalva", getattr(pozicija, "spalva", None) or "—"],
+    ]
+    if pozicija.pastabos:
+        poz_data.append(["Pastabos", pozicija.pastabos])
+
+    poz_tbl = Table(poz_data, colWidths=[35 * mm, 125 * mm])
+    poz_tbl.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("BACKGROUND", (0, 0), (0, -1), colors.whitesmoke),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("BOX", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.grey),
+            ]
+        )
+    )
+    story.append(poz_tbl)
+    story.append(Spacer(1, 6))
+
+    # KAINOS
+    story.append(Paragraph("Kainos", styles["SectionLT"]))
+    if kainos:
+        rows = [["Data", "Suma", "Matas", "Būsena", "Kiekis"]]
+        for k in kainos:
+            if k.kiekis_nuo or k.kiekis_iki:
+                kiekis = f"{k.kiekis_nuo or ''}–{k.kiekis_iki or ''}"
+            else:
+                kiekis = "—"
+            rows.append([
+                k.created.strftime("%Y-%m-%d") if k.created else "—",
+                str(k.suma),
+                k.kainos_matas or "",
+                k.busena or "",
+                kiekis,
+            ])
+        k_tbl = Table(rows, colWidths=[25 * mm, 22 * mm, 22 * mm, 30 * mm, 40 * mm])
+        k_tbl.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (-1, -1), font_name),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        story.append(k_tbl)
+    else:
+        story.append(Paragraph("Kainų nėra.", styles["NormalLT"]))
+    story.append(Spacer(1, 6))
+
+    # BRĖŽINIAI
+    story.append(Paragraph("Brėžiniai ir dokumentai", styles["SectionLT"]))
+
+    if breziniai:
+        image_exts = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp")
+        for b in breziniai:
+            fname = b.failas.name if b.failas else ""
+            ext = os.path.splitext(fname)[1].lower()
+            # pavadinimas
+            story.append(Paragraph(b.pavadinimas or fname, styles["SmallLT"]))
+            # jeigu vaizdas – bandome rodyti
+            if ext in image_exts and b.failas and hasattr(b.failas, "path") and os.path.exists(b.failas.path):
+                try:
+                    img = Image(b.failas.path, width=70 * mm, height=40 * mm)
+                    story.append(img)
+                except Exception:
+                    # jei nepavyko įkelti, tiesiog parašom
+                    story.append(Paragraph("(nepavyko įkelti paveikslėlio)", styles["SmallLT"]))
+            else:
+                # čia gali būti PDF, DOC, XLS – tiesiog paliekam kaip tekstą
+                story.append(Paragraph(f"Failas: {fname}", styles["SmallLT"]))
+            story.append(Spacer(1, 4))
+    else:
+        story.append(Paragraph("Brėžinių nepridėta.", styles["NormalLT"]))
+
+    # FOOTER
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("Pasiūlymas sugeneruotas automatiškai iš pozicijos duomenų.", styles["SmallLT"]))
+
+    # PDF generavimas
+    doc.build(story)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="pasiulymas_{pozicija.poz_kodas}.pdf"'
+    return resp
