@@ -1,193 +1,215 @@
 # pozicijos/views.py
-from django.http import HttpResponse, JsonResponse
-from django.views.generic import TemplateView, DetailView, CreateView, UpdateView
 from django.db.models import Q, Count
-from django.template.loader import render_to_string
-from django.urls import reverse_lazy
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.core.exceptions import FieldError
 
 from .models import Pozicija
-from .schemas.columns import COLUMNS
-from .forms import PozicijaForm
+from .forms import PozicijaForm, PozicijosKainaFormSet
+from .schemas.columns import COLUMNS  # tavo columns.py
 
 
-def parse_filters(params):
-    q = (params.get("q") or "").strip()
-    f = {}
-    for k, v in params.items():
-        if k.startswith("f[") and k.endswith("]"):
-            key = k[2:-1]
-            val = v.strip()
-            if val:
-                f[key] = val
+# ---- pagalbinės ----
 
-    cols_param = (params.get("cols") or "").strip()
-    cols = [c for c in cols_param.split(",") if c]
-
-    try:
-        page_size = int(params.get("page_size") or 50)
-    except ValueError:
-        page_size = 50
-
-    try:
-        page = int(params.get("page") or 1)
-    except ValueError:
-        page = 1
-
-    return q, f, cols, page, page_size
+def _get_visible_cols(request):
+    cols_param = request.GET.get("cols")
+    if cols_param:
+        return [c for c in cols_param.split(",") if c]
+    return [c["key"] for c in COLUMNS if c.get("default")]
 
 
-def apply_filters(qs, q, f):
-    # globali paieška
-    if q:
-        q_obj = Q()
-        for col in COLUMNS:
-            if col.get("searchable"):
-                q_obj |= Q(**{f"{col['key']}__icontains": q})
-        qs = qs.filter(q_obj)
+def apply_filters(qs, request):
+    """
+    Globali paieška ir stulpelių filtrai.
+    Filtruojam tik pagal tuos laukus, kurie yra modelyje.
+    """
+    model_fields = {f.name for f in Pozicija._meta.get_fields()}
 
-    # stulpeliniai filtrai
-    for key, val in f.items():
-        col = next((c for c in COLUMNS if c["key"] == key), None)
-        if not col:
+    # globali
+    g = (request.GET.get("q") or "").strip()
+    if g:
+      q_obj = Q()
+      for col in COLUMNS:
+          if not col.get("searchable"):
+              continue
+          key = col["key"]
+          if key not in model_fields:
+              continue
+          q_obj |= Q(**{f"{key}__icontains": g})
+      if q_obj:
+          try:
+              qs = qs.filter(q_obj)
+          except FieldError:
+              pass
+
+    # stulpelių filtrai
+    for key, value in request.GET.items():
+        if not key.startswith("f[") or not key.endswith("]"):
+            continue
+        col_key = key[2:-1]
+        val = value.strip()
+        if not val:
             continue
 
-        field_name = col["key"]
-        ftype = col.get("filter")
+        col = next((c for c in COLUMNS if c["key"] == col_key), None)
+        if not col:
+            continue
+        if col_key not in model_fields:
+            continue
 
-        if ftype == "range":
-            expr = val.replace(" ", "")
-            if ".." in expr:
-                lo, hi = expr.split("..", 1)
-                if lo:
-                    qs = qs.filter(**{f"{field_name}__gte": lo})
-                if hi:
-                    qs = qs.filter(**{f"{field_name}__lte": hi})
-            elif expr.startswith(">="):
-                num = expr[2:]
-                qs = qs.filter(**{f"{field_name}__gte": num})
-            elif expr.startswith("<="):
-                num = expr[2:]
-                qs = qs.filter(**{f"{field_name}__lte": num})
+        ftype = col.get("filter") or col.get("type") or "text"
+
+        try:
+            if ftype in ("text", "choice"):
+                qs = qs.filter(**{f"{col_key}__icontains": val})
+            elif ftype in ("date",):
+                qs = qs.filter(**{col_key: val})
+            elif ftype in ("number", "range"):
+                if val.startswith(">="):
+                    qs = qs.filter(**{f"{col_key}__gte": val[2:].strip()})
+                elif val.startswith("<="):
+                    qs = qs.filter(**{f"{col_key}__lte": val[2:].strip()})
+                elif ".." in val:
+                    lo, hi = val.split("..", 1)
+                    if lo:
+                        qs = qs.filter(**{f"{col_key}__gte": lo})
+                    if hi:
+                        qs = qs.filter(**{f"{col_key}__lte": hi})
+                else:
+                    qs = qs.filter(**{col_key: val})
             else:
-                qs = qs.filter(**{field_name: expr})
-        elif ftype == "date":
-            qs = qs.filter(**{f"{field_name}": val})
-        else:
-            qs = qs.filter(**{f"{field_name}__icontains": val})
+                qs = qs.filter(**{f"{col_key}__icontains": val})
+        except FieldError:
+            continue
 
     return qs
 
 
-class PozicijuSarasasView(TemplateView):
-    template_name = "pozicijos/list.html"
+# ---- sąrašas ----
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        q, f, cols, page, page_size = parse_filters(self.request.GET)
+def pozicijos_list(request):
+    visible_cols = _get_visible_cols(request)
 
-        qs = Pozicija.objects.all()
-        qs = apply_filters(qs, q, f)
+    qs = Pozicija.objects.all().order_by("-created", "-id")
+    qs = apply_filters(qs, request)
+    page_size = int(request.GET.get("page_size", 25) or 25)
+    items = qs[:page_size]
 
-        start = (page - 1) * page_size
-        end = start + page_size
-        items = qs.order_by("id")[start:end]
+    return render(
+        request,
+        "pozicijos/list.html",
+        {
+            "columns_schema": COLUMNS,
+            "visible_cols": visible_cols,
+            "items": items,
+            "q": request.GET.get("q", ""),
+            "f": {},
+            "page_size": page_size,
+        },
+    )
 
-        default_cols = [c["key"] for c in COLUMNS if c.get("default")]
-        visible_cols = cols or default_cols
 
-        ctx.update({
+def pozicijos_tbody(request):
+    visible_cols = _get_visible_cols(request)
+    qs = Pozicija.objects.all().order_by("-created", "-id")
+    qs = apply_filters(qs, request)
+    page_size = int(request.GET.get("page_size", 25) or 25)
+    items = qs[:page_size]
+
+    f_vals = {}
+    for key, value in request.GET.items():
+        if key.startswith("f[") and key.endswith("]"):
+            f_vals[key[2:-1]] = value
+
+    return render(
+        request,
+        "pozicijos/_tbody.html",
+        {
             "items": items,
             "columns_schema": COLUMNS,
             "visible_cols": visible_cols,
-            "q": q,
-            "f": f,
-            "page": page,
-            "page_size": page_size,
-        })
-        return ctx
+            "f": f_vals,
+        },
+    )
 
 
-class PozicijuTbodyPartialView(TemplateView):
-    """
-    Grąžina tik <tbody> fragmentą AJAX'ui.
-    """
-    def get(self, request, *args, **kwargs):
-        q, f, cols, page, page_size = parse_filters(request.GET)
-        qs = Pozicija.objects.all()
-        qs = apply_filters(qs, q, f)
+def pozicijos_stats(request):
+    qs = Pozicija.objects.all()
+    qs = apply_filters(qs, request)
 
-        start = (page - 1) * page_size
-        end = start + page_size
-        items = qs.order_by("id")[start:end]
+    agg = qs.values("klientas").annotate(cnt=Count("id")).order_by("-cnt")
 
-        default_cols = [c["key"] for c in COLUMNS if c.get("default")]
-        visible_cols = cols or default_cols
+    labels, values, total = [], [], 0
+    for row in agg:
+        lbl = row["klientas"] or "—"
+        labels.append(lbl)
+        values.append(row["cnt"])
+        total += row["cnt"]
 
-        html = render_to_string(
-            "pozicijos/_tbody.html",
-            {
-                "items": items,
-                "columns_schema": COLUMNS,
-                "visible_cols": visible_cols,
-            },
-            request=request,
-        )
-        return HttpResponse(html)
+    return JsonResponse({"labels": labels, "values": values, "total": total})
 
 
-class PozicijuStatsView(TemplateView):
-    """
-    JSON donut grafikui: kiek įrašų pagal klientą + bendras filtruotų įrašų skaičius.
-    """
-    def get(self, request, *args, **kwargs):
-        q, f, cols, page, page_size = parse_filters(request.GET)
-        qs = Pozicija.objects.all()
-        qs = apply_filters(qs, q, f)
+# ---- CRUD ----
 
-        total = qs.count()
-
-        data = (
-            qs.values("klientas")
-              .annotate(cnt=Count("id"))
-              .order_by("-cnt")[:12]
-        )
-
-        labels = [d["klientas"] or "—" for d in data]
-        values = [d["cnt"] for d in data]
-
-        return JsonResponse({
-            "labels": labels,
-            "values": values,
-            "total": total,
-        })
+def pozicija_detail(request, pk):
+    pozicija = get_object_or_404(Pozicija, pk=pk)
+    kainos = pozicija.kainos.all()  # visos kainos šiai pozicijai
+    return render(
+        request,
+        "pozicijos/detail.html",
+        {
+            "pozicija": pozicija,
+            "kainos": kainos,
+        },
+    )
 
 
-class PozicijaDetailView(DetailView):
-    model = Pozicija
-    template_name = "pozicijos/detail.html"
-    context_object_name = "pozicija"
+def pozicija_create(request):
+    if request.method == "POST":
+        form = PozicijaForm(request.POST)
+        if form.is_valid():
+            obj = form.save()
+            return redirect("pozicijos:detail", pk=obj.pk)
+    else:
+        form = PozicijaForm()
+    return render(request, "pozicijos/form.html", {"form": form})
 
 
-class PozicijosKorteleView(DetailView):
-    """
-    /pozicijos/detale/<slug>/ variantas
-    """
-    model = Pozicija
-    template_name = "pozicijos/detail.html"
-    context_object_name = "pozicija"
-    slug_field = "poz_kodas"
-    slug_url_kwarg = "slug"
+def pozicija_edit(request, pk):
+    obj = get_object_or_404(Pozicija, pk=pk)
+    if request.method == "POST":
+        form = PozicijaForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            return redirect("pozicijos:detail", pk=obj.pk)
+    else:
+        form = PozicijaForm(instance=obj)
+    return render(request, "pozicijos/form.html", {"form": form, "pozicija": obj})
 
 
-class PozicijaCreateView(CreateView):
-    model = Pozicija
-    form_class = PozicijaForm
-    template_name = "pozicijos/form.html"
-    success_url = reverse_lazy("pozicijos:list")
+# ---- KAINOS kaip sename projekte ----
 
+def pozicijos_kainos_redaguoti(request, pk):
+    pozicija = get_object_or_404(Pozicija, pk=pk)
 
-class PozicijaUpdateView(UpdateView):
-    model = Pozicija
-    form_class = PozicijaForm
-    template_name = "pozicijos/form.html"
-    success_url = reverse_lazy("pozicijos:list")
+    if request.method == "POST":
+        formset = PozicijosKainaFormSet(request.POST, instance=pozicija)
+        if formset.is_valid():
+            formset.save()
+            # paskutinę aktualią užkeliame į pozicijos kaina_eur
+            last = pozicija.kainos.filter(busena="aktuali").order_by("-created").first()
+            if last:
+                pozicija.kaina_eur = last.suma
+                pozicija.save(update_fields=["kaina_eur"])
+            return redirect("pozicijos:detail", pk=pozicija.pk)
+    else:
+        formset = PozicijosKainaFormSet(instance=pozicija)
+
+    return render(
+        request,
+        "pozicijos/kainos_redaguoti.html",
+        {
+            "pozicija": pozicija,
+            "formset": formset,
+        },
+    )

@@ -16,9 +16,7 @@
       color:#0f172a;
     }
 
-    header.site{background:#111827;color:#fff;padding:12px 16px}
-    header.site a{color:#fff;text-decoration:none;margin-right:14px}
-
+    /* header'o neber – tai nebėra ir šito fono */
     main{padding:18px 0}
 
     .container{max-width:1200px;margin:0 auto;padding:0 16px}
@@ -40,8 +38,7 @@
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media(max-width:640px){.grid{grid-template-columns:1fr}}
 
-    /* ✅ PATAISYTA: sticky taikomas VISAM <thead>, <th> – static.
-       Taip antraštė nelipa ant 1-os eilutės ir visada dera su stulpeliais. */
+    /* senasis sticky iš base – paliekam, jei kur nors naudoji #results-table */
     .sticky-head thead,
     #results-table thead{
       position: sticky;
@@ -59,20 +56,11 @@
 
   <link rel="stylesheet" href="{% static 'detaliu_registras/css/style.css' %}">
   {% block page_css %}{% endblock %}
-
   {% block extra_head %}{% endblock %}
 </head>
 
-
-
 <body>
-  <header class="site">
-    <div class="container" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-      <a href="{% url 'detaliu_registras:uzklausa_list' %}">Užklausos</a>
-      <a href="{% url 'detaliu_registras:ivesti_uzklausa' %}">Nauja užklausa</a>
-      {% block site_header_extras %}{% endblock %}
-    </div>
-  </header>
+  {# JUODOS JUOSTOS NEBĖRA #}
 
   <main>
     <div class="container">
@@ -85,38 +73,7 @@
     </div>
   </main>
 
-  <!-- Dinamiškas poslinkis pagal viršutinę juostą – tik jei ji išties FIXED/STICKY -->
-  <script>
-    (function(){
-      function setHeaderOffset(){
-        var h = document.querySelector('header.site');
-        var px = 0;
-        if (h){
-          var cs  = getComputedStyle(h);
-          var pos = cs.position;
-          var isOverlay = (pos === 'fixed' || pos === 'sticky');
-          // offsetą taikom tik jei header dengia turinį (fixed/sticky)
-          px = isOverlay ? Math.ceil(h.getBoundingClientRect().height) : 0;
-        }
-        document.documentElement.style.setProperty('--app-header-offset', px + 'px');
-      }
-
-      if(document.readyState==='loading'){
-        document.addEventListener('DOMContentLoaded', setHeaderOffset);
-      }else{
-        setHeaderOffset();
-      }
-      window.addEventListener('load', setHeaderOffset);
-      window.addEventListener('resize', setHeaderOffset);
-
-      var header=document.querySelector('header.site');
-      if(header){
-        new MutationObserver(setHeaderOffset).observe(header, {childList:true, subtree:true, attributes:true});
-      }
-    })();
-  </script>
-
   {% block extra_scripts %}{% endblock %}
-  {% block page_js %} {% endblock %}
+  {% block page_js %}{% endblock %}
 </body>
 </html>

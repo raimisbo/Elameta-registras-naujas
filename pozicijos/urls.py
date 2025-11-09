@@ -5,11 +5,11 @@ from . import views
 app_name = "pozicijos"
 
 urlpatterns = [
-    path("", views.PozicijuSarasasView.as_view(), name="list"),
-    path("tbody/", views.PozicijuTbodyPartialView.as_view(), name="tbody"),
-    path("stats/", views.PozicijuStatsView.as_view(), name="stats"),
-    path("new/", views.PozicijaCreateView.as_view(), name="create"),
-    path("<int:pk>/", views.PozicijaDetailView.as_view(), name="detail"),
-    path("<int:pk>/edit/", views.PozicijaUpdateView.as_view(), name="edit"),
-    path("detale/<slug:slug>/", views.PozicijosKorteleView.as_view(), name="detail_slug"),
+    path("", views.pozicijos_list, name="list"),
+    path("tbody/", views.pozicijos_tbody, name="tbody"),
+    path("stats/", views.pozicijos_stats, name="stats"),
+    path("nauja/", views.pozicija_create, name="create"),
+    path("<int:pk>/", views.pozicija_detail, name="detail"),
+    path("<int:pk>/redaguoti/", views.pozicija_edit, name="edit"),
+    path("<int:pk>/kainos/", views.pozicijos_kainos_redaguoti, name="kainos"),
 ]

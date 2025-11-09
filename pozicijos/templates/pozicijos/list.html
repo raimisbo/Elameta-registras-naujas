@@ -8,6 +8,7 @@
 
 {% block page_css %}
 <style>
+  /* šitam puslapyje – be viršutinės juostos */
   header, .navbar, .topbar {
     display: none !important;
   }
@@ -19,7 +20,12 @@
     gap:1rem;
     margin-bottom:.75rem;
   }
-  .controls-block { display:flex; flex-direction:column; gap:.35rem; }
+  .title-block h1{
+    margin:0;
+    font-size:1.4rem;
+    font-weight:600;
+  }
+  .controls-block { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.5rem; }
   .controls-bar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
   .controls-bar input[type="search"]{padding:.25rem .5rem; min-width:220px;}
   .controls-bar button,
@@ -28,6 +34,7 @@
   .chip{background:#e2e8f0; padding:2px 6px; border-radius:4px; display:inline-flex; gap:4px; align-items:center; font-size:.8rem;}
   .chip button{border:0; background:transparent; cursor:pointer;}
 
+  /* grafikas */
   .graph-box{min-width:240px;}
   .donut-box{position:relative; width:220px; height:220px;}
   .donut-box canvas{width:220px!important; height:220px!important;}
@@ -37,6 +44,7 @@
   .donut-legend li{display:flex; align-items:center; gap:8px; font-size:14px;}
   .donut-legend .dot{width:10px; height:10px; border-radius:50%;}
 
+  /* lentelė */
   .table-wrap{
     overflow:auto;
     max-height:calc(100vh - 180px);
@@ -68,8 +76,8 @@
     background:#fff;
   }
   #pozicijos-table tbody tr:nth-child(even) td{background:#f8f8f8;}
-  .th-filter{width:100%; box-sizing:border-box;}
 
+  /* stalčius */
   .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.2s;}
   .drawer-backdrop.open{opacity:1; pointer-events:auto;}
   .drawer{position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.25); transition:.2s; display:flex; flex-direction:column; z-index:100;}
@@ -83,12 +91,14 @@
     flex-direction:column;
     gap: .35rem;
   }
+
   #cols-list label {
     display: flex;
     gap: .4rem;
     align-items:center;
   }
 
+  /* mūsų sticky – tik nuspalvinti ir ant viršaus */
   #pozicijos-table thead tr.headers th.sticky-col-header{
     position:sticky !important;
     top:0;
@@ -109,30 +119,16 @@
     z-index:180;
     background:inherit;
   }
+  .th-filter{width:100%; box-sizing:border-box;}
 </style>
 {% endblock %}
 
 {% block content %}
 
 <div class="top-wrap">
-  <div class="controls-block">
-    <div class="controls-bar">
-      <a href="{% url 'pozicijos:create' %}" class="btn btn-primary">+ Nauja pozicija</a>
-      <input id="q" name="q" type="search" placeholder="Globali paieška..." value="{{ q|default:'' }}">
-      <button id="btn-cols" type="button">Stulpeliai</button>
-      <button id="btn-clear" type="button">Išvalyti</button>
-      <label>Rodyti:
-        <select id="page_size" name="page_size">
-          <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
-          <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
-          <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
-          <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
-        </select>
-      </label>
-    </div>
-    <div id="chips" class="chips"></div>
+  <div class="title-block">
+    <h1>Detalių registras</h1>
   </div>
-
   <div class="graph-box">
     <div class="donut-box">
       <canvas id="statsDonut" width="220" height="220"></canvas>
@@ -140,6 +136,24 @@
     </div>
     <ul class="donut-legend" id="donutLegend"></ul>
   </div>
+</div>
+
+<div class="controls-block">
+  <div class="controls-bar">
+    <a href="{% url 'pozicijos:create' %}" class="btn btn-primary">+ Nauja pozicija</a>
+    <input id="q" name="q" type="search" placeholder="Globali paieška..." value="{{ q|default:'' }}">
+    <button id="btn-cols" type="button">Stulpeliai</button>
+    <button id="btn-clear" type="button">Išvalyti</button>
+    <label>Rodyti:
+      <select id="page_size" name="page_size">
+        <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+      </select>
+    </label>
+  </div>
+  <div id="chips" class="chips"></div>
 </div>
 
 <div class="table-wrap" id="pozicijos-wrap">
@@ -177,6 +191,7 @@
   </table>
 </div>
 
+<!-- stulpelių stalčius -->
 <div id="drawer-backdrop" class="drawer-backdrop"></div>
 <aside id="drawer" class="drawer">
   <div class="drawer-header">
@@ -213,6 +228,7 @@
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
   const SCHEMA   = JSON.parse(document.getElementById("columns-schema").textContent);
+  const DEFAULT_LABELS = ["Klientas", "Projektas", "Kodas", "Pavadinimas", "Kaina (EUR)", "Pastabos", "Kaina", "Kaina EUR"];
   const KEY_COLS = "pozicijos:visibleCols";
   const DND_KEY  = "dnd-order:pozicijos";
 
@@ -224,9 +240,6 @@
   const drawer   = $("#drawer");
   const backdrop = $("#drawer-backdrop");
   const btnClear = $("#btn-clear");
-
-  // Numatytieji pagal PAVADINIMĄ
-  const DEFAULT_LABELS = ["Klientas", "Projektas", "Kodas", "Pavadinimas", "Kaina", "Pastabos"];
 
   const PALETTE  = ["#0ea5e9","#22c55e","#f97316","#e11d48","#6366f1","#14b8a6","#facc15","#8b5cf6","#6b7280","#f43f5e","#a855f7","#10b981"];
 
@@ -365,7 +378,7 @@
     return el;
   }
 
-  // donut
+  // DONUT
   let donutChart = null;
   function ensureDonut(){
     if (donutChart) return donutChart;
@@ -428,7 +441,7 @@
       });
   }
 
-  // sticky
+  // STICKY – auto nustatymas
   function detectAndApplySticky(){
     const tbl = table;
     const container = wrap;
@@ -440,6 +453,8 @@
         el.style.left = "";
         el.style.backgroundColor = "";
       });
+
+    window.applySticky = detectAndApplySticky;
 
     const headerRow = tbl.querySelector("thead tr.headers");
     const filterRow = tbl.querySelector("thead tr.filters");
@@ -475,8 +490,6 @@
       td.style.backgroundColor = bg;
     });
   }
-  // kad DnD galėtų iškviesti
-  window.applySticky = detectAndApplySticky;
 
   document.addEventListener("visibility:columns-changed", detectAndApplySticky);
   document.addEventListener("tbody:reloaded", detectAndApplySticky);

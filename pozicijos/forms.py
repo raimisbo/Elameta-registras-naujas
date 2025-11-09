@@ -1,27 +1,60 @@
 # pozicijos/forms.py
 from django import forms
-from .models import Pozicija
+from django.forms import inlineformset_factory
+
+from .models import Pozicija, PozicijosKaina
 
 
 class PozicijaForm(forms.ModelForm):
     class Meta:
         model = Pozicija
-        # nerodom techninių laukų
-        exclude = ("created", "updated")
-        widgets = {
-            "pastabos": forms.Textarea(attrs={"rows": 3}),
-            "instrukcija": forms.Textarea(attrs={"rows": 3}),
-        }
+        fields = [
+            "klientas",
+            "projektas",
+            "poz_kodas",
+            "poz_pavad",
+            "metalas",
+            "plotas",
+            "svoris",
+            "kabinimo_budas",
+            "kabinimas_reme",
+            "detaliu_kiekis_reme",
+            "faktinis_kiekis_reme",
+            "paruosimas",
+            "padengimas",
+            "padengimo_standartas",
+            "spalva",
+            "maskavimas",
+            "atlikimo_terminas",
+            "testai_kokybe",
+            "pakavimas",
+            "instrukcija",
+            "pakavimo_dienos_norma",
+            "pak_po_ktl",
+            "pak_po_milt",
+            "kaina_eur",
+            "pastabos",
+        ]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-        # padarom, kad kodas ir pavadinimas būtų privalomi
-        for name in ("poz_kodas", "poz_pavad"):
-            if name in self.fields:
-                self.fields[name].required = True
+class PozicijosKainaForm(forms.ModelForm):
+    class Meta:
+        model = PozicijosKaina
+        fields = [
+            "suma",
+            "kainos_matas",
+            "busena",
+            "yra_fiksuota",
+            "kiekis_nuo",
+            "kiekis_iki",
+            "fiksuotas_kiekis",
+        ]
 
-        # visiems uždedam klasę, kad normaliai atrodytų
-        for f in self.fields.values():
-            cls = f.widget.attrs.get("class", "")
-            f.widget.attrs["class"] = (cls + " form-control").strip()
+
+PozicijosKainaFormSet = inlineformset_factory(
+    Pozicija,
+    PozicijosKaina,
+    form=PozicijosKainaForm,
+    extra=1,
+    can_delete=True,
+)

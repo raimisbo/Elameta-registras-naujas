@@ -4,8 +4,10 @@
 
 {% block content %}
 <h1>Pozicija {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</h1>
+
 <p>
-  <a href="{% url 'pozicijos:edit' pozicija.pk %}" class="btn btn-primary">Redaguoti</a>
+  <a href="{% url 'pozicijos:edit' pozicija.pk %}" class="btn btn-primary">Redaguoti poziciją</a>
+  <a href="{% url 'pozicijos:kainos' pozicija.pk %}" class="btn btn-secondary">Kainos istorija</a>
   <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal į sąrašą</a>
 </p>
 
@@ -18,14 +20,44 @@
     <tr><th>Metalas</th><td>{{ pozicija.metalas }}</td></tr>
     <tr><th>Padengimas</th><td>{{ pozicija.padengimas }}</td></tr>
     <tr><th>Spalva</th><td>{{ pozicija.spalva }}</td></tr>
-    <tr><th>Kaina EUR</th><td>{{ pozicija.kaina_eur }}</td></tr>
-    <tr><th>Pastabos</th><td>{{ pozicija.pastabos }}</td></tr>
+    <tr><th>Dabartinė kaina</th><td>{{ pozicija.kaina_eur }}</td></tr>
+    <tr><th>Pastabos</th><td>{{ pozicija.pastabos|linebreaksbr }}</td></tr>
   </tbody>
 </table>
 
+<h2 style="margin-top:1rem;">Paskutinės kainos</h2>
+{% if kainos %}
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Suma</th>
+        <th>Matas</th>
+        <th>Būsena</th>
+        <th>Kiekis nuo</th>
+        <th>Kiekis iki</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in kainos %}
+        <tr>
+          <td>{{ k.created|date:"Y-m-d H:i" }}</td>
+          <td>{{ k.suma }}</td>
+          <td>{{ k.kainos_matas }}</td>
+          <td>{{ k.busena }}</td>
+          <td>{{ k.kiekis_nuo }}</td>
+          <td>{{ k.kiekis_iki }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Kainų dar nėra.</p>
+{% endif %}
+
 <style>
-.detail-table{border-collapse:collapse;background:#fff}
+.detail-table{border-collapse:collapse;background:#fff;margin-bottom:.75rem;}
 .detail-table th,.detail-table td{border:1px solid #eee;padding:6px 8px;text-align:left}
-.detail-table th{background:#f8f8f8;width:220px}
+.detail-table th{background:#f8f8f8}
 </style>
 {% endblock %}

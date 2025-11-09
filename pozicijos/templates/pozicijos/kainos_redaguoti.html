@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Kainos – {{ pozicija.poz_kodas }}{% endblock %}
+
+{% block content %}
+<h1>Kainos – {{ pozicija.poz_kodas }} {{ pozicija.poz_pavad }}</h1>
+
+<p>
+  <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">← Atgal į poziciją</a>
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <table style="width:100%; border-collapse:collapse; background:#fff; margin-bottom:.5rem;">
+    <thead>
+      <tr>
+        <th style="border:1px solid #eee; padding:4px 6px;">Suma</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Matas</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Būsena</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Fiksuota?</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Kiekis nuo</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Kiekis iki</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Fiksuotas kiekis</th>
+        <th style="border:1px solid #eee; padding:4px 6px;">Šalinti</th>
+      </tr>
+    </thead>
+    <tbody id="kainos-body">
+      {% for form in formset %}
+        <tr class="kaina-row">
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.suma }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.kainos_matas }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.busena }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px; text-align:center;">{{ form.yra_fiksuota }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.kiekis_nuo }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.kiekis_iki }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px;">{{ form.fiksuotas_kiekis }}</td>
+          <td style="border:1px solid #eee; padding:4px 6px; text-align:center;">
+            {% if form.instance.pk %}
+              {{ form.DELETE }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <button type="submit" class="btn btn-primary">Išsaugoti</button>
+</form>
+{% endblock %}
