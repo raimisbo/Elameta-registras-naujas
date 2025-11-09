@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load static %}
 {% load attr %}
 {% load dict_get %}
 {% load json_utils %}
@@ -8,23 +7,28 @@
 
 {% block page_css %}
 <style>
-  /* šitam puslapyje – be viršutinės juostos */
-  header, .navbar, .topbar {
-    display: none !important;
-  }
+  header, .navbar, .topbar { display: none !important; }
 
   .top-wrap {
     display:flex;
-    justify-content:space-between;
     align-items:flex-start;
     gap:1rem;
     margin-bottom:.75rem;
   }
-  .title-block h1{
-    margin:0;
-    font-size:1.4rem;
-    font-weight:600;
+
+  .logo-block {
+    display:flex;
+    align-items:center;
+    min-width:140px;
   }
+  .logo-block img {
+    max-height:42px;
+    width:auto;
+    display:block;
+  }
+
+  .title-block{ flex:1; text-align:center; }
+  .title-block h1{ margin:0; font-size:1.4rem; font-weight:600; }
 
   .controls-block { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.5rem; }
   .controls-bar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
@@ -35,7 +39,6 @@
   .chip{background:#e2e8f0; padding:2px 6px; border-radius:4px; display:inline-flex; gap:4px; align-items:center; font-size:.8rem;}
   .chip button{border:0; background:transparent; cursor:pointer;}
 
-  /* grafikas – legenda šalia */
   .graph-box{
     display:flex;
     gap:.75rem;
@@ -50,18 +53,13 @@
   .donut-legend li{display:flex; align-items:center; gap:8px; font-size:14px;}
   .donut-legend .dot{width:10px; height:10px; border-radius:50%;}
 
-  /* lentelė */
   .table-wrap{
     overflow:auto;
     max-height:calc(100vh - 180px);
     border:1px solid #ddd;
     background:#fff;
   }
-  #pozicijos-table{
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-  }
+  #pozicijos-table{ width:100%; border-collapse:separate; border-spacing:0; }
   #pozicijos-table thead tr.headers th{background:#f4f4f4;}
   #pozicijos-table thead tr.filters th{background:#fafafa;}
   #pozicijos-table thead th{
@@ -72,10 +70,7 @@
     white-space:nowrap;
     z-index:5;
   }
-  #pozicijos-table thead tr.filters th{
-    top:34px;
-    z-index:6;
-  }
+  #pozicijos-table thead tr.filters th{ top:34px; z-index:6; }
   #pozicijos-table tbody td{
     padding:.35rem .5rem;
     border-bottom:1px solid #eee;
@@ -83,19 +78,17 @@
   }
   #pozicijos-table tbody tr:nth-child(even) td{background:#f8f8f8;}
 
-  /* stalčius */
   .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.2s;}
   .drawer-backdrop.open{opacity:1; pointer-events:auto;}
   .drawer{position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.25); transition:.2s; display:flex; flex-direction:column; z-index:100;}
   .drawer.open{right:0;}
   .drawer-header{display:flex; justify-content:space-between; align-items:center; padding:.75rem .75rem; border-bottom:1px solid #eee;}
   .drawer-body{padding:.75rem .75rem; overflow:auto; display:flex; flex-direction:column; gap:.5rem;}
+
   .cols-search{width:100%; padding:.25rem .5rem; margin-bottom:.25rem;}
+  #cols-list { display:flex; flex-direction:column; gap:.35rem; }
+  #cols-list label { display:flex; gap:.4rem; align-items:center; }
 
-  #cols-list { display: flex; flex-direction:column; gap: .35rem; }
-  #cols-list label { display: flex; gap: .4rem; align-items:center; }
-
-  /* mūsų sticky – tik nuspalvinti ir ant viršaus */
   #pozicijos-table thead tr.headers th.sticky-col-header{
     position:sticky !important;
     top:0;
@@ -123,6 +116,9 @@
 {% block content %}
 
 <div class="top-wrap">
+  <div class="logo-block">
+    <img src="{{ MEDIA_URL }}logo.png" alt="Logo">
+  </div>
   <div class="title-block">
     <h1>Detalių registras</h1>
   </div>
@@ -188,7 +184,6 @@
   </table>
 </div>
 
-<!-- stulpelių stalčius -->
 <div id="drawer-backdrop" class="drawer-backdrop"></div>
 <aside id="drawer" class="drawer">
   <div class="drawer-header">
@@ -276,9 +271,7 @@
 
   $("#cols-all-off")?.addEventListener("click", () => setVisibleCols([]));
   $("#cols-all-on")?.addEventListener("click", () => setVisibleCols(SCHEMA.map(c=>c.key)));
-  $("#cols-default")?.addEventListener("click", () => {
-    setVisibleCols(getDefaultColsFromSchema());
-  });
+  $("#cols-default")?.addEventListener("click", () => setVisibleCols(getDefaultColsFromSchema()));
   $("#cols-reset")?.addEventListener("click", () => {
     localStorage.removeItem(DND_KEY);
     localStorage.removeItem(KEY_COLS);
@@ -438,7 +431,7 @@
       });
   }
 
-  // STICKY – auto nustatymas
+  // STICKY
   function detectAndApplySticky(){
     const tbl = table;
     const container = wrap;
