@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Kainos – {{ pozicija.poz_kodas }}{% endblock %}
+
+{% block page_css %}
+<style>
+  header, .navbar, .topbar { display:none !important; }
+  table.kainos { border-collapse:collapse; width:100%; max-width:900px; background:#fff; }
+  table.kainos th, table.kainos td { border:1px solid #e5e7eb; padding:6px 8px; font-size:.9rem; }
+  table.kainos th { background:#f8fafc; }
+  .actions { margin-bottom:.75rem; display:flex; gap:.5rem; flex-wrap:wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Kainos – {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</h1>
+
+<div class="actions">
+  <a href="{% url 'pozicijos:kaina_add' pozicija.pk %}" class="btn">+ Nauja kaina</a>
+  <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Atgal į poziciją</a>
+</div>
+
+<table class="kainos">
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Kiekis nuo</th>
+      <th>Kiekis iki</th>
+      <th>Kaina / suma</th>
+      <th>Matas</th>
+      <th>Būsena</th>
+      <th>Veiksmai</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for k in kainos %}
+      <tr>
+        <td>{{ k.created|date:"Y-m-d" }}</td>
+        <td>{{ k.kiekis_nuo|default:"—" }}</td>
+        <td>{{ k.kiekis_iki|default:"—" }}</td>
+        <td>{{ k.suma }}</td>
+        <td>{{ k.kainos_matas }}</td>
+        <td>{{ k.busena }}</td>
+        <td>
+          <a href="{% url 'pozicijos:kaina_edit' pozicija.pk k.id %}">Redaguoti</a> |
+          <a href="{% url 'pozicijos:kaina_delete' pozicija.pk k.id %}">Šalinti</a>
+        </td>
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="7">Kainų dar nėra.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

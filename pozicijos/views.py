@@ -17,7 +17,7 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
-    Image,
+    Image, PageBreak,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -260,7 +260,7 @@ def pozicija_pdf(request, pk):
     breziniai = pozicija.breziniai.all()
     kainos = pozicija.kainos.all()
 
-    # bandome registruoti LT šriftą
+    # 1) šriftas LT
     font_name = "Helvetica"
     font_path = os.path.join(settings.MEDIA_ROOT, "fonts", "DejaVuSans.ttf")
     if os.path.exists(font_path):
@@ -281,11 +281,12 @@ def pozicija_pdf(request, pk):
     styles.add(ParagraphStyle(name="TitleLT", parent=styles["Heading1"], fontName=font_name))
     styles.add(ParagraphStyle(name="NormalLT", parent=styles["Normal"], fontName=font_name, fontSize=10, leading=12))
     styles.add(ParagraphStyle(name="SmallLT", parent=styles["Normal"], fontName=font_name, fontSize=9, leading=11))
-    styles.add(ParagraphStyle(name="SectionLT", parent=styles["Heading2"], fontName=font_name, fontSize=11, leading=13, spaceBefore=6, spaceAfter=3))
+    styles.add(ParagraphStyle(name="SectionLT", parent=styles["Heading2"], fontName=font_name, fontSize=11, leading=13, spaceBefore=8, spaceAfter=3))
+    styles.add(ParagraphStyle(name="MutedLT", parent=styles["Normal"], fontName=font_name, fontSize=8, textColor=colors.grey))
 
     story = []
 
-    # HEADER
+    # ===== HEADER =====
     logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
     if os.path.exists(logo_path):
         header_left = Image(logo_path, width=35 * mm, height=15 * mm)
@@ -293,7 +294,7 @@ def pozicija_pdf(request, pk):
         header_left = Paragraph(" ", styles["NormalLT"])
 
     header_right = Paragraph(
-        "<b>UAB „Tavo įmonė“</b><br/>Įm. k. 123456789<br/>PVM LT123456789<br/>info@imone.lt",
+        "<b>UAB „Tavo įmonė“</b><br/>Įm. k. 123456789<br/>PVM LT123456789<br/>info@imone.lt<br/>+370 000 00000",
         styles["SmallLT"],
     )
 
@@ -302,20 +303,19 @@ def pozicija_pdf(request, pk):
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.3, colors.lightgrey),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                ("LINEBELOW", (0, 0), (-1, 0), 0.25, colors.grey),
             ]
         )
     )
     story.append(header_tbl)
     story.append(Spacer(1, 6))
 
-    # PAVADINIMAS
+    # ===== TITLAS =====
     title_txt = f"Pasiūlymas: {pozicija.poz_kodas or ''} – {pozicija.poz_pavad or ''}"
     story.append(Paragraph(title_txt, styles["TitleLT"]))
-    story.append(Spacer(1, 4))
+    story.append(Spacer(1, 2))
 
-    # META
     meta_html = (
         f"Klientas: {pozicija.klientas or '—'}<br/>"
         f"Projektas: {pozicija.projektas or '—'}<br/>"
@@ -324,8 +324,8 @@ def pozicija_pdf(request, pk):
     story.append(Paragraph(meta_html, styles["NormalLT"]))
     story.append(Spacer(1, 6))
 
-    # POZICIJOS DUOMENYS
-    story.append(Paragraph("Pozicijos duomenys", styles["SectionLT"]))
+    # ===== POZICIJA =====
+    story.append(Paragraph("1. Pozicijos duomenys", styles["SectionLT"]))
 
     poz_data = [
         ["Kodas", pozicija.poz_kodas or "—"],
@@ -337,7 +337,7 @@ def pozicija_pdf(request, pk):
     if pozicija.pastabos:
         poz_data.append(["Pastabos", pozicija.pastabos])
 
-    poz_tbl = Table(poz_data, colWidths=[35 * mm, 125 * mm])
+    poz_tbl = Table(poz_data, colWidths=[38 * mm, 122 * mm])
     poz_tbl.setStyle(
         TableStyle(
             [
@@ -353,8 +353,8 @@ def pozicija_pdf(request, pk):
     story.append(poz_tbl)
     story.append(Spacer(1, 6))
 
-    # KAINOS
-    story.append(Paragraph("Kainos", styles["SectionLT"]))
+    # ===== KAINOS =====
+    story.append(Paragraph("2. Kainos", styles["SectionLT"]))
     if kainos:
         rows = [["Data", "Suma", "Matas", "Būsena", "Kiekis"]]
         for k in kainos:
@@ -362,14 +362,16 @@ def pozicija_pdf(request, pk):
                 kiekis = f"{k.kiekis_nuo or ''}–{k.kiekis_iki or ''}"
             else:
                 kiekis = "—"
-            rows.append([
-                k.created.strftime("%Y-%m-%d") if k.created else "—",
-                str(k.suma),
-                k.kainos_matas or "",
-                k.busena or "",
-                kiekis,
-            ])
-        k_tbl = Table(rows, colWidths=[25 * mm, 22 * mm, 22 * mm, 30 * mm, 40 * mm])
+            rows.append(
+                [
+                    k.created.strftime("%Y-%m-%d") if k.created else "—",
+                    str(k.suma),
+                    k.kainos_matas or "",
+                    k.busena or "",
+                    kiekis,
+                ]
+            )
+        k_tbl = Table(rows, colWidths=[23 * mm, 23 * mm, 20 * mm, 32 * mm, 40 * mm])
         k_tbl.setStyle(
             TableStyle(
                 [
@@ -386,36 +388,58 @@ def pozicija_pdf(request, pk):
         story.append(Paragraph("Kainų nėra.", styles["NormalLT"]))
     story.append(Spacer(1, 6))
 
-    # BRĖŽINIAI
-    story.append(Paragraph("Brėžiniai ir dokumentai", styles["SectionLT"]))
+    # ===== SĄLYGOS =====
+    story.append(Paragraph("3. Sąlygos", styles["SectionLT"]))
+    story.append(Paragraph("• Kaina galioja 14 kalendorinių dienų nuo pasiūlymo datos, jei nenurodyta kitaip.", styles["SmallLT"]))
+    story.append(Paragraph("• Gamybos terminas ir pakavimas – pagal suderintus techninius reikalavimus.", styles["SmallLT"]))
+    story.append(Paragraph("• Brėžiniai ir kiti dokumentai – žr. priedą.", styles["SmallLT"]))
+    story.append(Spacer(1, 8))
 
+    # ===== PARAŠAI =====
+    story.append(Paragraph("4. Patvirtinimas", styles["SectionLT"]))
+    sign_tbl = Table(
+        [
+            ["Pasiūlymą parengė:", "Pasiūlymą patvirtino:"],
+            ["_____________________", "_____________________"],
+            ["Vardas, pavardė, data", "Vardas, pavardė, data"],
+        ],
+        colWidths=[80 * mm, 80 * mm],
+    )
+    sign_tbl.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
+    story.append(sign_tbl)
+
+    # ===== BRĖŽINIAI KITAM PUSLAPY =====
     if breziniai:
+        story.append(PageBreak())
+        story.append(Paragraph("Priedas: brėžiniai ir dokumentai", styles["SectionLT"]))
         image_exts = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp")
         for b in breziniai:
             fname = b.failas.name if b.failas else ""
             ext = os.path.splitext(fname)[1].lower()
-            # pavadinimas
             story.append(Paragraph(b.pavadinimas or fname, styles["SmallLT"]))
-            # jeigu vaizdas – bandome rodyti
             if ext in image_exts and b.failas and hasattr(b.failas, "path") and os.path.exists(b.failas.path):
                 try:
-                    img = Image(b.failas.path, width=70 * mm, height=40 * mm)
+                    img = Image(b.failas.path, width=150 * mm, height=90 * mm)
                     story.append(img)
                 except Exception:
-                    # jei nepavyko įkelti, tiesiog parašom
-                    story.append(Paragraph("(nepavyko įkelti paveikslėlio)", styles["SmallLT"]))
+                    story.append(Paragraph(f"({fname} nepavyko atvaizduoti)", styles["MutedLT"]))
             else:
-                # čia gali būti PDF, DOC, XLS – tiesiog paliekam kaip tekstą
-                story.append(Paragraph(f"Failas: {fname}", styles["SmallLT"]))
-            story.append(Spacer(1, 4))
-    else:
-        story.append(Paragraph("Brėžinių nepridėta.", styles["NormalLT"]))
+                # pvz. PDF – tik tekstu
+                story.append(Paragraph(f"Failas: {fname}", styles["MutedLT"]))
+            story.append(Spacer(1, 6))
 
-    # FOOTER
+    # ===== FOOTER =====
     story.append(Spacer(1, 10))
-    story.append(Paragraph("Pasiūlymas sugeneruotas automatiškai iš pozicijos duomenų.", styles["SmallLT"]))
+    story.append(Paragraph("Pasiūlymas sugeneruotas automatiškai iš pozicijos duomenų.", styles["MutedLT"]))
 
-    # PDF generavimas
     doc.build(story)
 
     pdf = buffer.getvalue()

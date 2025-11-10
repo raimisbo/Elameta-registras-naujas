@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}Redaguoti kainą{% else %}Nauja kaina{% endif %}{% endblock %}
+
+{% block page_css %}
+<style>
+  header, .navbar, .topbar { display:none !important; }
+  .form-box{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:14px 16px;
+    max-width:540px;
+  }
+  .form-row{margin-bottom:.6rem;}
+  label{display:block; font-weight:600; margin-bottom:.2rem;}
+  input[type="text"],
+  input[type="number"],
+  textarea{
+    width:100%;
+    box-sizing:border-box;
+    padding:4px 6px;
+  }
+  .actions{display:flex; gap:.5rem; margin-top:.75rem;}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{% if mode == "edit" %}Redaguoti kainą{% else %}Nauja kaina{% endif %}</h1>
+<p>Pozicija: <strong>{{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</strong></p>
+
+<div class="form-box">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-row">
+      <label for="{{ form.suma.id_for_label }}">{{ form.suma.label }}</label>
+      {{ form.suma }}
+      {{ form.suma.errors }}
+    </div>
+
+    <div class="form-row">
+      <label for="{{ form.kainos_matas.id_for_label }}">{{ form.kainos_matas.label }}</label>
+      {{ form.kainos_matas }}
+      {{ form.kainos_matas.errors }}
+    </div>
+
+    <div class="form-row">
+      <label for="{{ form.busena.id_for_label }}">{{ form.busena.label }}</label>
+      {{ form.busena }}
+      {{ form.busena.errors }}
+    </div>
+
+    <div class="form-row">
+      <label for="{{ form.kiekis_nuo.id_for_label }}">{{ form.kiekis_nuo.label }}</label>
+      {{ form.kiekis_nuo }}
+      {{ form.kiekis_nuo.errors }}
+    </div>
+
+    <div class="form-row">
+      <label for="{{ form.kiekis_iki.id_for_label }}">{{ form.kiekis_iki.label }}</label>
+      {{ form.kiekis_iki }}
+      {{ form.kiekis_iki.errors }}
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Išsaugoti</button>
+      <a href="{% url 'pozicijos:kainos_list' pozicija.pk %}" class="btn-secondary">Atgal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
