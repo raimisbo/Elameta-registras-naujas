@@ -1,66 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Pasiūlymas – {{ pozicija.poz_kodas }}{% endblock %}
-
-{% block page_css %}
-<style>
-  header, .navbar, .topbar { display:none !important; }
-  .proposal-box {
-    max-width: 720px;
-    margin: 0 auto;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 14px 16px 16px;
-  }
-  .proposal-box h1 {
-    margin-top:0;
-    font-size: 1.15rem;
-  }
-  .form-row { margin-bottom: .75rem; }
-  label { font-weight: 600; display:block; margin-bottom: .2rem; }
-  textarea { width:100%; min-height:120px; }
-  .inline-check { display:flex; gap:.5rem; align-items:center; }
-  .actions { display:flex; gap:.5rem; margin-top:1rem; }
-  .btn { display:inline-block; padding:6px 12px; border-radius:6px; border:1px solid #2563eb; background:#2563eb; color:#fff; text-decoration:none; }
-  .btn-secondary { background:#f3f4f6; color:#111827; border-color:#d1d5db; }
-  input[type="text"] { width:100%; padding:4px 6px; box-sizing:border-box; }
-</style>
-{% endblock %}
+{% block title %}Parengti pasiūlymą – {{ pozicija.poz_kodas }}{% endblock %}
 
 {% block content %}
-<div class="proposal-box">
-  <h1>Pasiūlymo paruošimas</h1>
-  <p>Pozicija: <strong>{{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</strong></p>
+<h1>Parengti pasiūlymą</h1>
+<p>Pasirink, ką norėsi matyti pasiūlyme, ir spausk „Peržiūra“.</p>
 
-  <form method="post" action="{% url 'pozicijos:pdf' pozicija.pk %}">
-    {% csrf_token %}
+<form method="post">
+  {% csrf_token %}
+  <div style="margin-bottom:1rem;">
+    <label style="display:flex;gap:.4rem;align-items:center;">
+      <input type="checkbox" name="show_prices" {% if default_show_prices %}checked{% endif %}>
+      Rodyti kainų lentelę
+    </label>
+    <label style="display:flex;gap:.4rem;align-items:center;margin-top:.4rem;">
+      <input type="checkbox" name="show_drawings" {% if default_show_drawings %}checked{% endif %}>
+      Rodyti brėžinių sąrašą
+    </label>
+  </div>
 
-    <div class="form-row inline-check">
-      <input type="checkbox" id="show_prices" name="show_prices" {% if show_prices %}checked{% endif %}>
-      <label for="show_prices" style="margin-bottom:0;">Rodyti kainų bloką</label>
-    </div>
+  <div style="margin-bottom:1rem;">
+    <label for="notes">Papildomos sąlygos / pastabos:</label><br>
+    <textarea name="notes" id="notes" rows="4" style="width:100%;max-width:560px;">{{ default_notes }}</textarea>
+  </div>
 
-    <div class="form-row inline-check">
-      <input type="checkbox" id="show_drawings" name="show_drawings" {% if show_drawings %}checked{% endif %}>
-      <label for="show_drawings" style="margin-bottom:0;">Rodyti brėžinių priedą</label>
-    </div>
-
-    <div class="form-row">
-      <label for="custom_price_note">Papildoma pastaba prie kainų (nebūtina)</label>
-      <input type="text" id="custom_price_note" name="custom_price_note" value="{{ custom_price_note }}">
-    </div>
-
-    <div class="form-row">
-      <label for="custom_terms">Sąlygos (galima keisti prieš PDF)</label>
-      <textarea id="custom_terms" name="custom_terms">{{ custom_terms }}</textarea>
-      <p style="font-size:.75rem; color:#6b7280; margin-top:.25rem;">Kiekviena eilutė bus atskira pastraipa PDF'e.</p>
-    </div>
-
-    <div class="actions">
-      <button type="submit" class="btn">Generuoti PDF</button>
-      <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn-secondary">Atgal</a>
-    </div>
-  </form>
-</div>
+  <button type="submit" class="btn btn-primary">Peržiūra</button>
+  <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Atgal</a>
+</form>
 {% endblock %}

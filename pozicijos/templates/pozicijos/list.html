@@ -110,6 +110,75 @@
     background:inherit;
   }
   .th-filter{width:100%; box-sizing:border-box;}
+
+
+  /* 1) Grafikas: kompaktiškas aukštis + legenda į šoną, kad “nevalgytų” pusės lango */
+  #chartWrap{
+    display:grid;
+    grid-template-columns: 1fr auto;
+    align-items:start;
+    gap:12px;
+    margin-bottom:10px;
+  }
+  /* ribojam realų drobės aukštį */
+  #chartWrap canvas{
+    height: 180px !important;
+    max-height: 180px !important;
+    width: 100% !important;
+  }
+  /* legenda slenkasi savo ribose, neužima aukščio */
+  #donutLegend{
+    max-height: 180px;
+    overflow:auto;
+  }
+
+  /* 2) Užtikrinam, kad puslapis būtų tas, kuris scrollinasi vertikaliai */
+  .table-wrap{ overflow: visible !important; }   /* jokio overflow-y čia */
+  main, .content{ overflow: visible !important; } /* jeigu bazėje buvo uždėtas overflow */
+
+  /* 3) Sticky ant VISOS THEAD (stabiliau Safari), o ne ant kiekvieno <th> */
+  #results-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+  #results-table thead{
+    position: sticky !important;
+    top: 0 !important;           /* nėra viršutinės juostos – prilimpa prie pat lango viršaus */
+    z-index: 20;                 /* kad būtų virš tbody */
+    background:#fff;
+  }
+  /* jei kur nors projekte buvo užrašyta “thead th { position:static !important }” – paliekam th static,
+     sticky daro pats THEAD. Tai pašalina konfliktus su ankstesniais bandymais. */
+  #results-table thead th{
+    position: static !important;
+    background:#f6f6f6;
+    border-bottom:1px solid #ddd;
+    white-space:nowrap;
+    padding:.45rem .55rem;
+  }
+
+  /* 4) Sticky pirmai kolonelei (jei naudojai) – paprasta versija */
+  #results-table th:first-child,
+  #results-table td:first-child{
+    position: sticky;
+    left: 0;
+    z-index: 25;                 /* virš kitų ląstelių */
+    background:#fff;             /* kad neužsimaišytų su eilutėm */
+  }
+
+  /* 5) Mažytis “šešėlis” po headeriu aiškumui */
+  #results-table thead::after{
+    content:"";
+    position: sticky;
+    display:block;
+    top:0;
+    height:0;
+    box-shadow: 0 2px 3px rgba(0,0,0,.08);
+  }
+
+
+
 </style>
 {% endblock %}
 

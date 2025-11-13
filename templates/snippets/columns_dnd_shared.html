@@ -4,197 +4,257 @@
   .th-dragging { opacity: .7; cursor: grabbing; box-shadow: 0 0 12px rgba(0,0,0,.25); background: #fff; }
   .th-drop-target { outline: 2px dashed #999; outline-offset: -3px; }
 </style>
+
 <script>
 (function () {
-  const TABLE_ID = "{{ table_id }}";
-  const PAGE_KEY = "{{ page_key }}";
-  const STORE_KEY = "dnd-order:" + PAGE_KEY;
+  var TABLE_ID = "{{ table_id }}";
+  var PAGE_KEY = "{{ page_key }}";
+  var STORE_KEY = "dnd-order:" + PAGE_KEY;
 
-  const table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(TABLE_ID);
   if (!table) return;
 
-  const headRow = table.querySelector("thead tr.headers");
+  var headRow   = table.querySelector("thead tr.headers") || table.querySelector("thead tr");
   if (!headRow) return;
+  var filterRow = table.querySelector("thead tr.filters");
+  var colgroup  = table.querySelector("colgroup");
+  var body      = table.querySelector("tbody");
 
-  const filterRow = table.querySelector("thead tr.filters");
-  const colgroup = table.querySelector("colgroup");
-  const body = table.querySelector("tbody");
+  var headerThs = Array.prototype.slice.call(headRow.children);
+  for (var i=0;i<headerThs.length;i++){
+    headerThs[i].classList.add("th-draggable");
+    headerThs[i].setAttribute("draggable","true");
+  }
 
-  // visus header th padarom drag'inamus
-  const headerThs = Array.from(headRow.children);
-  headerThs.forEach(th => th.classList.add("th-draggable"));
-
-  let dragSrc = null;
+  function getKey(el){
+    if (!el) return "";
+    return el.getAttribute("data-key") || el.getAttribute("data-col") || (el.dataset ? (el.dataset.key || el.dataset.col) : "") || "";
+  }
 
   function getStoredOrder() {
-    try {
-      return JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
-    } catch (e) {
-      return [];
-    }
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); }
+    catch(e){ return []; }
   }
 
   function saveOrder(order) {
-    localStorage.setItem(STORE_KEY, JSON.stringify(order));
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(order||[])); } catch(e){}
   }
 
   function currentOrderFromDOM() {
-    return Array.from(headRow.children)
-      .map(th => th.dataset.key)
-      .filter(Boolean);
+    var out = [];
+    var ch = headRow.children;
+    for (var i=0;i<ch.length;i++){
+      var k = getKey(ch[i]);
+      if (k) out.push(k);
+    }
+    return out;
   }
 
-  /**
-   * Perstato HEADER, FILTRŲ EILUTĘ, COLGROUP ir TBODY pagal duotą stulpelių tvarką
-   */
+  function callSticky(){
+    try{
+      if (window.applyStickyFirstCol){ window.applyStickyFirstCol(); return; }
+    }catch(_){}
+    // --- Fallback: jei projekte nėra applyStickyFirstCol, pasidarom minimaliai čia ---
+    try{
+      // nuvalom senas klases
+      var rm = table.querySelectorAll('.sticky-col-header, .sticky-col-filter, .sticky-col-cell');
+      for (var i=0;i<rm.length;i++){ rm[i].classList.remove('sticky-col-header','sticky-col-filter','sticky-col-cell'); }
+
+      // randam pirmą matomą TH
+      var ths = headRow.children;
+      var firstKey = "";
+      for (var j=0;j<ths.length;j++){
+        var th = ths[j];
+        var hidden = th.getAttribute('data-hidden') === '1' || th.classList.contains('is-hidden');
+        var cs = window.getComputedStyle(th);
+        var visible = (th.offsetParent !== null) && cs.display!=='none' && cs.visibility!=='hidden';
+        if (!hidden && visible){
+          firstKey = getKey(th);
+          if (firstKey){
+            th.classList.add('sticky-col-header');
+            break;
+          }
+        }
+      }
+      if (!firstKey) return;
+
+      if (filterRow){
+        var fths = filterRow.children;
+        for (var k=0;k<fths.length;k++){
+          var f = fths[k];
+          if (getKey(f) === firstKey){ f.classList.add('sticky-col-filter'); break; }
+        }
+      }
+      if (body){
+        var rows = body.querySelectorAll('tr');
+        for (var r=0;r<rows.length;r++){
+          var tds = rows[r].children;
+          for (var c=0;c<tds.length;c++){
+            var td = tds[c];
+            if (getKey(td) === firstKey){ td.classList.add('sticky-col-cell'); break; }
+          }
+        }
+      }
+    }catch(e){}
+  }
+
   function applyOrder(order) {
-    if (!order || !order.length) return;
+    if (!order || !order.length) { callSticky(); return; }
 
     // 1) HEADER
-    const thMap = {};
-    Array.from(headRow.children).forEach(th => {
-      const key = th.dataset.key;
-      if (key) thMap[key] = th;
-    });
-    order.forEach(key => {
-      const th = thMap[key];
-      if (th) headRow.appendChild(th);
-    });
+    var thMap = {};
+    for (var i=0;i<headRow.children.length;i++){
+      var th = headRow.children[i];
+      var k = getKey(th);
+      if (k) thMap[k] = th;
+    }
+    for (i=0;i<order.length;i++){
+      var key = order[i];
+      var node = thMap[key];
+      if (node) headRow.appendChild(node);
+    }
 
-    // 2) FILTRŲ EILUTĖ
-    if (filterRow) {
-      const fMap = {};
-      Array.from(filterRow.children).forEach(th => {
-        const key = th.dataset.key;
-        if (key) fMap[key] = th;
-      });
-      order.forEach(key => {
-        const th = fMap[key];
-        if (th) filterRow.appendChild(th);
-      });
+    // 2) FILTRAI
+    if (filterRow){
+      var fMap = {};
+      for (i=0;i<filterRow.children.length;i++){
+        var fth = filterRow.children[i];
+        var fk = getKey(fth);
+        if (fk) fMap[fk] = fth;
+      }
+      for (i=0;i<order.length;i++){
+        var k2 = order[i];
+        var nodeF = fMap[k2];
+        if (nodeF) filterRow.appendChild(nodeF);
+      }
     }
 
     // 3) COLGROUP
-    if (colgroup) {
-      const cMap = {};
-      Array.from(colgroup.children).forEach(col => {
-        const key = col.dataset.key;
-        if (key) cMap[key] = col;
-      });
-      order.forEach(key => {
-        const col = cMap[key];
-        if (col) colgroup.appendChild(col);
-      });
+    if (colgroup){
+      var cMap = {};
+      for (i=0;i<colgroup.children.length;i++){
+        var col = colgroup.children[i];
+        var ck = getKey(col);
+        if (ck) cMap[ck] = col;
+      }
+      for (i=0;i<order.length;i++){
+        var k3 = order[i];
+        var nodeC = cMap[k3];
+        if (nodeC) colgroup.appendChild(nodeC);
+      }
     }
 
-    // 4) TBODY – čia buvo tavo problema
-    if (body) {
-      const rows = Array.from(body.querySelectorAll("tr"));
-      rows.forEach(tr => {
-        const tds = Array.from(tr.children);
-        // susikuriam žemėlapį pagal data-key
-        const tdMap = {};
-        const noKey = []; // veiksmų stulpelis ar panašūs
-        tds.forEach(td => {
-          const key = td.dataset.key;
-          if (key) {
-            tdMap[key] = td;
-          } else {
-            noKey.push(td);
-          }
-        });
-
-        // dabar pagal orderį sudedam iš naujo
-        order.forEach(key => {
-          const td = tdMap[key];
-          if (td) tr.appendChild(td);
-        });
-
-        // gale prikabinam tuos, kurie be data-key (pvz. "Veiksmai")
-        noKey.forEach(td => tr.appendChild(td));
-      });
+    // 4) TBODY
+    if (body){
+      var rows = body.querySelectorAll("tr");
+      for (var r=0;r<rows.length;r++){
+        var tr = rows[r];
+        var tds = Array.prototype.slice.call(tr.children);
+        var tdMap = {};
+        var tail = [];
+        for (var t=0;t<tds.length;t++){
+          var td = tds[t];
+          var keyTd = getKey(td);
+          if (keyTd) tdMap[keyTd] = td; else tail.push(td);
+        }
+        for (i=0;i<order.length;i++){
+          var ok = order[i];
+          var nodeTd = tdMap[ok];
+          if (nodeTd) tr.appendChild(nodeTd);
+        }
+        for (t=0;t<tail.length;t++){ tr.appendChild(tail[t]); }
+      }
     }
 
-    // kad mūsų sticky pirmas matomas vėl susiskaičiuotų
-    if (window.applySticky) {
-      try { window.applySticky(); } catch (e) {}
-    }
+    // — lipnumai ir event’ai —
+    callSticky();
+    try{
+      if (window.CustomEvent){
+        var ev = new CustomEvent('columns:reordered', {detail:{order:order}});
+        document.dispatchEvent(ev);
+      }
+    }catch(_){}
   }
 
-  // drag įvykiai
-  headerThs.forEach(th => {
-    th.draggable = true;
+  // Drag n’ drop
+  var dragSrc = null;
 
-    th.addEventListener("dragstart", e => {
-      dragSrc = th;
-      th.classList.add("th-dragging");
-      e.dataTransfer.effectAllowed = "move";
-    });
+  function onDragStart(e){
+    dragSrc = this;
+    this.classList.add("th-dragging");
+    try{ e.dataTransfer.effectAllowed = "move"; }catch(_){}
+  }
+  function onDragEnd(){
+    dragSrc = null;
+    for (var i=0;i<headerThs.length;i++){
+      headerThs[i].classList.remove("th-dragging","th-drop-target");
+    }
+  }
+  function onDragOver(e){
+    if (!dragSrc || dragSrc === this) return;
+    if (e && e.preventDefault) e.preventDefault();
+    this.classList.add("th-drop-target");
+    try{ e.dataTransfer.dropEffect = "move"; }catch(_){}
+  }
+  function onDragLeave(){ this.classList.remove("th-drop-target"); }
+  function onDrop(e){
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!dragSrc || dragSrc === this) return;
+    this.classList.remove("th-drop-target");
 
-    th.addEventListener("dragend", () => {
-      dragSrc = null;
-      headerThs.forEach(h => h.classList.remove("th-dragging", "th-drop-target"));
-    });
+    var cells = Array.prototype.slice.call(headRow.children);
+    var srcIndex = cells.indexOf(dragSrc);
+    var targetIndex = cells.indexOf(this);
 
-    th.addEventListener("dragover", e => {
-      if (!dragSrc || dragSrc === th) return;
-      e.preventDefault();
-      th.classList.add("th-drop-target");
-      e.dataTransfer.dropEffect = "move";
-    });
+    if (srcIndex < targetIndex) {
+      headRow.insertBefore(dragSrc, this.nextSibling);
+    } else {
+      headRow.insertBefore(dragSrc, this);
+    }
 
-    th.addEventListener("dragleave", () => {
-      th.classList.remove("th-drop-target");
-    });
+    var newOrder = currentOrderFromDOM();
+    applyOrder(newOrder);
+    saveOrder(newOrder);
+    return false;
+  }
 
-    th.addEventListener("drop", e => {
-      e.stopPropagation();
-      if (!dragSrc || dragSrc === th) return;
-      th.classList.remove("th-drop-target");
+  for (var i=0;i<headerThs.length;i++){
+    var th = headerThs[i];
+    th.addEventListener("dragstart", onDragStart);
+    th.addEventListener("dragend", onDragEnd);
+    th.addEventListener("dragover", onDragOver);
+    th.addEventListener("dragleave", onDragLeave);
+    th.addEventListener("drop", onDrop);
+  }
 
-      const cells = Array.from(headRow.children);
-      const srcIndex = cells.indexOf(dragSrc);
-      const targetIndex = cells.indexOf(th);
-
-      if (srcIndex < targetIndex) {
-        headRow.insertBefore(dragSrc, th.nextSibling);
-      } else {
-        headRow.insertBefore(dragSrc, th);
-      }
-
-      // iš DOM'o pasiimam naują tvarką ir pritaikom viskam
-      const newOrder = currentOrderFromDOM();
-      applyOrder(newOrder);
-      saveOrder(newOrder);
-
-      return false;
-    });
-  });
-
-  // pradinė tvarka iš localStorage
-  const storedOrder = getStoredOrder();
+  // pradinė tvarka
+  var storedOrder = getStoredOrder();
   if (storedOrder && storedOrder.length) {
     applyOrder(storedOrder);
   } else {
-    // jei dar nieko nesaugojom – saugom dabartinę
     saveOrder(currentOrderFromDOM());
+    callSticky();
   }
 
-  // mygtukas "↺ Atstatyti tvarką" – jei yra
-  const resetBtn = document.getElementById("cols-reset-order");
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      localStorage.removeItem(STORE_KEY);
-      // paprasčiausia – perkrauti
+  // "↺ Atstatyti tvarką"
+  var resetBtn = document.getElementById("cols-reset-order");
+  if (resetBtn){
+    resetBtn.addEventListener("click", function(){
+      try{ localStorage.removeItem(STORE_KEY); }catch(_){}
       location.reload();
     });
   }
 
-  // kai tavo AJAX perpiešia <tbody> (mes darėm dispatch("tbody:reloaded"))
-  // reikia perstumti ir naujai atėjusias eiles
-  document.addEventListener("tbody:reloaded", () => {
-    const ord = getStoredOrder();
-    if (ord && ord.length) applyOrder(ord);
+  // kai <tbody> perpiešiamas per AJAX
+  document.addEventListener("tbody:reloaded", function(){
+    var ord = getStoredOrder();
+    if (ord && ord.length) applyOrder(ord); else callSticky();
   });
+
+  // kai perjunginėjami stulpeliai (checkbox’ai)
+  var colsList = document.getElementById('cols-list') || document.querySelector('[data-role="cols-list"]');
+  if (colsList){
+    colsList.addEventListener('change', function(){ setTimeout(callSticky, 0); });
+  }
 })();
 </script>
