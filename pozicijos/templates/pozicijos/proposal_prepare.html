@@ -1,30 +1,53 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Parengti pasiūlymą – {{ pozicija.poz_kodas }}{% endblock %}
+{% block title %}Pasiūlymo paruošimas{% endblock %}
 
 {% block content %}
-<h1>Parengti pasiūlymą</h1>
-<p>Pasirink, ką norėsi matyti pasiūlyme, ir spausk „Peržiūra“.</p>
+<h1 style="margin:0 0 10px">Pasiūlymo paruošimas – #{{ pozicija.id }} {{ pozicija.poz_kodas }}</h1>
 
-<form method="post">
-  {% csrf_token %}
-  <div style="margin-bottom:1rem;">
-    <label style="display:flex;gap:.4rem;align-items:center;">
-      <input type="checkbox" name="show_prices" {% if default_show_prices %}checked{% endif %}>
-      Rodyti kainų lentelę
-    </label>
-    <label style="display:flex;gap:.4rem;align-items:center;margin-top:.4rem;">
-      <input type="checkbox" name="show_drawings" {% if default_show_drawings %}checked{% endif %}>
-      Rodyti brėžinių sąrašą
-    </label>
+<form id="prep-form" method="get" action="{% url 'pozicijos:proposal_prepare' pozicija.pk %}" class="box" style="display:grid;gap:10px">
+  <div>
+    <label><input type="checkbox" name="show_prices" value="1" {% if show_prices %}checked{% endif %}> Rodyti kainų lentelę</label>
+  </div>
+  <div>
+    <label><input type="checkbox" name="show_drawings" value="1" {% if show_drawings %}checked{% endif %}> Rodyti brėžinių sąrašą</label>
+  </div>
+  <div>
+    <label for="notes">Pastabos / sąlygos</label><br>
+    <textarea id="notes" name="notes" rows="4" style="width:100%">{{ notes }}</textarea>
   </div>
 
-  <div style="margin-bottom:1rem;">
-    <label for="notes">Papildomos sąlygos / pastabos:</label><br>
-    <textarea name="notes" id="notes" rows="4" style="width:100%;max-width:560px;">{{ default_notes }}</textarea>
-  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <!-- Atnaujina šį paruošimo puslapį su dabartinėmis varnelėmis -->
+    <button type="submit" class="btn btn-secondary">Atnaujinti</button>
 
-  <button type="submit" class="btn btn-primary">Peržiūra</button>
-  <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Atgal</a>
+    <!-- Šitie du mygtukai siunčia TĄ PAČIĄ formą,
+         tik su kitu URL (formaction), todėl visada nuneša varnelės + notes -->
+    <button type="submit"
+            class="btn btn-secondary"
+            formaction="{% url 'pozicijos:pdf' pozicija.pk %}"
+            formmethod="get"
+            name="preview" value="1">
+      Peržiūra (HTML)
+    </button>
+
+    <button type="submit"
+            class="btn"
+            formaction="{% url 'pozicijos:pdf' pozicija.pk %}"
+            formmethod="get">
+      PDF
+    </button>
+  </div>
 </form>
+
+<div class="box">
+  <h3 style="margin:0 0 8px">Kas bus įtraukta į PDF</h3>
+  <ul style="margin:0 0 6px 18px">
+    <li>Pagrindinė informacija apie poziciją</li>
+    <li>Kainų lentelė: <strong>{% if show_prices %}TAIP{% else %}NE{% endif %}</strong></li>
+    <li>Brėžinių miniatiūros: <strong>{% if show_drawings %}TAIP{% else %}NE{% endif %}</strong></li>
+    <li>Pastabos / sąlygos: <strong>{% if notes %}TAIP{% else %}NE{% endif %}</strong></li>
+  </ul>
+</div>
 {% endblock %}

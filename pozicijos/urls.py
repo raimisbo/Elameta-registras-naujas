@@ -6,10 +6,10 @@ from . import proposal_views  # pasiūlymo parengimas / pdf
 app_name = "pozicijos"
 
 urlpatterns = [
-    # sąrašas
+    # sąrašas + ajax dalys
     path("", views.pozicijos_list, name="list"),
     path("tbody/", views.pozicijos_tbody, name="tbody"),
-    path("stats/", views.pozicijos_stats, name="stats"),  # ← dėl donut
+    path("stats/", views.pozicijos_stats, name="stats"),  # grafiko/donut endpoint
 
     # kurti / redaguoti
     path("nauja/", views.pozicija_create, name="create"),
