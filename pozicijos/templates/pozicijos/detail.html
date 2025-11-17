@@ -5,92 +5,181 @@
 {% block title %}Pozicija {{ pozicija.poz_kodas }}{% endblock %}
 
 {% block content %}
-<h1>Pozicija {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</h1>
+<h1 class="page-title">Pozicija {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</h1>
 
-<div class="actions" style="margin-bottom:12px; display:flex; gap:6px; flex-wrap:wrap;">
+<div class="actions">
   <a href="{% url 'pozicijos:edit' pozicija.pk %}" class="btn">Redaguoti poziciją</a>
   <a href="{% url 'pozicijos:proposal_prepare' pozicija.pk %}" class="btn btn-secondary">Parengti pasiūlymą</a>
-  <a href="{% url 'pozicijos:pdf' pozicija.pk %}" class="btn btn-secondary">PDF (peržiūra)</a>
-  <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal į sąrašą</a>
+  <a href="{% url 'pozicijos:kainos_list' pozicija.pk %}" class="btn btn-secondary">Valdyti kainas</a>
+  <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">← Atgal į sąrašą</a>
 </div>
 
-<table class="detail-table">
-  <tbody>
-    {# einam per VISĄ schema, bet nerodom virtualių stulpelių #}
-    {% for col in columns_schema %}
-      {% if col.type != "virtual" %}
-        <tr>
-          <th>{{ col.label }}</th>
-          <td>{{ pozicija|attr:col.key|default:"—" }}</td>
-        </tr>
+<div class="two-col">
+  <!-- Kairė: pagrindinė info + kainos -->
+  <section class="col-left">
+    <div class="box">
+      <div class="box-head">
+        <h3>Pagrindinė informacija</h3>
+      </div>
+      <table class="detail-table">
+        <tbody>
+          {% for col in columns_schema %}
+            {% if col.type != "virtual" %}
+              {% with val=pozicija|attr:col.key %}
+                {% if val %}
+                  <tr>
+                    <th>{{ col.label }}</th>
+                    <td>{{ val }}</td>
+                  </tr>
+                {% endif %}
+              {% endwith %}
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="box">
+      <div class="box-head">
+        <h3>Kainos (aktualios)</h3>
+        <div class="box-head-actions">
+          <a class="btn btn-secondary btn-sm" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">Valdyti kainas</a>
+        </div>
+      </div>
+
+      {% if kainos_akt %}
+        <div class="table-wrap">
+          <table class="table zebra">
+            <thead>
+              <tr>
+                <th>Suma</th>
+                <th>Matas</th>
+                <th>Tipas</th>
+                <th>Kiekis</th>
+                <th>Galioja</th>
+                <th>Pastaba</th>
+                <th>Įrašyta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for k in kainos_akt %}
+                <tr>
+                  <td>{{ k.kaina }} €</td>
+                  <td>{{ k.matas }}</td>
+                  <td>{% if k.yra_fiksuota %}Fiksuota{% else %}Intervalas{% endif %}</td>
+                  <td>
+                    {% if k.yra_fiksuota %}
+                      {{ k.fiksuotas_kiekis }}
+                    {% else %}
+                      {{ k.kiekis_nuo|default:"–" }} – {{ k.kiekis_iki|default:"∞" }}
+                    {% endif %}
+                  </td>
+                  <td>{{ k.galioja_nuo|default:"–" }} – {{ k.galioja_iki|default:"∞" }}</td>
+                  <td>{{ k.pastaba|default:"" }}</td>
+                  <td>{{ k.created|date:"Y-m-d" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">Nėra pažymėtų „aktuali“ kainų.</p>
       {% endif %}
-    {% endfor %}
-  </tbody>
-</table>
+    </div>
+  </section>
 
-<h2 style="margin-top:16px;">Brėžiniai</h2>
-<div style="margin-bottom:8px;">
-  <form action="{% url 'pozicijos:brezinys_upload' pozicija.pk %}"
-        method="post"
-        enctype="multipart/form-data"
-        style="display:flex; gap:6px; align-items:center;">
-    {% csrf_token %}
-    <input type="file" name="failas" required>
-    <input type="text" name="pavadinimas" placeholder="Pavadinimas">
-    <button type="submit" class="btn btn-secondary">Įkelti</button>
-  </form>
+  <!-- Dešinė: Brėžiniai -->
+  <section class="col-right">
+    <div class="box">
+      <div class="box-head">
+        <h3>Brėžiniai</h3>
+      </div>
+
+      <form action="{% url 'pozicijos:brezinys_upload' pozicija.pk %}"
+            method="post" enctype="multipart/form-data" class="upload-row">
+        {% csrf_token %}
+        <input type="file" name="failas" required>
+        <input type="text" name="pavadinimas" placeholder="Pavadinimas">
+        <button type="submit" class="btn btn-secondary btn-sm">Įkelti</button>
+      </form>
+
+      {% if pozicija.breziniai.all %}
+        <div class="brez-grid">
+          {% for b in pozicija.breziniai.all %}
+            <div class="brez-card">
+              <a class="thumb" href="{{ b.failas.url }}" target="_blank" rel="noopener"
+                 title="{{ b.pavadinimas|default:b.filename }}">
+                {% if b.thumb_url %}
+                  <img src="{{ b.thumb_url }}" loading="lazy" alt=""
+                       onerror="this.style.display='none';this.closest('.thumb').classList.add('thumb--fallback');">
+                {% else %}
+                  <div class="thumb--fallback"></div>
+                {% endif %}
+              </a>
+              <div class="meta">
+                <div class="name" title="{{ b.pavadinimas|default:b.filename }}">{{ b.pavadinimas|default:b.filename }}</div>
+                <div class="ext">.{{ b.ext|default:"failas" }}</div>
+              </div>
+              <div class="card-actions">
+                <a class="btn-xxs" href="{{ b.failas.url }}" target="_blank" rel="noopener" title="Atidaryti">Atidaryti</a>
+                <a class="btn-xxs danger" href="{% url 'pozicijos:brezinys_delete' pozicija.pk b.pk %}" title="Šalinti">Šalinti</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Brėžinių nėra.</p>
+      {% endif %}
+    </div>
+  </section>
 </div>
-
-{% if pozicija.breziniai.all %}
-  <ul>
-    {% for br in pozicija.breziniai.all %}
-      <li>
-        <a href="{{ br.failas.url }}" target="_blank">
-          {{ br.pavadinimas|default:br.failas.name }}
-        </a>
-        <a href="{% url 'pozicijos:brezinys_delete' pozicija.pk br.pk %}"
-           style="color:#b91c1c; margin-left:6px;">
-          šalinti
-        </a>
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>Brėžinių nėra.</p>
-{% endif %}
 
 <style>
-.detail-table{
-  border-collapse:collapse;
-  background:#fff;
-  margin-top:6px;
-  min-width:420px;
+/* ——— bendri ——— */
+.page-title{margin:0 0 10px}
+.actions{margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap}
+.box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fff}
+.box-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-4px 0 10px}
+.box-head h3{margin:0}
+.box-head-actions{display:flex;gap:6px}
+.muted{margin:6px 0 0;color:#64748b}
+
+/* ——— dviejų kolonų išdėstymas ——— */
+.two-col{display:grid;grid-template-columns:1.35fr .95fr;gap:12px}
+@media(max-width:1100px){.two-col{grid-template-columns:1fr}}
+
+/* ——— pagrindinė lentelė ——— */
+.detail-table{border-collapse:collapse;width:100%}
+.detail-table th,.detail-table td{border:1px solid #eee;padding:6px 8px;text-align:left;vertical-align:top}
+.detail-table th{background:#f8f8f8;width:220px}
+
+/* ——— kainos lentelė ——— */
+.table-wrap{overflow:auto}
+.table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0}
+.table th,.table td{border-bottom:1px solid #ececec;padding:8px 10px;text-align:left;vertical-align:middle}
+.table thead th{background:#f8fafc;position:sticky;top:0;z-index:1}
+.table.zebra tbody tr:nth-child(even) td{background:#fafafa}
+
+/* ——— brėžinių blokas ——— */
+.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.btn-sm{padding:6px 10px;font-size:14px;border-radius:6px}
+.brez-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.brez-card{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+.thumb{width:100%;aspect-ratio:4/3;border:1px solid #eee;border-radius:6px;display:grid;place-items:center;overflow:hidden;background:#fafafa}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb--fallback{width:52px;height:52px;border-radius:10px;border:1px solid #d1d5db;background:#f3f4f6}
+.meta{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%}
+.ext{font-size:11px;color:#6b7280}
+.card-actions{display:flex;gap:6px;justify-content:flex-start;margin-top:2px}
+
+/* mažučiai mygtukai po miniatiūra */
+.btn-xxs{
+  display:inline-block;text-decoration:none;cursor:pointer;
+  font-size:11px;line-height:1;border:1px solid #d1d5db;background:#f9fafb;color:#111827;
+  border-radius:999px;padding:4px 8px;
 }
-.detail-table th,
-.detail-table td{
-  border:1px solid #eee;
-  padding:6px 8px;
-  text-align:left;
-  vertical-align:top;
-}
-.detail-table th{
-  background:#f8f8f8;
-  width:240px;
-}
-a.btn,
-button.btn{
-  display:inline-block;
-  padding:6px 10px;
-  border-radius:6px;
-  background:#2563eb;
-  color:#fff;
-  text-decoration:none;
-  border:1px solid #2563eb;
-}
-.btn-secondary{
-  background:#f3f4f6;
-  color:#0f172a;
-  border-color:#d1d5db;
-}
+.btn-xxs:hover{background:#f3f4f6}
+.btn-xxs.danger{border-color:#fecaca;background:#fee2e2;color:#7f1d1d}
 </style>
 {% endblock %}

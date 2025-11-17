@@ -1,4 +1,5 @@
 # pozicijos/views.py
+from django.contrib import messages
 from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -7,6 +8,7 @@ from django.views.decorators.http import require_POST
 from .models import Pozicija, PozicijosBrezinys
 from .forms import PozicijaForm, PozicijosBrezinysForm
 from .schemas.columns import COLUMNS
+from .services.previews import generate_preview_for_instance
 from . import proposal_views  # pasiūlymo parengimui / pdf
 
 
@@ -116,14 +118,16 @@ def pozicijos_stats(request):
 
 def pozicija_detail(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
-    return render(
-        request,
-        "pozicijos/detail.html",
-        {
-            "pozicija": poz,
-            "columns_schema": COLUMNS,  # ← kad matytum VISAS eilutes
-        },
-    )
+
+    # AKTUALIOS kainos (rodom kortelėje)
+    kainos_akt = poz.aktualios_kainos()
+
+    context = {
+        "pozicija": poz,
+        "columns_schema": COLUMNS,   # kad detail‘e eitume per visą schemą
+        "kainos_akt": kainos_akt,    # nauja: lentelė „Kainos (aktualios)“
+    }
+    return render(request, "pozicijos/detail.html", context)
 
 
 def pozicija_create(request):
@@ -152,12 +156,17 @@ def pozicija_edit(request, pk):
 @require_POST
 def brezinys_upload(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
-    form = PozicijosBrezinysForm(request.POST, request.FILES)
-    if form.is_valid():
-        br = form.save(commit=False)
-        br.pozicija = poz
-        br.save()
-    return redirect("pozicijos:detail", pk=pk)
+    if request.method == "POST" and request.FILES.get("failas"):
+        f = request.FILES["failas"]
+        title = request.POST.get("pavadinimas", "").strip()
+        br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
+        # Po įkėlimo – bandome sugeneruoti preview
+        res = generate_preview_for_instance(br)
+        if not res.ok:
+            messages.info(request, f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}")
+        else:
+            messages.success(request, "Įkelta ir sugeneruota peržiūra.")
+    return redirect("pozicijos:detail", pk=poz.pk)
 
 
 def brezinys_delete(request, pk, bid):

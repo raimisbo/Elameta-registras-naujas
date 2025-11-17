@@ -1,73 +1,70 @@
 {% extends "base.html" %}
-
-{% block title %}{% if mode == "edit" %}Redaguoti kainą{% else %}Nauja kaina{% endif %}{% endblock %}
-
-{% block page_css %}
-<style>
-  header, .navbar, .topbar { display:none !important; }
-  .form-box{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:8px;
-    padding:14px 16px;
-    max-width:540px;
-  }
-  .form-row{margin-bottom:.6rem;}
-  label{display:block; font-weight:600; margin-bottom:.2rem;}
-  input[type="text"],
-  input[type="number"],
-  textarea{
-    width:100%;
-    box-sizing:border-box;
-    padding:4px 6px;
-  }
-  .actions{display:flex; gap:.5rem; margin-top:.75rem;}
-</style>
-{% endblock %}
+{% block title %}{% if obj %}Redaguoti kainą{% else %}Nauja kaina{% endif %}{% endblock %}
 
 {% block content %}
-<h1>{% if mode == "edit" %}Redaguoti kainą{% else %}Nauja kaina{% endif %}</h1>
-<p>Pozicija: <strong>{{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}</strong></p>
+<h1 style="margin:0 0 8px">{% if obj %}Redaguoti kainą{% else %}Nauja kaina{% endif %} – {{ pozicija.poz_kodas }}</h1>
+<p><a class="btn btn-secondary" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">← Atgal į kainas</a></p>
 
-<div class="form-box">
-  <form method="post">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
+<form method="post" class="box" style="max-width:720px">
+  {% csrf_token %}
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+    <label>Kaina {{ form.kaina }}</label>
+    <label>Matas {{ form.matas }}</label>
 
-    <div class="form-row">
-      <label for="{{ form.suma.id_for_label }}">{{ form.suma.label }}</label>
-      {{ form.suma }}
-      {{ form.suma.errors }}
+    <label style="grid-column:1/-1">
+      <span style="display:flex;gap:6px;align-items:center">
+        {{ form.yra_fiksuota }} <span>Fiksuota</span>
+      </span>
+    </label>
+
+    <label>Fiksuotas kiekis {{ form.fiksuotas_kiekis }}</label>
+    <div></div>
+
+    <label>Kiekis nuo {{ form.kiekis_nuo }}</label>
+    <label>Kiekis iki {{ form.kiekis_iki }}</label>
+
+    <label>Galioja nuo {{ form.galioja_nuo }}</label>
+    <label>Galioja iki {{ form.galioja_iki }}</label>
+
+    <label>Būsena {{ form.busena }}</label>
+    <label>Prioritetas {{ form.prioritetas }}</label>
+
+    <label style="grid-column:1/-1">Pastaba {{ form.pastaba }}</label>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="flash flash-error" style="margin-top:10px">
+      {{ form.non_field_errors }}
     </div>
+  {% endif %}
 
-    <div class="form-row">
-      <label for="{{ form.kainos_matas.id_for_label }}">{{ form.kainos_matas.label }}</label>
-      {{ form.kainos_matas }}
-      {{ form.kainos_matas.errors }}
-    </div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button class="btn" type="submit">Išsaugoti</button>
+    <a class="btn btn-secondary" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">Atšaukti</a>
+  </div>
+</form>
 
-    <div class="form-row">
-      <label for="{{ form.busena.id_for_label }}">{{ form.busena.label }}</label>
-      {{ form.busena }}
-      {{ form.busena.errors }}
-    </div>
-
-    <div class="form-row">
-      <label for="{{ form.kiekis_nuo.id_for_label }}">{{ form.kiekis_nuo.label }}</label>
-      {{ form.kiekis_nuo }}
-      {{ form.kiekis_nuo.errors }}
-    </div>
-
-    <div class="form-row">
-      <label for="{{ form.kiekis_iki.id_for_label }}">{{ form.kiekis_iki.label }}</label>
-      {{ form.kiekis_iki }}
-      {{ form.kiekis_iki.errors }}
-    </div>
-
-    <div class="actions">
-      <button type="submit" class="btn">Išsaugoti</button>
-      <a href="{% url 'pozicijos:kainos_list' pozicija.pk %}" class="btn-secondary">Atgal</a>
-    </div>
-  </form>
-</div>
+<script>
+  // Paprastas UX: rodyti tinkamus laukus pagal "fiksuota"
+  function toggleQtyFields(){
+    const fx = document.getElementById('id_yra_fiksuota');
+    const fxi = document.getElementById('id_fiksuotas_kiekis').closest('label');
+    const nuo = document.getElementById('id_kiekis_nuo').closest('label');
+    const iki = document.getElementById('id_kiekis_iki').closest('label');
+    if (!fx || !fxi || !nuo || !iki) return;
+    if (fx.checked){
+      fxi.style.display = '';
+      nuo.style.display = 'none';
+      iki.style.display = 'none';
+    } else {
+      fxi.style.display = 'none';
+      nuo.style.display = '';
+      iki.style.display = '';
+    }
+  }
+  document.addEventListener('change', e=>{
+    if (e.target && e.target.id === 'id_yra_fiksuota'){ toggleQtyFields(); }
+  });
+  document.addEventListener('DOMContentLoaded', toggleQtyFields);
+</script>
 {% endblock %}

@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'simple_history',
 
     # third-party
@@ -26,7 +27,7 @@ INSTALLED_APPS = [
 
     # local
     'detaliu_registras',
-    'pozicijos',
+    'pozicijos.apps.PozicijosConfig',
 ]
 
 MIDDLEWARE = [
@@ -92,8 +93,8 @@ STATIC_URL = '/static/'
 # STATICFILES_DIRS = [BASE_DIR / "static"]       # papildomi projektiniai statiniai
 STATIC_ROOT = BASE_DIR / "staticfiles"         # gamybos collectstatic
 
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- Default primary key field ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

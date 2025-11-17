@@ -1,341 +1,318 @@
 # pozicijos/proposal_views.py
-from pathlib import Path
-from typing import Optional, Iterable
-from decimal import Decimal
-from datetime import date, datetime
+from __future__ import annotations
+
+import io
+import os
+from datetime import datetime
+from urllib.parse import urlencode
 
 from django.conf import settings
-from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse
-from django.utils import timezone
+from django.shortcuts import get_object_or_404, render
 
-from .models import Pozicija
-try:
-    from .schemas.columns import COLUMNS  # dict'ų sąrašas
-except Exception:
-    COLUMNS = []
-
-# ReportLab
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+
+from .models import Pozicija
 
 
-def _find_first_existing(paths: Iterable[Path]) -> Optional[Path]:
-    for p in paths:
-        if p and p.exists():
-            return p
-    return None
+# ===== LT šriftai ===========================================================
 
-def _find_logo_path() -> Optional[Path]:
-    base = Path(settings.BASE_DIR)
-    return _find_first_existing([
-        base / "media" / "logo.png",
-        base / "static" / "img" / "logo.png",
-    ])
+def _register_fonts() -> tuple[str, str]:
+    """
+    Pabandome paimti LT šriftus iš MEDIA_ROOT/fonts.
+    Jei randam bent vieną .ttf/.otf – registruojam kaip LT-Regular (ir LT-Bold, jei yra antras).
+    Jei nieko – liekam su numatytais Helvetica.
+    """
+    regular = "Helvetica"
+    bold = "Helvetica-Bold"
 
-def _find_font_path() -> Optional[Path]:
-    base = Path(settings.BASE_DIR)
-    return _find_first_existing([
-        base / "media" / "fonts" / "NotoSans-Regular.ttf",
-        base / "static" / "fonts" / "NotoSans-Regular.ttf",
-        base / "media" / "fonts" / "DejaVuSans.ttf",
-        base / "static" / "fonts" / "DejaVuSans.ttf",
-    ])
+    fonts_dir = os.path.join(settings.MEDIA_ROOT, "fonts")
+    if not os.path.isdir(fonts_dir):
+        return regular, bold
 
-def _draw_wrapped_text(c: canvas.Canvas, text: str, x: float, y: float,
-                       max_chars: int, line_h: float, bottom_margin: float,
-                       font: str, size: int) -> float:
-    c.setFont(font, size)
-    text = text or ""
-    for paragraph in (text.splitlines() or [""]):
-        t = paragraph.rstrip("\n")
-        if t == "":
-            y -= line_h
-            if y < bottom_margin:
-                c.showPage(); y = A4[1] - 18 * mm; c.setFont(font, size)
+    font_files = [
+        f for f in os.listdir(fonts_dir)
+        if f.lower().endswith((".ttf", ".otf"))
+    ]
+    if not font_files:
+        return regular, bold
+
+    def register_font(alias: str, filename: str) -> str | None:
+        path = os.path.join(fonts_dir, filename)
+        try:
+            pdfmetrics.registerFont(TTFont(alias, path))
+            return alias
+        except Exception:
+            return None
+
+    reg_alias = register_font("LT-Regular", font_files[0]) or regular
+    bold_alias = reg_alias
+    if len(font_files) > 1:
+        bold_alias = register_font("LT-Bold", font_files[1]) or reg_alias
+
+    return reg_alias, bold_alias
+
+
+# ===== Pagalbiniai duomenų ruošėjai =========================================
+
+def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
+    """
+    Paruošia (label, value) sąrašą iš visų Pozicija laukų.
+    Tušti laukai praleidžiami. Tai praktiškai „visos opcijos iš kortelės“,
+    tik be id/created/updated.
+    """
+    rows: list[tuple[str, str]] = []
+    skip = {"id", "created", "updated"}
+
+    for field in pozicija._meta.fields:
+        if field.name in skip:
             continue
-        while t:
-            line = t[:max_chars]
-            t = t[max_chars:]
-            c.drawString(x, y, line)
-            y -= line_h
-            if y < bottom_margin:
-                c.showPage(); y = A4[1] - 18 * mm; c.setFont(font, size)
-    return y
-
-def _fmt(val) -> str:
-    if val is None or val == "":
-        return ""
-    if isinstance(val, Decimal):
-        return f"{val.normalize()}"
-    if isinstance(val, (date, datetime)):
-        return val.strftime("%Y-%m-%d")
-    return str(val)
+        value = getattr(pozicija, field.name, None)
+        if value in (None, ""):
+            continue
+        label = str(field.verbose_name or field.name).capitalize()
+        rows.append((label, value))
+    return rows
 
 
-FALLBACK_FIELDS = [
-    ("Klientas", "klientas"),
-    ("Projektas", "projektas"),
-    ("Kodas", "poz_kodas"),
-    ("Pavadinimas", "poz_pavad"),
-    ("Metalas", "metalas"),
-    ("Plotas", "plotas"),
-    ("Svoris", "svoris"),
-    ("Kabinimo būdas", "kabinimo_budas"),
-    ("Kabinimas rėme", "kabinimas_reme"),
-    ("Detalių kiekis rėme", "detaliu_kiekis_reme"),
-    ("Faktinis kiekis rėme", "faktinis_kiekis_reme"),
-    ("Paruošimas", "paruosimas"),
-    ("Padengimas", "padengimas"),
-    ("Standartas", "padengimo_standartas"),
-    ("Spalva", "spalva"),
-    ("Maskavimas", "maskavimas"),
-    ("Atlikimo terminas", "atlikimo_terminas"),
-    ("Pakavimas", "pakavimas"),
-    ("Instrukcija", "instrukcija"),
-    ("Pakavimo d. norma", "pakavimo_dienos_norma"),
-    ("Pak. po KTL", "pak_po_ktl"),
-    ("Pak. po milt", "pak_po_milt"),
-    ("Kaina", "kaina_eur"),
-    ("Pastabos", "pastabos"),
-]
+def _get_kainos_for_pdf(pozicija: Pozicija):
+    """
+    Naudojam naują modelį KainosEilute (related_name='kainu_eilutes').
+    Renkam tik aktualias eilutes.
+    """
+    return pozicija.kainu_eilutes.filter(busena="aktuali").order_by(
+        "matas", "yra_fiksuota", "kiekis_nuo", "fiksuotas_kiekis", "galioja_nuo"
+    )
 
+
+# ===== Views: UI puslapis ====================================================
 
 def proposal_prepare(request, pk: int):
+    """
+    UI puslapis pasiūlymo paruošimui (varnelės + pastabos).
+    Nieko neredaguoja DB, tik ruošia GET parametrus PDF/HTML peržiūrai.
+    """
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
-    show_prices = request.GET.get("show_prices") == "1"
-    show_drawings = request.GET.get("show_drawings") == "1"
-    notes = (request.GET.get("notes") or "").strip()
+    show_prices = bool(request.GET.get("show_prices"))
+    show_drawings = bool(request.GET.get("show_drawings"))
+    notes = request.GET.get("notes", "")
 
-    kainos = list(pozicija.kainos.all() if show_prices else [])
-    brez = list(pozicija.breziniai.all() if show_drawings else [])
+    # QS stringas HTML / PDF nuorodoms
+    params: dict[str, str] = {}
+    if show_prices:
+        params["show_prices"] = "1"
+    if show_drawings:
+        params["show_drawings"] = "1"
+    if notes:
+        params["notes"] = notes
+    qs = urlencode(params)
 
     context = {
         "pozicija": pozicija,
-        "columns": COLUMNS,
-        "kainos": kainos,
-        "brez": brez,
         "show_prices": show_prices,
         "show_drawings": show_drawings,
         "notes": notes,
-        "now": timezone.now(),
-        "logo_url": None,
+        "qs": qs,
     }
     return render(request, "pozicijos/proposal_prepare.html", context)
 
 
+# ===== Views: PDF / HTML peržiūra ===========================================
+
 def proposal_pdf(request, pk: int):
+    """
+    Jei ?preview=1 – grąžina HTML (peržiūra su CSS, kaip puslapis).
+    Kitu atveju – sugeneruoja PDF per ReportLab, su LT šriftais ir logotipu.
+    """
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
-    show_prices = request.GET.get("show_prices") == "1"
-    show_drawings = request.GET.get("show_drawings") == "1"
-    notes = (request.GET.get("notes") or "").strip()
+    show_prices = bool(request.GET.get("show_prices"))
+    show_drawings = bool(request.GET.get("show_drawings"))
+    notes = request.GET.get("notes", "").strip()
+    preview = bool(request.GET.get("preview"))
 
-    kainos = list(pozicija.kainos.all() if show_prices else [])
-    brez = list(pozicija.breziniai.all() if show_drawings else [])
+    field_rows = _build_field_rows(pozicija)
+    kainos = _get_kainos_for_pdf(pozicija)
+    brez = list(pozicija.breziniai.all())
 
-    if request.GET.get("preview") == "1":
-        context = {
+    if preview:
+        # HTML peržiūra – čia viskas su tavo baziniu CSS.
+        ctx = {
             "pozicija": pozicija,
-            "columns": COLUMNS,
+            "field_rows": field_rows,
             "kainos": kainos,
             "brez": brez,
             "show_prices": show_prices,
             "show_drawings": show_drawings,
             "notes": notes,
-            "now": timezone.now(),
-            "logo_url": None,
         }
-        return render(request, "pozicijos/proposal_pdf.html", context)
+        return render(request, "pozicijos/proposal_pdf.html", ctx)
 
-    resp = HttpResponse(content_type="application/pdf")
-    resp["Content-Disposition"] = f'inline; filename="pasiulymas-{pozicija.pk}.pdf"'
-
-    c = canvas.Canvas(resp, pagesize=A4)
+    # ===== Tikras PDF =====
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    LM, RM, TM, BM = 18 * mm, 18 * mm, 18 * mm, 18 * mm
-    x = LM
-    y = height - TM
+    font_regular, font_bold = _register_fonts()
 
-    base_font = "Helvetica"
-    font_path = _find_font_path()
-    if font_path:
-        try:
-            pdfmetrics.registerFont(TTFont("LTText", str(font_path)))
-            base_font = "LTText"
-        except Exception:
-            base_font = "Helvetica"
+    # viršuje – logotipas + antraštė
+    c.setFont(font_regular, 10)
+    y = height - 30 * mm
 
-    logo_path = _find_logo_path()
-    if logo_path:
+    logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
+    if os.path.exists(logo_path):
         try:
-            img = ImageReader(str(logo_path))
-            logo_w = 38 * mm
-            c.drawImage(img, x, y - logo_w * 0.35, width=logo_w, height=logo_w * 0.35,
-                        preserveAspectRatio=True, mask='auto')
+            img = ImageReader(logo_path)
+            c.drawImage(img, 20 * mm, height - 25 * mm,
+                        width=40 * mm, preserveAspectRatio=True, mask="auto")
         except Exception:
             pass
 
-    c.setFont(base_font, 16)
-    c.drawRightString(width - RM, y, "Pasiūlymas")
-    y -= 8 * mm
-    c.setFont(base_font, 11)
-    c.drawRightString(width - RM, y, f"Pozicija: {getattr(pozicija, 'poz_kodas', pozicija.pk)}")
-    y -= 5 * mm
-    c.drawRightString(width - RM, y, f"{getattr(pozicija, 'poz_pavad', '')}")
-    y -= 7 * mm
+    c.setFont(font_bold, 20)
+    c.drawCentredString(width / 2, height - 20 * mm, "Pasiūlymas")
 
-    c.setStrokeColorRGB(0.88, 0.91, 0.94)
-    c.line(LM, y, width - RM, y)
-    y -= 6 * mm
+    c.setFont(font_regular, 10)
+    c.drawRightString(width - 20 * mm, height - 20 * mm, f"Pozicija: {pozicija.poz_kodas}")
+    if pozicija.poz_pavad:
+        c.drawRightString(width - 20 * mm, height - 25 * mm, f"Detalė: {pozicija.poz_pavad}")
 
-    c.setFont(base_font, 12)
-    c.drawString(x, y, "Pagrindinė informacija")
-    y -= 6 * mm
-    c.setFont(base_font, 10)
-    row_h = 6 * mm
+    y = height - 35 * mm
+    c.line(20 * mm, y, width - 20 * mm, y)
+    y -= 10
 
-    def draw_row(label: str, value, y0: float) -> float:
-        val = _fmt(value)
-        if not val:
-            return y0
-        if y0 < BM + 25 * mm:
-            c.showPage(); y1 = height - TM; c.setFont(base_font, 10)
-        else:
-            y1 = y0
-        c.drawString(x, y1, f"{label}: {val}"[:170])
-        return y1 - row_h
+    # Pagrindinė informacija (visos kortelės opcijos, be tuščių)
+    c.setFont(font_bold, 12)
+    c.drawString(20 * mm, y, "Pagrindinė informacija")
+    y -= 8
+    c.setFont(font_regular, 10)
 
-    if COLUMNS:
-        for col in COLUMNS:
-            if (col or {}).get("type") == "virtual":
-                continue
-            key = (col or {}).get("key")
-            if not key:
-                continue
-            label = (col or {}).get("label", key)
-            value = getattr(pozicija, key, "")
-            y = draw_row(label, value, y)
-    else:
-        for label, key in FALLBACK_FIELDS:
-            y = draw_row(label, getattr(pozicija, key, ""), y)
+    for label, val in field_rows:
+        text = f"{label}: {val}"
+        if y < 30 * mm:
+            c.showPage()
+            c.setFont(font_regular, 10)
+            y = height - 30 * mm
+        c.drawString(20 * mm, y, text)
+        y -= 12
 
-    if show_prices:
-        if y < BM + 35 * mm:
-            c.showPage(); y = height - TM; c.setFont(base_font, 10)
+    # Kainos
+    if show_prices and kainos:
+        if y < 60 * mm:
+            c.showPage()
+            c.setFont(font_regular, 10)
+            y = height - 30 * mm
 
-        c.setFont(base_font, 12)
-        c.drawString(x, y, "Kainos")
-        y -= 6 * mm
-        c.setFont(base_font, 10)
+        c.setFont(font_bold, 12)
+        c.drawString(20 * mm, y, "Kainos")
+        y -= 8
+        c.setFont(font_regular, 9)
 
-        headers = ["Suma", "Matas", "Būsena", "Kiekis nuo", "Kiekis iki", "Fiks. kiekis", "Įrašyta"]
-        col_w = (width - LM - RM) / len(headers)
-        for i, hname in enumerate(headers):
-            c.drawString(x + i * col_w, y, hname)
-        y -= 5 * mm
-        c.line(LM, y, width - RM, y)
-        y -= 3 * mm
+        headers = ["Kaina €", "Matas", "Tipas", "Nuo", "Iki", "Fiks. kiekis", "Galioja nuo", "Galioja iki"]
+        col_x = [20, 45, 65, 88, 110, 135, 165, 195]  # mm
+        for hx, h in zip(col_x, headers):
+            c.drawString(hx * mm, y, h)
+        y -= 6
+        c.line(20 * mm, y, (width - 20 * mm), y)
+        y -= 8
 
         for k in kainos:
-            if y < BM + 20 * mm:
-                c.showPage(); y = height - TM; c.setFont(base_font, 10)
-            vals = [
-                _fmt(getattr(k, "suma", "")),
-                _fmt(getattr(k, "kainos_matas", "")),
-                getattr(k, "get_busena_display", lambda: "")(),
-                _fmt(getattr(k, "kiekis_nuo", "") or "—"),
-                _fmt(getattr(k, "kiekis_iki", "") or "—"),
-                _fmt(getattr(k, "fiksuotas_kiekis", "") or "—"),
-                _fmt(getattr(k, "created", None)),
-            ]
-            for i, v in enumerate(vals):
-                c.drawString(x + i * col_w, y, str(v))
-            y -= 5 * mm
-        y -= 4 * mm
+            if y < 30 * mm:
+                c.showPage()
+                c.setFont(font_regular, 9)
+                y = height - 30 * mm
+            tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
+            c.drawString(col_x[0] * mm, y, f"{k.kaina}")
+            c.drawString(col_x[1] * mm, y, k.matas)
+            c.drawString(col_x[2] * mm, y, tipas)
+            c.drawString(col_x[3] * mm, y, str(k.kiekis_nuo or "—"))
+            c.drawString(col_x[4] * mm, y, str(k.kiekis_iki or "—"))
+            c.drawString(col_x[5] * mm, y, str(k.fiksuotas_kiekis or "—"))
+            c.drawString(col_x[6] * mm, y, k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—")
+            c.drawString(col_x[7] * mm, y, k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—")
+            y -= 10
 
-    if show_drawings:
-        if y < BM + 45 * mm:
-            c.showPage(); y = height - TM; c.setFont(base_font, 10)
+    # Brėžinių miniatiūros (PDF'e naudojam originalų vaizdą)
+    if show_drawings and brez:
+        if y < 60 * mm:
+            c.showPage()
+            c.setFont(font_regular, 10)
+            y = height - 30 * mm
 
-        c.setFont(base_font, 12)
-        c.drawString(x, y, "Brėžinių miniatiūros")
-        y -= 6 * mm
-        c.setFont(base_font, 10)
+        c.setFont(font_bold, 12)
+        c.drawString(20 * mm, y, "Brėžinių miniatiūros")
+        y -= 10
 
-        thumb_h = 28 * mm
-        thumb_w = 42 * mm
-        gap = 6 * mm
-        col_count = int((width - LM - RM + gap) // (thumb_w + gap)) or 1
-
-        col_i = 0
-        line_bottom = y
+        thumb_w = 50 * mm
+        thumb_h = 35 * mm
+        x = 20 * mm
 
         for b in brez:
-            if y < BM + thumb_h + 15 * mm:
+            if y < 40 * mm:
                 c.showPage()
-                y = height - TM
-                c.setFont(base_font, 10)
-                c.setFont(base_font, 12); c.drawString(x, y, "Brėžinių miniatiūros")
-                y -= 6 * mm
-                c.setFont(base_font, 10)
-                col_i = 0
-                line_bottom = y
-
-            bx = x + col_i * (thumb_w + gap)
-            by = y - thumb_h
+                c.setFont(font_regular, 10)
+                y = height - 30 * mm
+                x = 20 * mm
 
             img_path = None
-            if getattr(b, "preview", None) and getattr(b.preview, "path", None):
-                img_path = b.preview.path
-            else:
-                name = str(getattr(b, "failas", ""))
-                if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")) and getattr(b, "failas", None):
-                    img_path = b.failas.path
+            try:
+                img_path = b.failas.path
+            except Exception:
+                img_path = None
 
-            if img_path:
+            if img_path and os.path.exists(img_path):
                 try:
-                    c.drawImage(ImageReader(img_path), bx, by, width=thumb_w, height=thumb_h,
-                                preserveAspectRatio=True, anchor='sw', mask='auto')
+                    c.drawImage(ImageReader(img_path), x, y - thumb_h,
+                                width=thumb_w, height=thumb_h,
+                                preserveAspectRatio=True, mask="auto")
                 except Exception:
-                    pass
+                    c.rect(x, y - thumb_h, thumb_w, thumb_h)
+            else:
+                c.rect(x, y - thumb_h, thumb_w, thumb_h)
 
-            label = (getattr(b, "pavadinimas", None) or Path(b.failas.name).name)[:46]
-            c.drawString(bx, by - 4 * mm, label)
+            title = b.pavadinimas or b.filename
+            c.drawString(x, y - thumb_h - 8, title[:40])
 
-            col_i += 1
-            if col_i >= col_count:
-                col_i = 0
-                y = by - 10 * mm
-                line_bottom = y
+            x += thumb_w + 10 * mm
+            if x + thumb_w > width - 20 * mm:
+                x = 20 * mm
+                y -= thumb_h + 20
 
-        if col_i != 0:
-            y = line_bottom
-
+    # Pastabos
     if notes:
-        if y < BM + 25 * mm:
-            c.showPage(); y = height - TM; c.setFont(base_font, 10)
-        c.setFont(base_font, 12)
-        c.drawString(x, y, "Pastabos / sąlygos")
-        y -= 6 * mm
-        y = _draw_wrapped_text(
-            c=c,
-            text=notes,
-            x=x,
-            y=y,
-            max_chars=110,
-            line_h=5 * mm,
-            bottom_margin=BM + 15 * mm,
-            font=base_font,
-            size=10,
-        )
+        if y < 60 * mm:
+            c.showPage()
+            c.setFont(font_regular, 10)
+            y = height - 30 * mm
+
+        c.setFont(font_bold, 12)
+        c.drawString(20 * mm, y, "Pastabos / sąlygos")
+        y -= 10
+        c.setFont(font_regular, 10)
+
+        for line in notes.splitlines():
+            if y < 30 * mm:
+                c.showPage()
+                c.setFont(font_regular, 10)
+                y = height - 30 * mm
+            c.drawString(20 * mm, y, line)
+            y -= 12
+
+    # data apačioje
+    c.setFont(font_regular, 8)
+    c.drawRightString(width - 20 * mm, 15 * mm, datetime.now().strftime("%Y-%m-%d %H:%M"))
 
     c.showPage()
     c.save()
-    return resp
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="pasiulymas_{pozicija.poz_kodas}.pdf"'
+    return response

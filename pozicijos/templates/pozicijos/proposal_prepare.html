@@ -1,53 +1,78 @@
+{# pozicijos/templates/pozicijos/proposal_prepare.html #}
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}Pasiūlymo paruošimas{% endblock %}
+{% block title %}Pasiūlymo paruošimas – {{ pozicija.poz_kodas }}{% endblock %}
 
 {% block content %}
-<h1 style="margin:0 0 10px">Pasiūlymo paruošimas – #{{ pozicija.id }} {{ pozicija.poz_kodas }}</h1>
+<h1>Pasiūlymo paruošimas</h1>
 
-<form id="prep-form" method="get" action="{% url 'pozicijos:proposal_prepare' pozicija.pk %}" class="box" style="display:grid;gap:10px">
-  <div>
-    <label><input type="checkbox" name="show_prices" value="1" {% if show_prices %}checked{% endif %}> Rodyti kainų lentelę</label>
-  </div>
-  <div>
-    <label><input type="checkbox" name="show_drawings" value="1" {% if show_drawings %}checked{% endif %}> Rodyti brėžinių sąrašą</label>
-  </div>
-  <div>
-    <label for="notes">Pastabos / sąlygos</label><br>
-    <textarea id="notes" name="notes" rows="4" style="width:100%">{{ notes }}</textarea>
-  </div>
+<p>
+  Pozicija: <strong>{{ pozicija.poz_kodas }}</strong> — {{ pozicija.poz_pavad }}
+</p>
 
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <!-- Atnaujina šį paruošimo puslapį su dabartinėmis varnelėmis -->
-    <button type="submit" class="btn btn-secondary">Atnaujinti</button>
+<form id="proposal-form" method="get" action="">
+  <div class="box" style="max-width:520px;display:flex;flex-direction:column;gap:12px">
 
-    <!-- Šitie du mygtukai siunčia TĄ PAČIĄ formą,
-         tik su kitu URL (formaction), todėl visada nuneša varnelės + notes -->
-    <button type="submit"
-            class="btn btn-secondary"
-            formaction="{% url 'pozicijos:pdf' pozicija.pk %}"
-            formmethod="get"
-            name="preview" value="1">
-      Peržiūra (HTML)
-    </button>
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" name="show_prices" value="1"
+             {% if show_prices %}checked{% endif %}>
+      Rodyti kainas
+    </label>
 
-    <button type="submit"
-            class="btn"
-            formaction="{% url 'pozicijos:pdf' pozicija.pk %}"
-            formmethod="get">
-      PDF
-    </button>
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" name="show_drawings" value="1"
+             {% if show_drawings %}checked{% endif %}>
+      Rodyti brėžinių miniatiūras
+    </label>
+
+    <label>
+      Pastabos:<br>
+      <textarea name="notes" rows="4" style="width:100%">{{ notes }}</textarea>
+    </label>
+
+    <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+      <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Atgal</a>
+
+      {# Mygtuko „Atnaujinti“ NEBĖRA – varnelės persiunčia formą automatiškai #}
+
+      {% if qs %}
+        <a class="btn btn-secondary"
+           href="{% url 'pozicijos:pdf' pozicija.pk %}?{{ qs }}&preview=1">
+          Peržiūra (HTML)
+        </a>
+        <a class="btn"
+           href="{% url 'pozicijos:pdf' pozicija.pk %}?{{ qs }}">
+          PDF
+        </a>
+      {% else %}
+        <a class="btn btn-secondary"
+           href="{% url 'pozicijos:pdf' pozicija.pk %}?preview=1">
+          Peržiūra (HTML)
+        </a>
+        <a class="btn"
+           href="{% url 'pozicijos:pdf' pozicija.pk %}">
+          PDF
+        </a>
+      {% endif %}
+    </div>
   </div>
 </form>
+{% endblock %}
 
-<div class="box">
-  <h3 style="margin:0 0 8px">Kas bus įtraukta į PDF</h3>
-  <ul style="margin:0 0 6px 18px">
-    <li>Pagrindinė informacija apie poziciją</li>
-    <li>Kainų lentelė: <strong>{% if show_prices %}TAIP{% else %}NE{% endif %}</strong></li>
-    <li>Brėžinių miniatiūros: <strong>{% if show_drawings %}TAIP{% else %}NE{% endif %}</strong></li>
-    <li>Pastabos / sąlygos: <strong>{% if notes %}TAIP{% else %}NE{% endif %}</strong></li>
-  </ul>
-</div>
+{% block page_js %}
+<script>
+  (function() {
+    const form = document.getElementById('proposal-form');
+    if (!form) return;
+
+    // automatinis submit, kai keičiasi varnelės
+    form.addEventListener('change', function (e) {
+      const t = e.target;
+      if (!t || !t.name) return;
+      if (t.name === 'show_prices' || t.name === 'show_drawings') {
+        form.submit();
+      }
+    });
+  })();
+</script>
 {% endblock %}

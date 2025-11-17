@@ -1,24 +1,11 @@
 # pozicijos/models.py
 from django.db import models
-from django.conf import settings
-from django.core.files.base import ContentFile
+from django.db.models import Q, Index, UniqueConstraint
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
-import os
-import io
-import mimetypes
-import shutil
-import subprocess
-from pathlib import Path
-
-# Vaizdų apdorojimas
-from PIL import Image
-
-# Pasirenkama: PDF -> PNG (jei įdiegtas pymupdf)
-try:
-    import fitz  # PyMuPDF
-except Exception:
-    fitz = None
-
+# ======================= Pagrindas: Pozicija =======================
 
 class Pozicija(models.Model):
     # pagrindiniai
@@ -27,21 +14,24 @@ class Pozicija(models.Model):
     poz_kodas = models.CharField("Kodas", max_length=100)
     poz_pavad = models.CharField("Pavadinimas", max_length=255)
 
-    # iš tavo sena columns.py
+    # specifikacija
     metalas = models.CharField("Metalas", max_length=120, null=True, blank=True)
     plotas = models.DecimalField("Plotas", max_digits=10, decimal_places=2, null=True, blank=True)
     svoris = models.DecimalField("Svoris", max_digits=10, decimal_places=3, null=True, blank=True)
 
+    # kabinimas
     kabinimo_budas = models.CharField("Kabinimo būdas", max_length=120, null=True, blank=True)
     kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, null=True, blank=True)
     detaliu_kiekis_reme = models.IntegerField("Detalių kiekis rėme", null=True, blank=True)
     faktinis_kiekis_reme = models.IntegerField("Faktinis kiekis rėme", null=True, blank=True)
 
+    # paviršius / dažymas
     paruosimas = models.CharField("Paruošimas", max_length=200, null=True, blank=True)
     padengimas = models.CharField("Padengimas", max_length=200, null=True, blank=True)
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, null=True, blank=True)
     spalva = models.CharField("Spalva", max_length=120, null=True, blank=True)
 
+    # kiti
     maskavimas = models.CharField("Maskavimas", max_length=200, null=True, blank=True)
     atlikimo_terminas = models.DateField("Atlikimo terminas", null=True, blank=True)
 
@@ -75,25 +65,53 @@ class Pozicija(models.Model):
     def dok_count(self):
         return ""
 
+    # ===== Helperiai kainoms
+
+    def aktualios_kainos(self, matas: str | None = None, as_of=None):
+        as_of = (as_of or timezone.now().date())
+        qs = self.kainu_eilutes.filter(
+            busena="aktuali"
+        ).filter(
+            Q(galioja_nuo__isnull=True) | Q(galioja_nuo__lte=as_of)
+        ).filter(
+            Q(galioja_iki__isnull=True) | Q(galioja_iki__gte=as_of)
+        )
+        if matas:
+            qs = qs.filter(matas=matas)
+        return qs.order_by("yra_fiksuota", "kiekis_nuo", "fiksuotas_kiekis", "prioritetas", "-created")
+
+    def get_kaina_for_qty(self, qty: int, matas: str = "vnt.", as_of=None):
+        as_of = (as_of or timezone.now().date())
+        qs = self.kainu_eilutes.filter(
+            matas=matas, busena="aktuali"
+        ).filter(
+            Q(galioja_nuo__isnull=True) | Q(galioja_nuo__lte=as_of)
+        ).filter(
+            Q(galioja_iki__isnull=True) | Q(galioja_iki__gte=as_of)
+        )
+
+        fx = qs.filter(yra_fiksuota=True, fiksuotas_kiekis=qty).order_by("prioritetas", "-created").first()
+        if fx:
+            return fx
+
+        iv = qs.filter(yra_fiksuota=False) \
+               .filter(Q(kiekis_nuo__isnull=True) | Q(kiekis_nuo__lte=qty)) \
+               .filter(Q(kiekis_iki__isnull=True) | Q(kiekis_iki__gte=qty)) \
+               .order_by("prioritetas", "-created").first()
+        return iv
+
+
+# ======================= Sena suderinamumui =======================
 
 class PozicijosKaina(models.Model):
     MATAS_CHOICES = [
-        ("vnt.", "vnt."),
-        ("kg", "kg"),
-        ("m2", "m2"),
+        ("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2"),
     ]
     BUSENA_CHOICES = [
-        ("aktuali", "Aktuali"),
-        ("sena", "Sena"),
-        ("pasiulymas", "Pasiūlymas"),
+        ("aktuali", "Aktuali"), ("sena", "Sena"), ("pasiulymas", "Pasiūlymas"),
     ]
 
-    pozicija = models.ForeignKey(
-        Pozicija,
-        on_delete=models.CASCADE,
-        related_name="kainos",
-        verbose_name="Pozicija",
-    )
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos", verbose_name="Pozicija")
     suma = models.DecimalField("Suma", max_digits=12, decimal_places=2)
     busena = models.CharField("Būsena", max_length=20, choices=BUSENA_CHOICES, default="aktuali")
     yra_fiksuota = models.BooleanField("Yra fiksuota", default=False)
@@ -112,130 +130,153 @@ class PozicijosKaina(models.Model):
         return f"{self.pozicija} – {self.suma} {self.kainos_matas}"
 
 
+# ======================= Brėžiniai (su preview helperiais) =======================
+
 class PozicijosBrezinys(models.Model):
-    pozicija = models.ForeignKey(
-        Pozicija,
-        on_delete=models.CASCADE,
-        related_name="breziniai",
-    )
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="breziniai")
     pavadinimas = models.CharField("Pavadinimas", max_length=255, blank=True)
     failas = models.FileField("Brėžinys", upload_to="pozicijos/breziniai/%Y/%m/")
-    # NAUJA: miniatiūra ir PDF info
-    preview = models.ImageField("Peržiūra (PNG)", upload_to="pozicijos/breziniai/%Y/%m/previews/", blank=True, null=True)
-    mime = models.CharField(max_length=80, blank=True)
-    pages = models.PositiveIntegerField(default=1)
-
     uploaded = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-uploaded"]
 
     def __str__(self):
-        return self.pavadinimas or self.failas.name
+        return self.pavadinimas or getattr(self.failas, "name", "")
+
+    # ---- Helperiai UI ir preview keliui ----
+    @property
+    def filename(self) -> str:
+        import os
+        name = getattr(self.failas, "name", "") or ""
+        return os.path.basename(name)
 
     @property
-    def filename(self):
-        return os.path.basename(self.failas.name or "")
+    def ext(self) -> str:
+        import os
+        name = (getattr(self.failas, "name", "") or "").lower()
+        _, ext = os.path.splitext(name)
+        return (ext or "").lstrip(".")
+
+    def _preview_relpath(self) -> str:
+        """Naujas kelias su hash (stabilus pavadinimas)."""
+        import os, hashlib
+        name = getattr(self.failas, "name", "") or ""
+        base, _ = os.path.splitext(os.path.basename(name))
+        digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
+        return f"pozicijos/breziniai/previews/{base}-{digest}.png"
+
+    def _legacy_preview_relpath(self) -> str:
+        """Senas kelias be hash — suderinamumui su anksčiau sugeneruotais PNG."""
+        import os
+        name = getattr(self.failas, "name", "") or ""
+        base, _ = os.path.splitext(os.path.basename(name))
+        return f"pozicijos/breziniai/previews/{base}.png"
 
     @property
-    def is_image(self):
-        name = (self.failas.name or "").lower()
-        return name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"))
-
-    def save(self, *args, **kwargs):
-        # nustatom MIME (jei trūksta)
-        if not self.mime and self.failas:
-            self.mime = mimetypes.guess_type(self.failas.name)[0] or ""
-        super().save(*args, **kwargs)
-        # sugeneruojame preview, jei dar nėra
-        if self.failas and not self.preview:
-            self._ensure_preview()
-
-    def _ensure_preview(self, max_size=(600, 600)):
+    def thumb_url(self) -> str | None:
         """
-        Sugeneruoja PNG peržiūrą:
-          - jei failas vaizdas -> sumažintas PNG
-          - jei PDF -> pirmo puslapio PNG (PyMuPDF, o jei jo nėra – bandome per poppler 'pdftoppm', jei įdiegtas)
-        Jei nepavyksta, peržiūros neliečia (šablonas rodys fallback).
-        """
-        if not self.failas:
-            return
-
-        try:
-            storage = self.failas.storage
-            src_path = storage.path(self.failas.name)
-        except Exception:
-            return
-
-        # 1) Vaizdas -> PNG thumbnail
-        if (self.mime or "").startswith("image/") or self.is_image:
-            try:
-                with Image.open(src_path) as im:
-                    im.thumbnail(max_size)
-                    buf = io.BytesIO()
-                    im.save(buf, format="PNG")
-                    buf.seek(0)
-                    name = f"{Path(self.filename).stem}_prev.png"
-                    self.preview.save(name, ContentFile(buf.read()), save=True)
-            except Exception:
-                # nepavyko – ignoruojam
-                pass
-            return
-
-        # 2) PDF -> PNG
-        if (self.mime or "").endswith("pdf") or str(self.failas.name).lower().endswith(".pdf"):
-            # 2a) PyMuPDF (jei yra)
-            if fitz:
-                try:
-                    doc = fitz.open(src_path)
-                    self.pages = max(1, doc.page_count or 1)
-                    page = doc.load_page(0)
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # ~2x
-                    out = pix.tobytes(output="png")
-                    name = f"{Path(self.filename).stem}_prev.png"
-                    self.preview.save(name, ContentFile(out), save=True)
-                    doc.close()
-                    return
-                except Exception:
-                    pass
-
-            # 2b) Poppler 'pdftoppm' (jei yra sistemoje, pvz. per Homebrew)
-            if shutil.which("pdftoppm"):
-                try:
-                    outdir = Path(settings.MEDIA_ROOT) / "tmp_previews"
-                    outdir.mkdir(parents=True, exist_ok=True)
-                    stem = Path(self.filename).stem
-                    tmp_png = outdir / f"{stem}-1.png"
-                    # pirmas puslapis į PNG
-                    subprocess.run(
-                        ["pdftoppm", "-png", "-f", "1", "-singlefile", src_path, str(outdir / stem)],
-                        check=True
-                    )
-                    with open(tmp_png, "rb") as fh:
-                        name = f"{stem}_prev.png"
-                        self.preview.save(name, ContentFile(fh.read()), save=True)
-                    # išvalom laikiną failą
-                    try:
-                        tmp_png.unlink(missing_ok=True)  # Python 3.8+ turi missing_ok
-                    except TypeError:
-                        if tmp_png.exists():
-                            tmp_png.unlink()
-                    return
-                except Exception:
-                    pass
-            # jei nei fitz, nei poppler – paliekam be preview
-
-    def delete(self, using=None, keep_parents=False):
-        """
-        Ištrinam ir DB įrašą, ir patį failą bei preview iš media/.
+        Jei sugeneruotas preview, grąžina URL. Pirma bandom naują (su hash),
+        jei jo nėra – tikrinam seną (legacy) pavadinimą be hash.
         """
         storage = self.failas.storage
-        name = self.failas.name
-        preview_name = self.preview.name if self.preview else None
+        rel_new = self._preview_relpath()
+        rel_old = self._legacy_preview_relpath()
+        try:
+            if storage.exists(rel_new):
+                return storage.url(rel_new)
+            if storage.exists(rel_old):
+                return storage.url(rel_old)
+        except Exception:
+            pass
+        return None
+
+    # ---- Valymas trynimo metu ----
+    def delete(self, using=None, keep_parents=False):
+        """
+        Trinant įrašą:
+         - pašalina originalų failą
+         - pašalina naują ir seną preview (jei yra)
+        """
+        storage = self.failas.storage
+        orig = getattr(self.failas, "name", None)
+        rel_new = self._preview_relpath()
+        rel_old = self._legacy_preview_relpath()
 
         super().delete(using=using, keep_parents=keep_parents)
 
-        if name and storage.exists(name):
-            storage.delete(name)
-        if preview_name and storage.exists(preview_name):
-            storage.delete(preview_name)
+        for path in (orig, rel_new, rel_old):
+            try:
+                if path and storage.exists(path):
+                    storage.delete(path)
+            except Exception:
+                pass
+
+
+# ======================= Naujas modelis: KainosEilute =======================
+
+class KainosEilute(models.Model):
+    MATAS_CHOICES = [("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2")]
+    BUSENA_CHOICES = [("aktuali", "Aktuali"), ("sena", "Sena"), ("pasiulymas", "Pasiūlymas")]
+
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainu_eilutes")
+    kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=2)
+    matas = models.CharField("Matas", max_length=10, choices=MATAS_CHOICES, default="vnt.", db_index=True)
+
+    # kiekio dimensija
+    yra_fiksuota = models.BooleanField("Fiksuotas kiekis", default=False, db_index=True)
+    fiksuotas_kiekis = models.IntegerField("Fiksuotas kiekis", null=True, blank=True)
+    kiekis_nuo = models.IntegerField("Kiekis nuo", null=True, blank=True)
+    kiekis_iki = models.IntegerField("Kiekis iki", null=True, blank=True)
+
+    # laikas
+    galioja_nuo = models.DateField("Galioja nuo", null=True, blank=True, db_index=True)
+    galioja_iki = models.DateField("Galioja iki", null=True, blank=True, db_index=True)
+
+    busena = models.CharField("Būsena", max_length=20, choices=BUSENA_CHOICES, default="aktuali", db_index=True)
+    prioritetas = models.IntegerField("Prioritetas", default=100, help_text="Mažesnis laimi, kai yra keli galimi")
+
+    pastaba = models.TextField("Pastaba", null=True, blank=True)
+
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        indexes = [
+            Index(fields=["pozicija", "matas", "busena"]),
+            Index(fields=["pozicija", "created"]),
+            Index(fields=["pozicija", "galioja_nuo", "galioja_iki"]),
+        ]
+        constraints = [
+            UniqueConstraint(
+                condition=Q(busena="aktuali", yra_fiksuota=True),
+                fields=["pozicija", "matas", "fiksuotas_kiekis"],
+                name="uniq_aktuali_fiksuota",
+            ),
+        ]
+        ordering = ["-created"]
+        verbose_name = "Kainos eilutė"
+        verbose_name_plural = "Kainų eilutės"
+
+    def __str__(self):
+        if self.yra_fiksuota:
+            scope = f"fx {self.fiksuotas_kiekis} {self.matas}"
+        else:
+            iki = self.kiekis_iki if self.kiekis_iki is not None else "∞"
+            scope = f"[{self.kiekis_nuo}-{iki}] {self.matas}"
+        return f"{self.pozicija} – {self.kaina} ({scope})"
+
+    def clean(self):
+        if self.yra_fiksuota:
+            if self.fiksuotas_kiekis is None:
+                raise ValidationError("Fiksuotai kainai privalomas „fiksuotas_kiekis“.")
+            if self.kiekis_nuo is not None or self.kiekis_iki is not None:
+                raise ValidationError("Fiksuotai kainai „kiekis_nuo/iki“ turi būti tušti.")
+        else:
+            if self.kiekis_nuo is None and self.kiekis_iki is None:
+                raise ValidationError("Intervalinei kainai užpildykite bent „kiekis_nuo“ arba „kiekis_iki“.")
+            if self.kiekis_nuo is not None and self.kiekis_iki is not None:
+                if self.kiekis_iki < self.kiekis_nuo:
+                    raise ValidationError("„kiekis_iki“ negali būti mažesnis už „kiekis_nuo“.")
