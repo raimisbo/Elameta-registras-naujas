@@ -98,3 +98,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- Default primary key field ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ===================== Pasiūlymo (offer) nustatymai =====================
+
+# Naudojama PDF pasiūlymo header'yje (proposal_pdf)
+OFFER_COMPANY_NAME = "UAB Elameta"
+OFFER_COMPANY_LINE1 = "Adresas, LT-00000, Miestas"
+OFFER_COMPANY_LINE2 = "Tel. +370 000 00000, el. paštas info@elameta.lt"

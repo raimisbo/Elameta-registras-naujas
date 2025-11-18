@@ -35,25 +35,16 @@
 
       {# Mygtuko „Atnaujinti“ NEBĖRA – varnelės persiunčia formą automatiškai #}
 
-      {% if qs %}
-        <a class="btn btn-secondary"
-           href="{% url 'pozicijos:pdf' pozicija.pk %}?{{ qs }}&preview=1">
-          Peržiūra (HTML)
-        </a>
-        <a class="btn"
-           href="{% url 'pozicijos:pdf' pozicija.pk %}?{{ qs }}">
-          PDF
-        </a>
-      {% else %}
-        <a class="btn btn-secondary"
-           href="{% url 'pozicijos:pdf' pozicija.pk %}?preview=1">
-          Peržiūra (HTML)
-        </a>
-        <a class="btn"
-           href="{% url 'pozicijos:pdf' pozicija.pk %}">
-          PDF
-        </a>
-      {% endif %}
+      <a href="#" class="btn btn-secondary"
+         id="btn-preview-html"
+         data-base-url="{% url 'pozicijos:pdf' pozicija.pk %}">
+        Peržiūra (HTML)
+      </a>
+      <a href="#" class="btn"
+         id="btn-pdf"
+         data-base-url="{% url 'pozicijos:pdf' pozicija.pk %}">
+        PDF
+      </a>
     </div>
   </div>
 </form>
@@ -65,6 +56,28 @@
     const form = document.getElementById('proposal-form');
     if (!form) return;
 
+    const notesField = form.querySelector('textarea[name="notes"]');
+    const showPricesField = form.querySelector('input[name="show_prices"]');
+    const showDrawingsField = form.querySelector('input[name="show_drawings"]');
+
+    function buildParams() {
+      const params = new URLSearchParams();
+
+      if (showPricesField && showPricesField.checked) {
+        params.set('show_prices', '1');
+      }
+      if (showDrawingsField && showDrawingsField.checked) {
+        params.set('show_drawings', '1');
+      }
+      if (notesField) {
+        const notesVal = notesField.value.trim();
+        if (notesVal) {
+          params.set('notes', notesVal);
+        }
+      }
+      return params.toString();
+    }
+
     // automatinis submit, kai keičiasi varnelės
     form.addEventListener('change', function (e) {
       const t = e.target;
@@ -73,6 +86,36 @@
         form.submit();
       }
     });
+
+    function attachButton(id, extraParam) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      const baseUrl = btn.getAttribute('data-base-url');
+      if (!baseUrl) return;
+
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        const qsStr = buildParams();
+        const finalParams = new URLSearchParams(qsStr);
+
+        if (extraParam) {
+          Object.keys(extraParam).forEach(function (key) {
+            finalParams.set(key, extraParam[key]);
+          });
+        }
+
+        let url = baseUrl;
+        const finalQs = finalParams.toString();
+        if (finalQs) {
+          url += '?' + finalQs;
+        }
+        window.location.href = url;
+      });
+    }
+
+    attachButton('btn-preview-html', {preview: '1'});
+    attachButton('btn-pdf', null);
   })();
 </script>
 {% endblock %}

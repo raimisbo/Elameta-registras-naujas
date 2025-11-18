@@ -10,6 +10,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
@@ -75,7 +76,14 @@ def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
         value = getattr(pozicija, field.name, None)
         if value in (None, ""):
             continue
-        label = str(field.verbose_name or field.name).capitalize()
+
+        # Specialus formatas dabartinei kainai: be (EUR), su € prieš sumą
+        if field.name == "kaina_eur":
+            label = "Dabartinė kaina"
+            rows.append((label, f"€ {value}"))
+            continue
+
+        label = str(field.verbose_name or field.name)
         rows.append((label, value))
     return rows
 
@@ -88,6 +96,47 @@ def _get_kainos_for_pdf(pozicija: Pozicija):
     return pozicija.kainu_eilutes.filter(busena="aktuali").order_by(
         "matas", "yra_fiksuota", "kiekis_nuo", "fiksuotas_kiekis", "galioja_nuo"
     )
+
+
+def _build_params_qs(show_prices: bool, show_drawings: bool, notes: str) -> str:
+    """
+    Pagal dabartinę formos būseną paruošia QS dalį be „preview“ parametro.
+    Naudojama ir paruošimo formoje, ir peržiūros šablone (Atgal mygtukui).
+    """
+    params: dict[str, str] = {}
+    if show_prices:
+        params["show_prices"] = "1"
+    if show_drawings:
+        params["show_drawings"] = "1"
+    notes_clean = (notes or "").strip()
+    if notes_clean:
+        params["notes"] = notes_clean
+    return urlencode(params)
+
+
+def _wrap_text_for_pdf(text: str, font_name: str, font_size: float, max_width: float) -> list[str]:
+    """
+    Paprastas žodžių laužymas pagal max_width.
+    Grąžina sąrašą eilučių, kurios tilps į nurodytą plotį.
+    """
+    words = text.split()
+    if not words:
+        return [""]
+
+    lines: list[str] = []
+    current = words[0]
+
+    for w in words[1:]:
+        candidate = current + " " + w
+        w_width = pdfmetrics.stringWidth(candidate, font_name, font_size)
+        if w_width <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = w
+    if current:
+        lines.append(current)
+    return lines
 
 
 # ===== Views: UI puslapis ====================================================
@@ -103,15 +152,7 @@ def proposal_prepare(request, pk: int):
     show_drawings = bool(request.GET.get("show_drawings"))
     notes = request.GET.get("notes", "")
 
-    # QS stringas HTML / PDF nuorodoms
-    params: dict[str, str] = {}
-    if show_prices:
-        params["show_prices"] = "1"
-    if show_drawings:
-        params["show_drawings"] = "1"
-    if notes:
-        params["notes"] = notes
-    qs = urlencode(params)
+    qs = _build_params_qs(show_prices, show_drawings, notes)
 
     context = {
         "pozicija": pozicija,
@@ -140,6 +181,7 @@ def proposal_pdf(request, pk: int):
     field_rows = _build_field_rows(pozicija)
     kainos = _get_kainos_for_pdf(pozicija)
     brez = list(pozicija.breziniai.all())
+    qs = _build_params_qs(show_prices, show_drawings, notes)
 
     if preview:
         # HTML peržiūra – čia viskas su tavo baziniu CSS.
@@ -151,6 +193,7 @@ def proposal_pdf(request, pk: int):
             "show_prices": show_prices,
             "show_drawings": show_drawings,
             "notes": notes,
+            "qs": qs,
         }
         return render(request, "pozicijos/proposal_pdf.html", ctx)
 
@@ -158,106 +201,338 @@ def proposal_pdf(request, pk: int):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
+    margin = 20 * mm
 
     font_regular, font_bold = _register_fonts()
+    c.setLineWidth(0.4)
 
-    # viršuje – logotipas + antraštė
-    c.setFont(font_regular, 10)
-    y = height - 30 * mm
+    # ---- VIRŠUTINĖ PILKA JUOSTA + LOGO + REKVIZITAI ------------------------
+    top_bar_h = 24 * mm
+    top_offset = 10 * mm  # papildomas nusileidimas žemyn
+    top_bar_y = height - top_bar_h - top_offset
+
+    # pilka juosta per visą lapo plotį
+    c.setFillColor(colors.HexColor("#F3F4F6"))
+    c.rect(0, top_bar_y, width, top_bar_h, fill=1, stroke=0)
 
     logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
+    logo_h = 14 * mm
+    logo_w = 35 * mm
+    logo_y = top_bar_y + (top_bar_h - logo_h) / 2
+    logo_x = margin
+
     if os.path.exists(logo_path):
         try:
             img = ImageReader(logo_path)
-            c.drawImage(img, 20 * mm, height - 25 * mm,
-                        width=40 * mm, preserveAspectRatio=True, mask="auto")
+            c.drawImage(
+                img,
+                logo_x,
+                logo_y,
+                width=logo_w,
+                height=logo_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
         except Exception:
             pass
 
+    # Rekvizitai dešinėje, ant pilkos juostos
+    company_name = getattr(settings, "OFFER_COMPANY_NAME", "Įmonės pavadinimas")
+    company_line1 = getattr(settings, "OFFER_COMPANY_LINE1", "Adresas, miestas")
+    company_line2 = getattr(settings, "OFFER_COMPANY_LINE2", "Tel. / el. paštas")
+
+    text_right_x = width - margin
+    text_top_y = top_bar_y + top_bar_h - 6 * mm
+
+    c.setFont(font_bold, 10)
+    c.setFillColor(colors.HexColor("#111827"))
+    c.drawRightString(text_right_x, text_top_y, company_name)
+
+    c.setFont(font_regular, 8.5)
+    c.setFillColor(colors.HexColor("#374151"))
+    c.drawRightString(text_right_x, text_top_y - 4 * mm, company_line1)
+    c.drawRightString(text_right_x, text_top_y - 8 * mm, company_line2)
+
+    # ---- PAVADINIMAS IR KLIENTO BLOKAS -------------------------------------
     c.setFont(font_bold, 20)
-    c.drawCentredString(width / 2, height - 20 * mm, "Pasiūlymas")
+    c.setFillColor(colors.HexColor("#111827"))
+    # šiek tiek atitrauktas nuo pilkos juostos
+    title_y = top_bar_y - 16 * mm
+    c.drawCentredString(width / 2, title_y, "PASIŪLYMAS")
 
     c.setFont(font_regular, 10)
-    c.drawRightString(width - 20 * mm, height - 20 * mm, f"Pozicija: {pozicija.poz_kodas}")
+    c.setFillColor(colors.HexColor("#111827"))
+    info_y = title_y - 16 * mm
+    latest_info_y = info_y
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    c.drawRightString(width - margin, info_y, f"Data: {today_str}")
+    latest_info_y = info_y
+    info_y -= 6 * mm
+
+    if pozicija.klientas:
+        c.drawString(margin, info_y, f"Klientas: {pozicija.klientas}")
+        latest_info_y = info_y
+        info_y -= 5 * mm
+    if pozicija.projektas:
+        c.drawString(margin, info_y, f"Projektas: {pozicija.projektas}")
+        latest_info_y = info_y
+        info_y -= 5 * mm
+
+    c.drawString(margin, info_y, f"Pozicijos kodas: {pozicija.poz_kodas}")
+    latest_info_y = info_y
+    info_y -= 5 * mm
     if pozicija.poz_pavad:
-        c.drawRightString(width - 20 * mm, height - 25 * mm, f"Detalė: {pozicija.poz_pavad}")
+        c.drawString(margin, info_y, f"Detalė: {pozicija.poz_pavad}")
+        latest_info_y = info_y
+        info_y -= 5 * mm
 
-    y = height - 35 * mm
-    c.line(20 * mm, y, width - 20 * mm, y)
-    y -= 10
+    # pilka linija PO viso šito bloko
+    c.setStrokeColor(colors.HexColor("#E5E7EB"))
+    line_y = latest_info_y - 4 * mm
+    c.line(margin, line_y, width - margin, line_y)
 
-    # Pagrindinė informacija (visos kortelės opcijos, be tuščių)
-    c.setFont(font_bold, 12)
-    c.drawString(20 * mm, y, "Pagrindinė informacija")
-    y -= 8
-    c.setFont(font_regular, 10)
+    # turinio startas – aiškiai žemiau linijos
+    y = line_y - 12 * mm
 
-    for label, val in field_rows:
-        text = f"{label}: {val}"
-        if y < 30 * mm:
+    # ---- PAGRINDINĖ INFORMACIJA – DVI KOLONOS ------------------------------
+    c.setFillColor(colors.HexColor("#111827"))
+    c.setFont(font_bold, 13)
+    c.drawString(margin, y, "Pagrindinė informacija")
+    y -= 6
+    c.setStrokeColor(colors.HexColor("#D1D5DB"))
+    c.line(margin, y, width - margin, y)
+    y -= 14  # tarpas po brūkšniu
+
+    c.setFont(font_regular, 9.5)
+    label_font_size = 9.5
+    value_font_size = 9.5
+
+    col1_label_x = margin
+    col1_val_x = margin + 30 * mm
+    col2_label_x = margin + 90 * mm
+    col2_val_x = margin + 120 * mm
+
+    row_height = 7 * mm
+
+    c.setFillColor(colors.HexColor("#111827"))
+    row_y = y
+
+    for idx, (label, val) in enumerate(field_rows):
+        if idx % 2 == 0 and idx != 0:
+            row_y -= row_height
+
+        if row_y < 40 * mm:
             c.showPage()
-            c.setFont(font_regular, 10)
-            y = height - 30 * mm
-        c.drawString(20 * mm, y, text)
-        y -= 12
+            width, height = A4
+            margin = 20 * mm
+            c.setLineWidth(0.4)
 
-    # Kainos
+            c.setFont(font_bold, 12)
+            c.setFillColor(colors.HexColor("#111827"))
+            c.drawString(margin, height - 30 * mm, "Pagrindinė informacija (tęsinys)")
+            c.setStrokeColor(colors.HexColor("#D1D5DB"))
+            c.line(margin, height - 32 * mm, width - margin, height - 32 * mm)
+
+            row_y = height - 44 * mm
+            c.setFont(font_regular, value_font_size)
+            c.setFillColor(colors.HexColor("#111827"))
+
+        if idx % 2 == 0:
+            lx = col1_label_x
+            vx = col1_val_x
+        else:
+            lx = col2_label_x
+            vx = col2_val_x
+
+        c.setFont(font_bold, label_font_size)
+        c.setFillColor(colors.HexColor("#374151"))
+        c.drawString(lx, row_y, f"{label}:")
+
+        c.setFont(font_regular, value_font_size)
+        c.setFillColor(colors.HexColor("#111827"))
+        text_val = str(val)
+        if len(text_val) > 60:
+            text_val = text_val[:57] + "…"
+        c.drawString(vx, row_y, text_val)
+
+    if len(field_rows) % 2 == 1:
+        row_y -= row_height
+
+    y = row_y - 14 * mm
+
+    # ---- POZICIJOS PASTABOS (pilnas laukas iš pozicija.pastabos) -----------
+    poz_past = (pozicija.pastabos or "").strip()
+    if poz_past:
+        if y < 60 * mm:
+            c.showPage()
+            width, height = A4
+            margin = 20 * mm
+            c.setLineWidth(0.4)
+            y = height - 30 * mm
+
+        c.setFillColor(colors.HexColor("#111827"))
+        c.setFont(font_bold, 13)
+        c.drawString(margin, y, "Pozicijos pastabos")
+        y -= 6
+        c.setStrokeColor(colors.HexColor("#D1D5DB"))
+        c.line(margin, y, width - margin, y)
+        y -= 10
+
+        font_size_poz = 9.5
+        c.setFont(font_regular, font_size_poz)
+        c.setFillColor(colors.HexColor("#111827"))
+
+        max_width = width - 2 * margin
+        wrapped_lines: list[str] = []
+        for raw in poz_past.splitlines() or [poz_past]:
+            if not raw.strip():
+                wrapped_lines.append("")
+                continue
+            wrapped_lines.extend(
+                _wrap_text_for_pdf(raw, font_regular, font_size_poz, max_width)
+            )
+
+        for line in wrapped_lines:
+            if y < 30 * mm:
+                c.showPage()
+                width, height = A4
+                margin = 20 * mm
+                c.setLineWidth(0.4)
+                c.setFont(font_regular, font_size_poz)
+                y = height - 30 * mm
+            c.drawString(margin, y, line)
+            y -= 11
+
+        y -= 8
+
+    # ---- KAINOS -------------------------------------------------------------
     if show_prices and kainos:
         if y < 60 * mm:
             c.showPage()
-            c.setFont(font_regular, 10)
+            width, height = A4
+            margin = 20 * mm
+            c.setLineWidth(0.4)
             y = height - 30 * mm
 
-        c.setFont(font_bold, 12)
-        c.drawString(20 * mm, y, "Kainos")
-        y -= 8
+        c.setFillColor(colors.HexColor("#111827"))
+        c.setFont(font_bold, 13)
+        c.drawString(margin, y, "Kainos")
+        y -= 6
+        c.setStrokeColor(colors.HexColor("#D1D5DB"))
+        c.line(margin, y, margin + 30 * mm, y)
+        y -= 10
+
         c.setFont(font_regular, 9)
 
-        headers = ["Kaina €", "Matas", "Tipas", "Nuo", "Iki", "Fiks. kiekis", "Galioja nuo", "Galioja iki"]
-        col_x = [20, 45, 65, 88, 110, 135, 165, 195]  # mm
+        headers = ["Kaina", "Matas", "Tipas", "Nuo", "Iki", "Fiks. kiekis", "Galioja nuo", "Galioja iki"]
+        col_x = [
+            margin,
+            margin + 25 * mm,
+            margin + 40 * mm,
+            margin + 63 * mm,
+            margin + 80 * mm,
+            margin + 98 * mm,
+            margin + 125 * mm,
+            margin + 150 * mm,
+        ]
+
+        c.setFillColor(colors.HexColor("#4B5563"))
         for hx, h in zip(col_x, headers):
-            c.drawString(hx * mm, y, h)
-        y -= 6
-        c.line(20 * mm, y, (width - 20 * mm), y)
+            c.drawString(hx, y, h)
+        y -= 4
+        c.setStrokeColor(colors.HexColor("#E5E7EB"))
+        c.line(margin, y, width - margin, y)
         y -= 8
 
-        for k in kainos:
-            if y < 30 * mm:
-                c.showPage()
-                c.setFont(font_regular, 9)
-                y = height - 30 * mm
-            tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
-            c.drawString(col_x[0] * mm, y, f"{k.kaina}")
-            c.drawString(col_x[1] * mm, y, k.matas)
-            c.drawString(col_x[2] * mm, y, tipas)
-            c.drawString(col_x[3] * mm, y, str(k.kiekis_nuo or "—"))
-            c.drawString(col_x[4] * mm, y, str(k.kiekis_iki or "—"))
-            c.drawString(col_x[5] * mm, y, str(k.fiksuotas_kiekis or "—"))
-            c.drawString(col_x[6] * mm, y, k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—")
-            c.drawString(col_x[7] * mm, y, k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—")
-            y -= 10
+        c.setFont(font_regular, 9)
+        c.setFillColor(colors.HexColor("#111827"))
 
-    # Brėžinių miniatiūros (PDF'e naudojam originalų vaizdą)
+        for k in kainos:
+            if y < 40 * mm:
+                c.showPage()
+                width, height = A4
+                margin = 20 * mm
+                c.setLineWidth(0.4)
+                c.setFont(font_bold, 12)
+                c.setFillColor(colors.HexColor("#111827"))
+                c.drawString(margin, height - 30 * mm, "Kainos (tęsinys)")
+                c.setStrokeColor(colors.HexColor("#D1D5DB"))
+                c.line(margin, height - 32 * mm, width - margin, height - 32 * mm)
+                y = height - 46 * mm
+                c.setFont(font_regular, 9)
+                c.setFillColor(colors.HexColor("#111827"))
+
+            tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
+            price_str = f"€ {k.kaina}"
+            c.drawString(col_x[0], y, price_str)
+            c.drawString(col_x[1], y, k.matas)
+            c.drawString(col_x[2], y, tipas)
+            c.drawString(col_x[3], y, str(k.kiekis_nuo or "—"))
+            c.drawString(col_x[4], y, str(k.kiekis_iki or "—"))
+            c.drawString(col_x[5], y, str(k.fiksuotas_kiekis or "—"))
+            c.drawString(
+                col_x[6],
+                y,
+                k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—",
+            )
+            c.drawString(
+                col_x[7],
+                y,
+                k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—",
+            )
+            y -= 9
+
+        y -= 10
+
+    # ---- BRĖŽINIŲ MINIATIŪROS ----------------------------------------------
     if show_drawings and brez:
-        if y < 60 * mm:
+        y -= 6 * mm
+
+        if y < 70 * mm:
             c.showPage()
-            c.setFont(font_regular, 10)
+            width, height = A4
+            margin = 20 * mm
+            c.setLineWidth(0.4)
             y = height - 30 * mm
 
-        c.setFont(font_bold, 12)
-        c.drawString(20 * mm, y, "Brėžinių miniatiūros")
-        y -= 10
+        c.setFillColor(colors.HexColor("#111827"))
+        c.setFont(font_bold, 13)
+        c.drawString(margin, y, "Brėžinių miniatiūros")
+        y -= 6
+        c.setStrokeColor(colors.HexColor("#D1D5DB"))
+        c.line(margin, y, margin + 45 * mm, y)
+        y -= 12
 
         thumb_w = 50 * mm
         thumb_h = 35 * mm
-        x = 20 * mm
+        card_gap_x = 10 * mm
+        card_gap_y = 18 * mm
+
+        x = margin
+        row_top_y = y
 
         for b in brez:
-            if y < 40 * mm:
+            if x + thumb_w > width - margin:
+                x = margin
+                row_top_y -= thumb_h + card_gap_y
+
+            if row_top_y - thumb_h < 40 * mm:
                 c.showPage()
-                c.setFont(font_regular, 10)
-                y = height - 30 * mm
-                x = 20 * mm
+                width, height = A4
+                margin = 20 * mm
+                c.setLineWidth(0.4)
+                c.setFont(font_bold, 12)
+                c.setFillColor(colors.HexColor("#111827"))
+                c.drawString(margin, height - 30 * mm, "Brėžinių miniatiūros (tęsinys)")
+                c.setStrokeColor(colors.HexColor("#D1D5DB"))
+                c.line(margin, height - 32 * mm, width - margin, height - 32 * mm)
+                row_top_y = height - 48 * mm
+                x = margin
+
+            card_h = thumb_h + 10 * mm
+            c.setFillColor(colors.whitesmoke)
+            c.roundRect(x, row_top_y - card_h, thumb_w, card_h, 3 * mm, fill=1, stroke=0)
 
             img_path = None
             try:
@@ -265,49 +540,82 @@ def proposal_pdf(request, pk: int):
             except Exception:
                 img_path = None
 
+            img_y = row_top_y - 8 * mm
             if img_path and os.path.exists(img_path):
                 try:
-                    c.drawImage(ImageReader(img_path), x, y - thumb_h,
-                                width=thumb_w, height=thumb_h,
-                                preserveAspectRatio=True, mask="auto")
+                    c.drawImage(
+                        ImageReader(img_path),
+                        x + 3 * mm,
+                        img_y - thumb_h,
+                        width=thumb_w - 6 * mm,
+                        height=thumb_h,
+                        preserveAspectRatio=True,
+                        mask="auto",
+                    )
                 except Exception:
-                    c.rect(x, y - thumb_h, thumb_w, thumb_h)
+                    c.setStrokeColor(colors.HexColor("#D1D5DB"))
+                    c.rect(x + 3 * mm, img_y - thumb_h, thumb_w - 6 * mm, thumb_h)
             else:
-                c.rect(x, y - thumb_h, thumb_w, thumb_h)
+                c.setStrokeColor(colors.HexColor("#D1D5DB"))
+                c.rect(x + 3 * mm, img_y - thumb_h, thumb_w - 6 * mm, thumb_h)
 
-            title = b.pavadinimas or b.filename
-            c.drawString(x, y - thumb_h - 8, title[:40])
+            # be pavadinimo teksto po paveiksliuku
+            x += thumb_w + card_gap_x
 
-            x += thumb_w + 10 * mm
-            if x + thumb_w > width - 20 * mm:
-                x = 20 * mm
-                y -= thumb_h + 20
+        y = row_top_y - thumb_h - card_gap_y
 
-    # Pastabos
+    # ---- PASTABOS IŠ FORMOS (notes) ----------------------------------------
     if notes:
         if y < 60 * mm:
             c.showPage()
-            c.setFont(font_regular, 10)
+            width, height = A4
+            margin = 20 * mm
+            c.setLineWidth(0.4)
             y = height - 30 * mm
 
-        c.setFont(font_bold, 12)
-        c.drawString(20 * mm, y, "Pastabos / sąlygos")
+        c.setFillColor(colors.HexColor("#111827"))
+        c.setFont(font_bold, 13)
+        c.drawString(margin, y, "Pastabos / sąlygos")
+        y -= 6
+        c.setStrokeColor(colors.HexColor("#D1D5DB"))
+        c.line(margin, y, margin + 45 * mm, y)
         y -= 10
-        c.setFont(font_regular, 10)
 
-        for line in notes.splitlines():
+        font_size_notes = 9.5
+        c.setFont(font_regular, font_size_notes)
+        c.setFillColor(colors.HexColor("#111827"))
+
+        max_width = width - 2 * margin
+        wrapped_lines: list[str] = []
+
+        for raw in notes.splitlines() or [notes]:
+            if not raw.strip():
+                wrapped_lines.append("")
+                continue
+            wrapped_lines.extend(
+                _wrap_text_for_pdf(raw, font_regular, font_size_notes, max_width)
+            )
+
+        for line in wrapped_lines:
             if y < 30 * mm:
                 c.showPage()
-                c.setFont(font_regular, 10)
+                width, height = A4
+                margin = 20 * mm
+                c.setLineWidth(0.4)
+                c.setFont(font_regular, font_size_notes)
                 y = height - 30 * mm
-            c.drawString(20 * mm, y, line)
-            y -= 12
+            c.drawString(margin, y, line)
+            y -= 11
 
-    # data apačioje
+    # ---- PORA INFORMACIJOS APAČIOJE ----------------------------------------
     c.setFont(font_regular, 8)
-    c.drawRightString(width - 20 * mm, 15 * mm, datetime.now().strftime("%Y-%m-%d %H:%M"))
+    c.setFillColor(colors.HexColor("#6B7280"))
+    c.drawRightString(
+        width - margin,
+        15 * mm,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
 
-    c.showPage()
     c.save()
 
     pdf = buffer.getvalue()

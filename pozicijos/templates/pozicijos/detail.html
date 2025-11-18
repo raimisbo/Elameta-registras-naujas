@@ -20,18 +20,31 @@
     <div class="box">
       <div class="box-head">
         <h3>Pagrindinė informacija</h3>
+        <div class="box-head-actions">
+          <button type="button"
+                  class="btn btn-secondary btn-sm"
+                  id="toggle-empty-rows">
+            Rodyti visus laukus
+          </button>
+        </div>
       </div>
       <table class="detail-table">
         <tbody>
+          {# 27+ laukai – tie patys, kaip lentelės stulpeliai (columns_schema) #}
           {% for col in columns_schema %}
             {% if col.type != "virtual" %}
               {% with val=pozicija|attr:col.key %}
-                {% if val %}
-                  <tr>
-                    <th>{{ col.label }}</th>
-                    <td>{{ val }}</td>
-                  </tr>
-                {% endif %}
+                {# tušti laukai pažymimi klase row-empty #}
+                <tr class="detail-row{% if not val %} row-empty{% endif %}">
+                  <th>{{ col.label }}</th>
+                  <td>
+                    {% if val %}
+                      {{ val }}
+                    {% else %}
+                      <span class="value-empty">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
               {% endwith %}
             {% endif %}
           {% endfor %}
@@ -64,7 +77,7 @@
             <tbody>
               {% for k in kainos_akt %}
                 <tr>
-                  <td>{{ k.kaina }} €</td>
+                  <td>€ {{ k.kaina }}</td>
                   <td>{{ k.matas }}</td>
                   <td>{% if k.yra_fiksuota %}Fiksuota{% else %}Intervalas{% endif %}</td>
                   <td>
@@ -152,6 +165,10 @@
 .detail-table{border-collapse:collapse;width:100%}
 .detail-table th,.detail-table td{border:1px solid #eee;padding:6px 8px;text-align:left;vertical-align:top}
 .detail-table th{background:#f8f8f8;width:220px}
+/* tušti laukai – kai rodome, jie truputį pilkesni */
+.detail-table tr.row-empty th,
+.detail-table tr.row-empty td{color:#6b7280;background:#f9fafb}
+.value-empty{color:#9ca3af;font-style:italic}
 
 /* ——— kainos lentelė ——— */
 .table-wrap{overflow:auto}
@@ -182,4 +199,30 @@
 .btn-xxs:hover{background:#f3f4f6}
 .btn-xxs.danger{border-color:#fecaca;background:#fee2e2;color:#7f1d1d}
 </style>
+{% endblock %}
+
+{% block page_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.getElementById('toggle-empty-rows');
+  if (!btn) return;
+
+  let showAll = false; // start: rodome tik užpildytus
+  const rows = document.querySelectorAll('.detail-table tr.row-empty');
+
+  function update() {
+    rows.forEach(function(r){
+      r.style.display = showAll ? 'table-row' : 'none';
+    });
+    btn.textContent = showAll ? 'Rodyti tik užpildytus' : 'Rodyti visus laukus';
+  }
+
+  update();
+
+  btn.addEventListener('click', function(){
+    showAll = !showAll;
+    update();
+  });
+});
+</script>
 {% endblock %}

@@ -1,4 +1,3 @@
-# pozicijos/models.py
 from django.db import models
 from django.db.models import Q, Index, UniqueConstraint
 from django.core.exceptions import ValidationError
@@ -189,6 +188,49 @@ class PozicijosBrezinys(models.Model):
                 return storage.url(rel_old)
         except Exception:
             pass
+        return None
+
+    def preview_abspath(self) -> str | None:
+        """
+        Grąžina absoliutų kelią iki sugeneruoto PNG preview,
+        jei jis egzistuoja (pirmiausia naujas hash pavadinimas, po to legacy).
+        """
+        storage = self.failas.storage
+        rel_new = self._preview_relpath()
+        rel_old = self._legacy_preview_relpath()
+        for rel in (rel_new, rel_old):
+            try:
+                if storage.exists(rel):
+                    try:
+                        return storage.path(rel)
+                    except Exception:
+                        return None
+            except Exception:
+                continue
+        return None
+
+    def best_image_path_for_pdf(self) -> str | None:
+        """
+        Parenka geriausią kelią PDF'ui:
+        - jei yra PNG preview – grąžina jį
+        - kitaip, jei originalas yra PNG/JPG/JPEG – grąžina originalo path
+        - kitaip None (PDF/TIFF/CAD nerodom)
+        """
+        preview = self.preview_abspath()
+        if preview:
+            return preview
+
+        try:
+            orig_path = self.failas.path
+        except Exception:
+            orig_path = None
+
+        if not orig_path:
+            return None
+
+        ext = (self.ext or "").lower()
+        if ext in {"png", "jpg", "jpeg"}:
+            return orig_path
         return None
 
     # ---- Valymas trynimo metu ----
