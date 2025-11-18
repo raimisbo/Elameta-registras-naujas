@@ -33,4 +33,5 @@ urlpatterns = [
     path("kainos/<int:id>/redaguoti/", kainos_views.kaina_update, name="kaina_update"),
     path("kainos/<int:id>/aktuali/", kainos_views.kaina_set_aktuali, name="kaina_set_aktuali"),
     path("kainos/<int:id>/salinti/", kainos_views.kaina_delete, name="kaina_delete"),
+    path("kainos/<int:id>/history/", kainos_views.kaina_history, name="kaina_history"),
 ]

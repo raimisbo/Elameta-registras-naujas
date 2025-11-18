@@ -1,91 +1,145 @@
 # pozicijos/kainos_views.py
-from decimal import Decimal
-from django.shortcuts import get_object_or_404, render, redirect
-from django.urls import reverse
+from __future__ import annotations
+
 from django.contrib import messages
-from django.views.decorators.http import require_POST
+from django.db import transaction
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import Pozicija, KainosEilute
-from .forms_kainos import KainaForm
-from .services.kainos import KainosCreateData, create_or_update_kaina, set_aktuali
+from .forms_kainos import KainaFormSet
+from .services.kainos import set_aktuali
 
 
-def kainos_list(request, pk):
+@require_http_methods(["GET", "POST"])
+def kainos_list(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Vieno lango kainų redagavimas (variantas A – formset ant Pozicija).
+
+    - Rodomos visos pasirinktos pozicijos kainos (pasirenkama būsenos/mato filtras).
+    - Viename puslapyje galima:
+        * kurti naujas eilutes,
+        * redaguoti esamas,
+        * pažymėti trynimui.
+    - Jeigu eilutei nustatoma busena='aktuali', set_aktuali pasirūpina, kad:
+        * toje grupėje liktų tik viena „aktuali“,
+        * senos būtų „sena“ ir, jei įmanoma, patrumpintas jų galiojimas,
+        * pozicija.kaina_eur būtų atnaujinta (sąrašo stulpeliui).
+    """
     pozicija = get_object_or_404(Pozicija, pk=pk)
-    qs = KainosEilute.objects.filter(pozicija=pozicija).order_by("-created")
 
-    busena = request.GET.get("busena")
+    busena = request.GET.get("busena", "")
+    matas = request.GET.get("matas", "")
+
+    base_qs = KainosEilute.objects.filter(pozicija=pozicija)
+
     if busena:
-        qs = qs.filter(busena=busena)
-    matas = request.GET.get("matas")
+        base_qs = base_qs.filter(busena=busena)
     if matas:
-        qs = qs.filter(matas=matas)
+        base_qs = base_qs.filter(matas=matas)
 
-    ctx = {
+    # aiški rikiuotė – ta pati, kaip istorijai/logikai
+    qs = base_qs.order_by(
+        "matas",
+        "yra_fiksuota",
+        "kiekis_nuo",
+        "fiksuotas_kiekis",
+        "prioritetas",
+        "-created",
+    )
+
+    if request.method == "POST":
+        formset = KainaFormSet(request.POST, instance=pozicija, queryset=qs)
+        if formset.is_valid():
+            with transaction.atomic():
+                # Trinamos eilutės
+                for form in formset.deleted_forms:
+                    if form.instance.pk:
+                        form.instance.delete()
+
+                # Išsaugomos / sukuriamos eilutės
+                instances = formset.save(commit=False)
+                for inst in instances:
+                    inst.pozicija = pozicija
+                    inst.save()
+
+                # Po saugojimo – pritaikom „aktuali“ logiką ten, kur reikia
+                for inst in instances:
+                    if inst.busena == "aktuali":
+                        # save=False, nes inst jau išsaugotas; set_aktuali tvarko senas ir pozicija.kaina_eur
+                        set_aktuali(inst, save=False)
+
+            messages.success(request, "Kainos išsaugotos.")
+            return redirect("pozicijos:kainos_list", pk=pozicija.pk)
+        else:
+            messages.error(request, "Patikrinkite formos klaidas.")
+    else:
+        formset = KainaFormSet(instance=pozicija, queryset=qs)
+
+    context = {
         "pozicija": pozicija,
-        "kainos": qs,
-        "busena": busena or "",
-        "matas": matas or "",
+        "formset": formset,
+        "busena": busena,
+        "matas": matas,
     }
-    return render(request, "pozicijos/kainos_list.html", ctx)
+    return render(request, "pozicijos/kainos_list.html", context)
 
 
-def kaina_create(request, pk):
-    pozicija = get_object_or_404(Pozicija, pk=pk)
-    if request.method == "POST":
-        form = KainaForm(request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            create_or_update_kaina(KainosCreateData(
-                pozicija=pozicija,
-                kaina=data["kaina"],
-                matas=data["matas"],
-                yra_fiksuota=data["yra_fiksuota"],
-                fiksuotas_kiekis=data.get("fiksuotas_kiekis"),
-                kiekis_nuo=data.get("kiekis_nuo"),
-                kiekis_iki=data.get("kiekis_iki"),
-                galioja_nuo=data.get("galioja_nuo"),
-                galioja_iki=data.get("galioja_iki"),
-                busena=data["busena"],
-                prioritetas=data["prioritetas"],
-                pastaba=data.get("pastaba"),
-            ))
-            messages.success(request, "Kaina išsaugota.")
-            return redirect("pozicijos:kainos_list", pk=pozicija.pk)
-    else:
-        form = KainaForm()
-    return render(request, "pozicijos/kaina_form.html", {"form": form, "pozicija": pozicija})
+def kaina_create(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Istoriškai buvęs atskiras „naujos kainos“ puslapis.
+    Dabar visas valdymas vyksta viename lange, todėl peradresuojam.
+    """
+    return redirect("pozicijos:kainos_list", pk=pk)
 
 
-def kaina_update(request, id):
+def kaina_update(request: HttpRequest, id: int) -> HttpResponse:
+    """
+    Istoriškai buvęs atskiras redagavimo puslapis – peradresuojam į bendrą sąrašą.
+    """
     k = get_object_or_404(KainosEilute, pk=id)
-    pozicija = k.pozicija
-    if request.method == "POST":
-        form = KainaForm(request.POST, instance=k)
-        if form.is_valid():
-            k = form.save()
-            if k.busena == "aktuali":
-                set_aktuali(k)
-            messages.success(request, "Kaina atnaujinta.")
-            return redirect("pozicijos:kainos_list", pk=pozicija.pk)
-    else:
-        form = KainaForm(instance=k)
-    return render(request, "pozicijos/kaina_form.html", {"form": form, "pozicija": pozicija, "obj": k})
+    return redirect("pozicijos:kainos_list", pk=k.pozicija_id)
 
 
 @require_POST
-def kaina_set_aktuali(request, id):
+def kaina_set_aktuali(request: HttpRequest, id: int) -> HttpResponse:
+    """
+    Jei šis URL naudojamas atskirai – pažymi eilutę kaip „aktuali“ ir sutvarko konfliktus.
+    """
     k = get_object_or_404(KainosEilute, pk=id)
-    set_aktuali(k)
-    messages.success(request, "Pažymėta „Aktuali“. Konfliktinės eilutės pasendintos.")
-    return redirect("pozicijos:kainos_list", pk=k.pozicija.pk)
+    set_aktuali(k)  # čia jau pats išsaugo ir atnaujina pozicija.kaina_eur
+    messages.success(request, "Kaina pažymėta kaip aktuali.")
+    return redirect("pozicijos:kainos_list", pk=k.pozicija_id)
 
 
-def kaina_delete(request, id):
+@require_POST
+def kaina_delete(request: HttpRequest, id: int) -> HttpResponse:
+    """
+    Paprastas trynimas (šiuo metu formset'e naudojam DELETE checkbox'ą, bet URL paliekam).
+    """
     k = get_object_or_404(KainosEilute, pk=id)
-    pozicija = k.pozicija
-    if request.method == "POST":
-        k.delete()
-        messages.success(request, "Įrašas pašalintas.")
-        return redirect("pozicijos:kainos_list", pk=pozicija.pk)
-    return render(request, "pozicijos/confirm_delete.html", {"obj": k, "back_url": reverse("pozicijos:kainos_list", args=[pozicija.pk])})
+    poz_id = k.pozicija_id
+    k.delete()
+    messages.success(request, "Kainos eilutė ištrinta.")
+    return redirect("pozicijos:kainos_list", pk=poz_id)
+
+
+def kaina_history(request: HttpRequest, id: int) -> HttpResponse:
+    """
+    Vienos KainosEilute įrašo istorija (simple_history).
+
+    Rodo:
+      - kada kaina sukurta / keista / ištrinta (history_type)
+      - reikšmes tuo metu (kaina, matas, kiekiai, busena ir pan.)
+      - kas keitė (history_user, jei yra)
+    """
+    kaina = get_object_or_404(KainosEilute, pk=id)
+    history_qs = kaina.history.all().order_by("-history_date")
+
+    context = {
+        "pozicija": kaina.pozicija,
+        "kaina": kaina,
+        "history": history_qs,
+    }
+    return render(request, "pozicijos/kaina_history.html", context)

@@ -1,0 +1,111 @@
+{# pozicijos/templates/pozicijos/kaina_history.html #}
+{% extends "base.html" %}
+
+{% block title %}Kainos istorija – {{ pozicija.poz_kodas }}{% endblock %}
+
+{% block content %}
+<h1 class="page-title">
+  Kainos istorija – {{ pozicija.poz_kodas }}
+  {% if pozicija.poz_pavad %}
+    <small style="color:#64748b">/ {{ pozicija.poz_pavad }}</small>
+  {% endif %}
+</h1>
+
+<div class="actions" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+  <a class="btn btn-secondary" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">
+    ← Atgal į kainas
+  </a>
+</div>
+
+<div class="box" style="margin-bottom:12px;">
+  <h3 style="margin:0 0 6px;">Eilutė</h3>
+  <p style="margin:0;font-size:14px;">
+    <strong>€ {{ kaina.kaina }}</strong> /
+    {{ kaina.matas }},
+    {% if kaina.yra_fiksuota %}
+      fiksuotas kiekis: {{ kaina.fiksuotas_kiekis }}
+    {% else %}
+      kiekis: {{ kaina.kiekis_nuo|default:"–" }} – {{ kaina.kiekis_iki|default:"∞" }}
+    {% endif %}
+    <br>
+    <strong>Būsena:</strong> {{ kaina.busena }} |
+    <strong>Galioja:</strong> {{ kaina.galioja_nuo|default:"–" }} – {{ kaina.galioja_iki|default:"∞" }} |
+    <strong>Prioritetas:</strong> {{ kaina.prioritetas }}
+    {% if kaina.pastaba %}
+      <br><strong>Pastaba:</strong> {{ kaina.pastaba }}
+    {% endif %}
+  </p>
+</div>
+
+<div class="box">
+  <h3 style="margin:0 0 6px;">Pakeitimų žurnalas</h3>
+  {% if history %}
+    <div style="overflow:auto;">
+      <table class="table zebra" style="min-width:900px;">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Veiksmas</th>
+            <th>€ Kaina</th>
+            <th>Matas</th>
+            <th>Tipas</th>
+            <th>Kiekis</th>
+            <th>Galioja</th>
+            <th>Būsena</th>
+            <th>Prior.</th>
+            <th>Pastaba</th>
+            <th>Vartotojas</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for h in history %}
+          <tr>
+            <td>{{ h.history_date|date:"Y-m-d H:i" }}</td>
+            <td>
+              {% if h.history_type == '+' %}
+                Sukurta
+              {% elif h.history_type == '~' %}
+                Pakeista
+              {% elif h.history_type == '-' %}
+                Ištrinta
+              {% else %}
+                –
+              {% endif %}
+            </td>
+            <td>€ {{ h.kaina }}</td>
+            <td>{{ h.matas }}</td>
+            <td>
+              {% if h.yra_fiksuota %}
+                Fiksuota
+              {% else %}
+                Intervalinė
+              {% endif %}
+            </td>
+            <td>
+              {% if h.yra_fiksuota %}
+                {{ h.fiksuotas_kiekis }}
+              {% else %}
+                {{ h.kiekis_nuo|default:"–" }} – {{ h.kiekis_iki|default:"∞" }}
+              {% endif %}
+            </td>
+            <td>{{ h.galioja_nuo|default:"–" }} – {{ h.galioja_iki|default:"∞" }}</td>
+            <td>{{ h.busena }}</td>
+            <td>{{ h.prioritetas }}</td>
+            <td>{{ h.pastaba|default:"" }}</td>
+            <td>
+              {% if h.history_user %}
+                {{ h.history_user }}
+              {% else %}
+                –
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted" style="margin:0;">Istorijos įrašų nėra.</p>
+  {% endif %}
+</div>
+{% endblock %}

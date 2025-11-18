@@ -1,14 +1,24 @@
+{# pozicijos/templates/pozicijos/kainos_list.html #}
 {% extends "base.html" %}
+
 {% block title %}Kainos – {{ pozicija.poz_kodas }}{% endblock %}
 
 {% block content %}
-<h1 style="margin:0 0 8px">Kainos – {{ pozicija.poz_kodas }} <small style="color:#64748b">/ {{ pozicija.poz_pavad }}</small></h1>
-<p style="margin:0 0 10px">
-  <a class="btn" href="{% url 'pozicijos:kaina_create' pozicija.pk %}">+ Nauja kaina</a>
-  <a class="btn btn-secondary" href="{% url 'pozicijos:detail' pozicija.pk %}">← Atgal į poziciją</a>
-</p>
+<h1 class="page-title">
+  Kainos – {{ pozicija.poz_kodas }}
+  {% if pozicija.poz_pavad %}
+    <small style="color:#64748b">/ {{ pozicija.poz_pavad }}</small>
+  {% endif %}
+</h1>
 
-<form method="get" class="box" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+<div class="actions" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+  <a class="btn btn-secondary" href="{% url 'pozicijos:detail' pozicija.pk %}">
+    ← Atgal į poziciją
+  </a>
+</div>
+
+<form method="get" class="box"
+      style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">
   <label> Būsena
     <select name="busena">
       <option value="">– visos –</option>
@@ -28,54 +38,208 @@
   <button class="btn btn-secondary" type="submit">Filtruoti</button>
 </form>
 
-<div class="box" style="overflow:auto">
-  <table class="table zebra" style="min-width:900px">
+<form method="post" class="box" style="overflow:auto;">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+    <div class="errorlist nonform" style="margin-bottom:8px;color:#b91c1c;">
+      {% for err in formset.non_form_errors %}
+        <div>{{ err }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+    <div style="font-size:14px;color:#4b5563;">
+      Redaguokite kainas viename lange.
+      Naujas eilutes pridėkite mygtuku <strong>„+ Pridėti eilutę“</strong>,
+      trynimui pažymėkite stulpelyje „Šalinti“.
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button type="button" id="add-row" class="btn btn-secondary">+ Pridėti eilutę</button>
+      <button type="submit" class="btn">Išsaugoti kainas</button>
+    </div>
+  </div>
+
+  <table class="table zebra"
+         style="min-width:1100px;border-collapse:separate;border-spacing:0;">
     <thead>
       <tr>
-        <th>Suma</th><th>Matas</th><th>Tipas</th><th>Kiekis</th>
-        <th>Galioja</th><th>Būsena</th><th>Prior.</th><th>Įrašyta</th><th>Veiksmai</th>
+        <th style="width:110px;">€ Suma</th>
+        <th style="width:80px;">Matas</th>
+        <th style="width:80px;">Tipas</th>
+        <th style="width:80px;">Kiekis nuo</th>
+        <th style="width:80px;">Kiekis iki</th>
+        <th style="width:90px;">Fiks. kiekis</th>
+        <th style="width:130px;">Galioja nuo</th>
+        <th style="width:130px;">Galioja iki</th>
+        <th style="width:110px;">Būsena</th>
+        <th style="width:70px;">Prior.</th>
+        <th>Pastaba</th>
+        <th style="width:110px;">Šalinti / istorija</th>
       </tr>
     </thead>
-    <tbody>
-      {% for k in kainos %}
-        <tr>
-          <td>{{ k.kaina }} €</td>
-          <td>{{ k.matas }}</td>
-          <td>{% if k.yra_fiksuota %}Fiksuota{% else %}Intervalas{% endif %}</td>
+    <tbody id="kainu-formset-body">
+      {% for form in formset %}
+        {% with st=form.instance.busena %}
+        <tr class="kaina-row
+                   {% if st == 'aktuali' %}kaina-row--aktuali
+                   {% elif st == 'sena' %}kaina-row--sena
+                   {% elif st == 'pasiulymas' %}kaina-row--pasiulymas
+                   {% endif %}">
           <td>
-            {% if k.yra_fiksuota %}
-              {{ k.fiksuotas_kiekis }}
-            {% else %}
-              {{ k.kiekis_nuo|default:"–" }} – {{ k.kiekis_iki|default:"∞" }}
-            {% endif %}
+            {{ form.id }}
+            {{ form.kaina.errors }}
+            {{ form.kaina }}
           </td>
-          <td>{{ k.galioja_nuo|default:"–" }} – {{ k.galioja_iki|default:"∞" }}</td>
           <td>
-            {% if k.busena == 'aktuali' %}
-              <span style="background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:2px 6px;border-radius:6px">Aktuali</span>
-            {% elif k.busena == 'sena' %}
-              <span style="background:#f3f4f6;border:1px solid #e5e7eb;color:#374151;padding:2px 6px;border-radius:6px">Sena</span>
-            {% else %}
-              <span style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;padding:2px 6px;border-radius:6px">Pasiūlymas</span>
-            {% endif %}
+            {{ form.matas.errors }}
+            {{ form.matas }}
           </td>
-          <td>{{ k.prioritetas }}</td>
-          <td>{{ k.created|date:"Y-m-d" }}</td>
-          <td style="white-space:nowrap">
-            <a class="btn btn-secondary" href="{% url 'pozicijos:kaina_update' k.id %}">Redaguoti</a>
-            {% if k.busena != 'aktuali' %}
-              <form action="{% url 'pozicijos:kaina_set_aktuali' k.id %}" method="post" style="display:inline">
-                {% csrf_token %}
-                <button class="btn" type="submit">Padaryti aktualia</button>
-              </form>
+          <td>
+            {{ form.yra_fiksuota.errors }}
+            <label style="display:flex;align-items:center;gap:4px;justify-content:center;">
+              {{ form.yra_fiksuota }}
+              <span style="font-size:12px;">Fiksuota</span>
+            </label>
+          </td>
+          <td>
+            {{ form.kiekis_nuo.errors }}
+            {{ form.kiekis_nuo }}
+          </td>
+          <td>
+            {{ form.kiekis_iki.errors }}
+            {{ form.kiekis_iki }}
+          </td>
+          <td>
+            {{ form.fiksuotas_kiekis.errors }}
+            {{ form.fiksuotas_kiekis }}
+          </td>
+          <td>
+            {{ form.galioja_nuo.errors }}
+            {{ form.galioja_nuo }}
+          </td>
+          <td>
+            {{ form.galioja_iki.errors }}
+            {{ form.galioja_iki }}
+          </td>
+          <td>
+            {{ form.busena.errors }}
+            {{ form.busena }}
+          </td>
+          <td>
+            {{ form.prioritetas.errors }}
+            {{ form.prioritetas }}
+          </td>
+          <td>
+            {{ form.pastaba.errors }}
+            {{ form.pastaba }}
+          </td>
+          <td style="text-align:center; white-space:nowrap;">
+            {{ form.DELETE }}
+            {% if form.instance.pk %}
+              <a href="{% url 'pozicijos:kaina_history' form.instance.pk %}"
+                 class="btn-xxs"
+                 style="margin-left:4px;">Istorija</a>
             {% endif %}
-            <a class="btn btn-secondary" href="{% url 'pozicijos:kaina_delete' k.id %}">Šalinti</a>
           </td>
         </tr>
+        {% endwith %}
       {% empty %}
-        <tr><td colspan="9">Nėra įrašų.</td></tr>
+        <tr>
+          <td colspan="12">Nėra įrašų.</td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
-</div>
+
+  <p style="margin-top:10px;font-size:12px;color:#6b7280;">
+    <strong>Tipas:</strong> pažymėjus „Fiksuota“, naudojamas tik stulpelis „Fiksuotas kiekis“,
+    o „Kiekis nuo/iki“ turi būti tušti. Intervalinei kainai užpildykite bent
+    „Kiekis nuo“ arba „Kiekis iki“.
+  </p>
+  <p style="margin-top:4px;font-size:12px;color:#6b7280;">
+    <strong>Istorija:</strong> dabartinė „aktuali“ kaina pažymėta žalsvai, senos – pilkesnės,
+    „pasiūlymas“ – melsvas. Galiojimo intervalai matomi stulpelyje „Galioja“.
+    Savo pakeitimų žurnalą rasite paspaudę „Istorija“.
+  </p>
+</form>
+
+<template id="empty-form-template">
+  {% with form=formset.empty_form %}
+  <tr class="kaina-row">
+    <td>
+      {{ form.id }}
+      {{ form.kaina }}
+    </td>
+    <td>{{ form.matas }}</td>
+    <td>
+      <label style="display:flex;align-items:center;gap:4px;justify-content:center;">
+        {{ form.yra_fiksuota }}
+        <span style="font-size:12px;">Fiksuota</span>
+      </label>
+    </td>
+    <td>{{ form.kiekis_nuo }}</td>
+    <td>{{ form.kiekis_iki }}</td>
+    <td>{{ form.fiksuotas_kiekis }}</td>
+    <td>{{ form.galioja_nuo }}</td>
+    <td>{{ form.galioja_iki }}</td>
+    <td>{{ form.busena }}</td>
+    <td>{{ form.prioritetas }}</td>
+    <td>{{ form.pastaba }}</td>
+    <td style="text-align:center;">{{ form.DELETE }}</td>
+  </tr>
+  {% endwith %}
+</template>
+
+<style>
+  .kaina-row--aktuali td {
+    background: #ecfdf5;
+  }
+  .kaina-row--sena td {
+    background: #f9fafb;
+    color: #6b7280;
+  }
+  .kaina-row--pasiulymas td {
+    background: #eff6ff;
+  }
+  .btn-xxs{
+    display:inline-block;
+    padding:3px 7px;
+    font-size:11px;
+    border-radius:999px;
+    border:1px solid #d1d5db;
+    text-decoration:none;
+    color:#111827;
+    background:#f9fafb;
+  }
+  .btn-xxs:hover{
+    background:#f3f4f6;
+  }
+</style>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  (function() {
+    const addBtn = document.getElementById('add-row');
+    const body = document.getElementById('kainu-formset-body');
+    const tmpl = document.getElementById('empty-form-template');
+    if (!addBtn || !body || !tmpl) return;
+
+    const prefix = '{{ formset.prefix }}';
+    const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+
+    addBtn.addEventListener('click', function () {
+      const total = parseInt(totalInput.value || '0', 10);
+      let html = tmpl.innerHTML.replace(/__prefix__/g, total);
+      const temp = document.createElement('tbody');
+      temp.innerHTML = html.trim();
+      const newRow = temp.querySelector('tr');
+      body.appendChild(newRow);
+      totalInput.value = total + 1;
+    });
+  })();
+</script>
 {% endblock %}
