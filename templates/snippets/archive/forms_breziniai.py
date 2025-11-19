@@ -1,6 +1,6 @@
 # pozicijos/forms_breziniai.py
 from django import forms
-from .models import PozicijosBrezinys
+from pozicijos.models import PozicijosBrezinys
 
 
 class PozicijosBrezinysForm(forms.ModelForm):

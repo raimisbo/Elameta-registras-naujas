@@ -217,6 +217,18 @@
   .btn-xxs:hover{
     background:#f3f4f6;
   }
+
+  /* --- paslepiam number input rodykles tik šiame puslapyje --- */
+  /* Chrome / Safari / Edge */
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  /* Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
 </style>
 {% endblock %}
 
@@ -226,20 +238,51 @@
     const addBtn = document.getElementById('add-row');
     const body = document.getElementById('kainu-formset-body');
     const tmpl = document.getElementById('empty-form-template');
-    if (!addBtn || !body || !tmpl) return;
+    if (!body) return;
 
     const prefix = '{{ formset.prefix }}';
     const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
 
-    addBtn.addEventListener('click', function () {
-      const total = parseInt(totalInput.value || '0', 10);
-      let html = tmpl.innerHTML.replace(/__prefix__/g, total);
-      const temp = document.createElement('tbody');
-      temp.innerHTML = html.trim();
-      const newRow = temp.querySelector('tr');
-      body.appendChild(newRow);
-      totalInput.value = total + 1;
-    });
+    // --- helperis vienai eilutei: ijungia/isjungia Kiekis nuo/iki pagal "Fiksuota" ---
+    function initRow(row) {
+      if (!row) return;
+      const chk = row.querySelector('input[type="checkbox"][name$="-yra_fiksuota"]');
+      const nuo = row.querySelector('input[name$="-kiekis_nuo"]');
+      const iki = row.querySelector('input[name$="-kiekis_iki"]');
+      if (!chk || !nuo || !iki) return;
+
+      function sync() {
+        const fixed = chk.checked;
+        // kai fiksuota, nuo/iki neaktyvūs ir išvalomi
+        if (fixed) {
+          nuo.value = "";
+          iki.value = "";
+        }
+        nuo.disabled = fixed;
+        iki.disabled = fixed;
+      }
+
+      chk.addEventListener('change', sync);
+      // pradinė būklė pagal jau esamą varnelę
+      sync();
+    }
+
+    // inicializuojam esamas eilutes
+    body.querySelectorAll('tr.kaina-row').forEach(initRow);
+
+    if (addBtn && tmpl && totalInput) {
+      addBtn.addEventListener('click', function () {
+        const total = parseInt(totalInput.value || '0', 10);
+        let html = tmpl.innerHTML.replace(/__prefix__/g, total);
+        const temp = document.createElement('tbody');
+        temp.innerHTML = html.trim();
+        const newRow = temp.querySelector('tr');
+        body.appendChild(newRow);
+        totalInput.value = total + 1;
+        // naujai eilutei irgi uzdedam logika
+        initRow(newRow);
+      });
+    }
   })();
 </script>
 {% endblock %}

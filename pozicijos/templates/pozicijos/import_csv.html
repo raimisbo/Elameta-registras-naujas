@@ -1,0 +1,66 @@
+{# pozicijos/templates/pozicijos/import_csv.html #}
+{% extends "base.html" %}
+
+{% block title %}Pozicijų CSV importas{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Pozicijų CSV importas</h1>
+
+<p class="muted" style="margin-bottom:12px;">
+  Šis puslapis nėra rodomas meniu – pasiekiamas tik žinant tikslų URL.
+  Naudok importą tik migracijai.
+</p>
+
+<form method="post" enctype="multipart/form-data" class="box" style="max-width:520px;display:flex;flex-direction:column;gap:10px;">
+  {% csrf_token %}
+
+  <label>CSV failas
+    <input type="file" name="file" required>
+  </label>
+
+  <label style="display:flex;align-items:center;gap:6px;">
+    <input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}>
+    Tik patikrinti (be išsaugojimo)
+  </label>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+    <button type="submit" class="btn">Vykdyti importą</button>
+  </div>
+</form>
+
+{% if result %}
+  <div class="box" style="margin-top:16px;">
+    <h2 style="margin:0 0 8px;font-size:16px;">Rezultatas</h2>
+    <p style="margin:0 0 6px;">
+      Perskaityta eilučių: <strong>{{ result.total }}</strong><br>
+      Sukurta pozicijų: <strong>{{ result.created }}</strong><br>
+      Atnaujinta pozicijų: <strong>{{ result.updated }}</strong><br>
+      Klaidų: <strong>{{ result.errors|length }}</strong>
+      {% if dry_run %}<br><em>(dry-run: duomenys nebuvo išsaugoti)</em>{% endif %}
+    </p>
+
+    {% if result.errors %}
+      <hr style="margin:10px 0;">
+      <h3 style="margin:0 0 6px;font-size:14px;">Klaidos</h3>
+      <div style="max-height:260px;overflow:auto;">
+        <table class="table zebra" style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="width:80px;">Eilutė</th>
+              <th>Žinutė</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for err in result.errors %}
+              <tr>
+                <td>{{ err.row_number }}</td>
+                <td>{{ err.message }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

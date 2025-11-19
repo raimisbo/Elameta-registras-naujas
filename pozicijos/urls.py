@@ -19,9 +19,10 @@ urlpatterns = [
     # detalė
     path("<int:pk>/", views.pozicija_detail, name="detail"),
 
-    # brėžiniai
+    # brėžiniai/importai
     path("<int:pk>/breziniai/upload/", views.brezinys_upload, name="brezinys_upload"),
     path("<int:pk>/breziniai/<int:bid>/delete/", views.brezinys_delete, name="brezinys_delete"),
+    path("_import_csv/", views.pozicijos_import_csv, name="import_csv"),
 
     # pasiūlymai
     path("<int:pk>/proposal/", proposal_views.proposal_prepare, name="proposal_prepare"),

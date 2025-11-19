@@ -5,11 +5,71 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
 
+from decimal import Decimal, InvalidOperation
+from .services.import_csv import import_pozicijos_from_csv
 from .models import Pozicija, PozicijosBrezinys
 from .forms import PozicijaForm, PozicijosBrezinysForm
 from .schemas.columns import COLUMNS
 from .services.previews import generate_preview_for_instance
 from . import proposal_views  # pasiūlymo parengimui / pdf
+
+
+# ==== Skaitinis filtras Plotas / Svoris: min..max, >, <, == ==================
+
+def build_numeric_range_q(field_name: str, expr: str) -> Q:
+    """
+    Vieno lauko (plotas/svoris) filtro interpretacija, kai ateina per f[field]:
+
+      "10..20"  -> >=10 ir <=20
+      ">5"      -> >=5
+      "<12.5"   -> <=12.5
+      "15"      -> ==15
+
+    Kablelį leidžiam kaip dešimtainį skirtuką: "12,5" -> 12.5.
+    Jei išraiška nekorektiška – grąžinam tuščią Q() (t.y. nefiltuojam).
+    """
+    raw = (expr or "").strip()
+    if not raw:
+        return Q()
+
+    # LT vartotojas dažnai rašo kablelį; Decimal nori taško
+    s = raw.replace(",", ".").strip()
+
+    min_val = None
+    max_val = None
+
+    try:
+        if ".." in s:
+            left, right = s.split("..", 1)
+            left = left.strip()
+            right = right.strip()
+            if left:
+                min_val = Decimal(left)
+            if right:
+                max_val = Decimal(right)
+        elif s.startswith(">"):
+            val = s[1:].strip()
+            if val:
+                min_val = Decimal(val)
+        elif s.startswith("<"):
+            val = s[1:].strip()
+            if val:
+                max_val = Decimal(val)
+        else:
+            # tikslus skaičius – traktuojam kaip == value
+            value = Decimal(s)
+            min_val = value
+            max_val = value
+    except (InvalidOperation, ValueError):
+        # blogai įvestas skaičius – nedarom filtro, bet ir nekertam klaidos
+        return Q()
+
+    q = Q()
+    if min_val is not None:
+        q &= Q(**{f"{field_name}__gte": min_val})
+    if max_val is not None:
+        q &= Q(**{f"{field_name}__lte": max_val})
+    return q
 
 
 def _visible_cols_from_request(request):
@@ -37,12 +97,19 @@ def _apply_filters(qs, request):
         if not value:
             continue
 
+        # tekstiniai filtrai – icontains
         if field in [
             "klientas", "projektas", "poz_kodas", "poz_pavad",
             "metalas", "padengimas", "spalva",
             "pakavimas", "maskavimas", "testai_kokybe",
         ]:
             qs = qs.filter(**{f"{field}__icontains": value})
+
+        # skaitmeniniai filtrai su min..max, >, <, == sintakse
+        elif field in ["plotas", "svoris"]:
+            qs = qs.filter(build_numeric_range_q(field, value))
+
+        # visi kiti – tikslus atitikimas
         else:
             qs = qs.filter(**{field: value})
 
@@ -125,7 +192,7 @@ def pozicija_detail(request, pk):
     context = {
         "pozicija": poz,
         "columns_schema": COLUMNS,   # kad detail‘e eitume per visą schemą
-        "kainos_akt": kainos_akt,    # nauja: lentelė „Kainos (aktualios)“
+        "kainos_akt": kainos_akt,    # lentelė „Kainos (aktualios)“
     }
     return render(request, "pozicijos/detail.html", context)
 
@@ -174,3 +241,29 @@ def brezinys_delete(request, pk, bid):
     br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
     br.delete()
     return redirect("pozicijos:detail", pk=pk)
+
+def pozicijos_import_csv(request):
+    """
+    Slaptas CSV importo puslapis.
+    Jokių nuorodų UI – pasiekiamas tik per URL /pozicijos/_import_csv/.
+    """
+    result = None
+    dry_run = False
+
+    if request.method == "POST":
+        dry_run = bool(request.POST.get("dry_run"))
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            messages.error(request, "Pasirink CSV failą.")
+        else:
+            result = import_pozicijos_from_csv(uploaded, dry_run=dry_run)
+
+    return render(
+        request,
+        "pozicijos/import_csv.html",
+        {
+            "result": result,
+            "dry_run": dry_run,
+        },
+    )
+
