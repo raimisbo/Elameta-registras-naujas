@@ -14,6 +14,16 @@ from .services.previews import generate_preview_for_instance
 from . import proposal_views  # pasiūlymo parengimui / pdf
 
 
+# Kurie stulpeliai gali būti rikiuojami – pagal key -> realų DB lauką.
+# Virtualūs ('brez_count', 'dok_count', ir pan.) čia nepatenka.
+SORTABLE_FIELDS = {
+    c["key"]: c.get("order_field", c["key"])
+    for c in COLUMNS
+    if c.get("type") != "virtual"
+}
+
+
+
 # ==== Skaitinis filtras Plotas / Svoris: min..max, >, <, == ==================
 
 def build_numeric_range_q(field_name: str, expr: str) -> Q:
@@ -116,6 +126,32 @@ def _apply_filters(qs, request):
     return qs
 
 
+def _apply_sorting(qs, request):
+    """
+    Rikiavimas pagal ?sort=key&dir=asc/desc
+    - sort: vienas iš COLUMNS key (pvz. 'klientas', 'poz_kodas', 'kaina_eur', ...)
+    - virtualūs key (pvz. 'brez_count', 'dok_count') ignoruojami.
+    - jei sort nėra arba neatpažįstamas -> pagal naujausią (created desc, id desc)
+    """
+    sort = request.GET.get("sort")
+    direction = request.GET.get("dir", "asc")
+
+    # Jei niekas nenurodyta – laikomės seno default'o
+    if not sort:
+        return qs.order_by("-created", "-id")
+
+    field = SORTABLE_FIELDS.get(sort)
+    if not field:
+        # jei prašo rikiuoti pagal virtualų ar neegzistuojantį – grįžtam prie default
+        return qs.order_by("-created", "-id")
+
+    if direction == "desc":
+        field = "-" + field
+
+    # Antrinis rikiavimas pagal id, kad būtų stabilu
+    return qs.order_by(field, "-id")
+
+
 def pozicijos_list(request):
     visible_cols = _visible_cols_from_request(request)
     q = request.GET.get("q", "").strip()
@@ -123,7 +159,8 @@ def pozicijos_list(request):
 
     qs = Pozicija.objects.all()
     qs = _apply_filters(qs, request)
-    qs = qs.order_by("-created", "-id")[:page_size]
+    qs = _apply_sorting(qs, request)[:page_size]
+    # qs = qs.order_by("-created", "-id")[:page_size]
 
     context = {
         "columns_schema": COLUMNS,
@@ -142,7 +179,8 @@ def pozicijos_tbody(request):
 
     qs = Pozicija.objects.all()
     qs = _apply_filters(qs, request)
-    qs = qs.order_by("-created", "-id")[:page_size]
+    qs = _apply_sorting(qs, request)[:page_size]
+    # qs = qs.order_by("-created", "-id")[:page_size]
 
     return render(
         request,

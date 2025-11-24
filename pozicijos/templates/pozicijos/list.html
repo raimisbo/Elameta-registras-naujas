@@ -7,6 +7,7 @@
 
 {% block page_css %}
 <style>
+  /* Paslepiam seną headerį (šitam puslapiui nereikia) */
   header, .navbar, .topbar { display: none !important; }
 
   .top-wrap {
@@ -59,9 +60,16 @@
     border:1px solid #ddd;
     background:#fff;
   }
-  #pozicijos-table{ width:100%; border-collapse:separate; border-spacing:0; }
+
+  #pozicijos-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+
   #pozicijos-table thead tr.headers th{background:#f4f4f4;}
   #pozicijos-table thead tr.filters th{background:#fafafa;}
+
   #pozicijos-table thead th{
     position:sticky;
     top:0;
@@ -70,7 +78,12 @@
     white-space:nowrap;
     z-index:5;
   }
-  #pozicijos-table thead tr.filters th{ top:34px; z-index:6; }
+
+  #pozicijos-table thead tr.filters th{
+    top:34px;
+    z-index:6;
+  }
+
   #pozicijos-table tbody td{
     padding:.35rem .5rem;
     border-bottom:1px solid #eee;
@@ -78,17 +91,9 @@
   }
   #pozicijos-table tbody tr:nth-child(even) td{background:#f8f8f8;}
 
-  .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.2s;}
-  .drawer-backdrop.open{opacity:1; pointer-events:auto;}
-  .drawer{position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.25); transition:.2s; display:flex; flex-direction:column; z-index:100;}
-  .drawer.open{right:0;}
-  .drawer-header{display:flex; justify-content:space-between; align-items:center; padding:.75rem .75rem; border-bottom:1px solid #eee;}
-  .drawer-body{padding:.75rem .75rem; overflow:auto; display:flex; flex-direction:column; gap:.5rem;}
+  .th-filter{width:100%; box-sizing:border-box;}
 
-  .cols-search{width:100%; padding:.25rem .5rem; margin-bottom:.25rem;}
-  #cols-list { display:flex; flex-direction:column; gap:.35rem; }
-  #cols-list label { display:flex; gap:.4rem; align-items:center; }
-
+  /* Sticky pirmai kolonelei + papildomos klasės (naudojamos JS) */
   #pozicijos-table thead tr.headers th.sticky-col-header{
     position:sticky !important;
     top:0;
@@ -109,75 +114,33 @@
     z-index:180;
     background:inherit;
   }
-  .th-filter{width:100%; box-sizing:border-box;}
 
-
-  /* 1) Grafikas: kompaktiškas aukštis + legenda į šoną, kad “nevalgytų” pusės lango */
-  #chartWrap{
-    display:grid;
-    grid-template-columns: 1fr auto;
-    align-items:start;
-    gap:12px;
-    margin-bottom:10px;
+  /* Rikiavimo rodyklės headeriuose */
+  #pozicijos-table thead tr.headers th[data-sort="asc"]::after{
+    content:" ▲";
+    font-size:.75em;
+    opacity:.65;
   }
-  /* ribojam realų drobės aukštį */
-  #chartWrap canvas{
-    height: 180px !important;
-    max-height: 180px !important;
-    width: 100% !important;
-  }
-  /* legenda slenkasi savo ribose, neužima aukščio */
-  #donutLegend{
-    max-height: 180px;
-    overflow:auto;
+  #pozicijos-table thead tr.headers th[data-sort="desc"]::after{
+    content:" ▼";
+    font-size:.75em;
+    opacity:.65;
   }
 
-  /* 2) Užtikrinam, kad puslapis būtų tas, kuris scrollinasi vertikaliai */
-  .table-wrap{ overflow: visible !important; }   /* jokio overflow-y čia */
-  main, .content{ overflow: visible !important; } /* jeigu bazėje buvo uždėtas overflow */
+  .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:.2s;}
+  .drawer-backdrop.open{opacity:1; pointer-events:auto;}
+  .drawer{position:fixed; top:0; right:-320px; width:320px; height:100vh; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,.25); transition:.2s; display:flex; flex-direction:column; z-index:100;}
+  .drawer.open{right:0;}
+  .drawer-header{display:flex; justify-content:space-between; align-items:center; padding:.75rem .75rem; border-bottom:1px solid #eee;}
+  .drawer-body{padding:.75rem .75rem; overflow:auto; display:flex; flex-direction:column; gap:.5rem;}
 
-  /* 3) Sticky ant VISOS THEAD (stabiliau Safari), o ne ant kiekvieno <th> */
-  #results-table{
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-  }
-  #results-table thead{
-    position: sticky !important;
-    top: 0 !important;           /* nėra viršutinės juostos – prilimpa prie pat lango viršaus */
-    z-index: 20;                 /* kad būtų virš tbody */
-    background:#fff;
-  }
-  /* jei kur nors projekte buvo užrašyta “thead th { position:static !important }” – paliekam th static,
-     sticky daro pats THEAD. Tai pašalina konfliktus su ankstesniais bandymais. */
-  #results-table thead th{
-    position: static !important;
-    background:#f6f6f6;
-    border-bottom:1px solid #ddd;
-    white-space:nowrap;
-    padding:.45rem .55rem;
-  }
+  .cols-search{width:100%; padding:.25rem .5rem; margin-bottom:.25rem;}
+  #cols-list { display:flex; flex-direction:column; gap:.35rem; }
+  #cols-list label { display:flex; gap:.4rem; align-items:center; }
 
-  /* 4) Sticky pirmai kolonelei (jei naudojai) – paprasta versija */
-  #results-table th:first-child,
-  #results-table td:first-child{
-    position: sticky;
-    left: 0;
-    z-index: 25;                 /* virš kitų ląstelių */
-    background:#fff;             /* kad neužsimaišytų su eilutėm */
-  }
-
-  /* 5) Mažytis “šešėlis” po headeriu aiškumui */
-  #results-table thead::after{
-    content:"";
-    position: sticky;
-    display:block;
-    top:0;
-    height:0;
-    box-shadow: 0 2px 3px rgba(0,0,0,.08);
-  }
-
-
+  /* Papildomai – kad vertikalus scroll būtų per visą puslapį, o ne tik per table-wrap */
+  .table-wrap{ overflow: visible !important; }
+  main, .content{ overflow: visible !important; }
 
 </style>
 {% endblock %}
@@ -289,9 +252,29 @@
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
   const SCHEMA   = JSON.parse(document.getElementById("columns-schema").textContent);
-  const DEFAULT_LABELS = ["Klientas", "Projektas", "Kodas", "Pavadinimas", "Kaina (EUR)", "Pastabos", "Kaina", "Kaina EUR"];
-  const KEY_COLS = "pozicijos:visibleCols";
+
+  // Numatytieji – pagal KEY (ne label), kaip sutarėm:
+  // Klientas, Projektas, Brėžinio kodas, Detalės pavadinimas, Kaina, Pastabos
+  const DEFAULT_KEYS = ["klientas","projektas","poz_kodas","poz_pavad","kaina_eur","pastabos"];
+  const KEY_COLS = "pozicijos:visibleCols:v2";
   const DND_KEY  = "dnd-order:pozicijos";
+
+  const TYPE_BY_KEY = {};
+  SCHEMA.forEach(c => { TYPE_BY_KEY[c.key] = c.type || "text"; });
+
+  let sortKey = null;
+  let sortDir = "asc";
+
+  // inicialiai perskaitom sort iš URL, jei yra
+  (function readSortFromUrl(){
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get("sort");
+      const d = params.get("dir");
+      if (s) sortKey = s;
+      if (d === "asc" || d === "desc") sortDir = d;
+    } catch(e) {}
+  })();
 
   const table    = $("#pozicijos-table");
   const wrap     = $("#pozicijos-wrap");
@@ -305,8 +288,9 @@
   const PALETTE  = ["#0ea5e9","#22c55e","#f97316","#e11d48","#6366f1","#14b8a6","#facc15","#8b5cf6","#6b7280","#f43f5e","#a855f7","#10b981"];
 
   function getDefaultColsFromSchema() {
+    // iš SCHEMA paimam tuos, kurių key yra DEFAULT_KEYS
     return SCHEMA
-      .filter(c => DEFAULT_LABELS.includes(c.label))
+      .filter(c => DEFAULT_KEYS.includes(c.key))
       .map(c => c.key);
   }
 
@@ -315,28 +299,48 @@
     if (!s) return getDefaultColsFromSchema();
     try { return JSON.parse(s); } catch(e) { return getDefaultColsFromSchema(); }
   }
+
   function setVisibleCols(keys){
     localStorage.setItem(KEY_COLS, JSON.stringify(keys));
+    // colgroup
     $$("#pozicijos-colgroup col").forEach(col => {
       const k = col.dataset.key; if (!k) return;
       if (keys.includes(k)) col.removeAttribute("hidden");
       else col.setAttribute("hidden","");
     });
+    // headeriai + filtrai
     $$("#pozicijos-table thead th").forEach(th => {
       const k = th.dataset.key; if (!k) return;
       if (keys.includes(k)) th.removeAttribute("hidden");
       else th.setAttribute("hidden","");
     });
-    fetchTbody();
+    // checkbox'ai stalčiuje
     $$(".col-toggle").forEach(ch => ch.checked = keys.includes(ch.value));
+
+    // perpiešiam tbody ir statistiką
+    fetchTbody();
     document.dispatchEvent(new CustomEvent("visibility:columns-changed"));
   }
 
-  // stalčius
-  $("#btn-cols")?.addEventListener("click", () => { drawer.classList.add("open"); backdrop.classList.add("open"); });
-  $("#drawer-close")?.addEventListener("click", () => { drawer.classList.remove("open"); backdrop.classList.remove("open"); });
-  backdrop?.addEventListener("click", () => { drawer.classList.remove("open"); backdrop.classList.remove("open"); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape"){ drawer.classList.remove("open"); backdrop.classList.remove("open"); } });
+  // --- stalčius ---
+  $("#btn-cols")?.addEventListener("click", () => {
+    drawer.classList.add("open");
+    backdrop.classList.add("open");
+  });
+  $("#drawer-close")?.addEventListener("click", () => {
+    drawer.classList.remove("open");
+    backdrop.classList.remove("open");
+  });
+  backdrop?.addEventListener("click", () => {
+    drawer.classList.remove("open");
+    backdrop.classList.remove("open");
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape"){
+      drawer.classList.remove("open");
+      backdrop.classList.remove("open");
+    }
+  });
 
   $("#cols-all-off")?.addEventListener("click", () => setVisibleCols([]));
   $("#cols-all-on")?.addEventListener("click", () => setVisibleCols(SCHEMA.map(c=>c.key)));
@@ -346,10 +350,14 @@
     localStorage.removeItem(KEY_COLS);
     location.reload();
   });
+
   $("#cols-search")?.addEventListener("input", e => {
     const v = e.target.value.toLowerCase();
-    $$("#cols-list label").forEach(l => l.style.display = l.textContent.toLowerCase().includes(v) ? "" : "none");
+    $$("#cols-list label").forEach(l => {
+      l.style.display = l.textContent.toLowerCase().includes(v) ? "" : "none";
+    });
   });
+
   $$(".col-toggle").forEach(ch => {
     ch.addEventListener("change", () => {
       const cur = new Set(getVisibleCols());
@@ -358,8 +366,7 @@
     });
   });
 
-  // AJAX tbody
-  let inflight;
+  // --- užklausos parametrai (filtrai + search + sort) ---
   function buildParams(){
     const p = new URLSearchParams();
     const cols = getVisibleCols();
@@ -371,9 +378,17 @@
       if (v) p.set(`f[${inp.dataset.key}]`, v);
     });
     if (pageSize) p.set("page_size", pageSize.value);
+
+    if (sortKey) {
+      p.set("sort", sortKey);
+      p.set("dir", sortDir);
+    }
+
     return p;
   }
 
+  // --- AJAX tbody ---
+  let inflight;
   function fetchTbody(){
     const params = buildParams();
     const url = new URL("{% url 'pozicijos:tbody' %}", location.origin);
@@ -403,7 +418,10 @@
       .catch(() => {});
   }
 
-  const debounce = (fn, ms=300) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
+  const debounce = (fn, ms=300) => {
+    let t;
+    return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); };
+  };
   const debouncedFetch = debounce(fetchTbody, 300);
 
   if (q) q.addEventListener("input", debouncedFetch);
@@ -414,6 +432,8 @@
     $$(".th-filter").forEach(i => i.value = "");
     localStorage.removeItem(KEY_COLS);
     localStorage.removeItem(DND_KEY);
+    sortKey = null;
+    sortDir = "asc";
     fetchTbody();
   });
 
@@ -437,7 +457,7 @@
     return el;
   }
 
-  // DONUT
+  // --- Donut grafikas ---
   let donutChart = null;
   function ensureDonut(){
     if (donutChart) return donutChart;
@@ -500,7 +520,7 @@
       });
   }
 
-  // STICKY
+  // --- Sticky pirmai kolonelei ---
   function detectAndApplySticky(){
     const tbl = table;
     const container = wrap;
@@ -513,8 +533,6 @@
         el.style.backgroundColor = "";
       });
 
-    window.applySticky = detectAndApplySticky;
-
     const headerRow = tbl.querySelector("thead tr.headers");
     const filterRow = tbl.querySelector("thead tr.filters");
     if (!headerRow) return;
@@ -526,7 +544,8 @@
     while (th && th.tagName !== "TH") th = th.parentElement;
 
     if (!th || th.hasAttribute("hidden")) {
-      const vis = Array.from(headerRow.querySelectorAll("th")).filter(h => !h.hasAttribute("hidden") && h.offsetParent !== null);
+      const vis = Array.from(headerRow.querySelectorAll("th"))
+        .filter(h => !h.hasAttribute("hidden") && h.offsetParent !== null);
       if (!vis.length) return;
       th = vis[0];
     }
@@ -550,14 +569,62 @@
     });
   }
 
+  function updateSortIndicators(){
+    if (!table) return;
+    const headers = table.querySelectorAll("thead tr.headers th");
+    headers.forEach(th => {
+      const key = th.dataset.key;
+      if (!key) return;
+      if (key === sortKey) {
+        th.dataset.sort = sortDir;
+      } else {
+        th.removeAttribute("data-sort");
+      }
+    });
+  }
+
+  // Click ant headerio – rikiavimas
+  const headerRow = table.querySelector("thead tr.headers");
+  if (headerRow) {
+    headerRow.addEventListener("click", function(e){
+      const th = e.target.closest("th");
+      if (!th || !headerRow.contains(th)) return;
+
+      const key = th.dataset.key;
+      if (!key) return;
+
+      // virtualių (Brėžinys, Dokumentai) nerikiuojam
+      if (TYPE_BY_KEY[key] === "virtual") return;
+
+      if (sortKey === key) {
+        sortDir = (sortDir === "asc" ? "desc" : "asc");
+      } else {
+        sortKey = key;
+        sortDir = "asc";
+      }
+
+      updateSortIndicators();
+      fetchTbody();
+    });
+  }
+
   document.addEventListener("visibility:columns-changed", detectAndApplySticky);
-  document.addEventListener("tbody:reloaded", detectAndApplySticky);
+  document.addEventListener("tbody:reloaded", () => {
+    detectAndApplySticky();
+    // tbody nepakeičia headerių, bet jei ateity perpiešim thead – turėsim
+    updateSortIndicators();
+  });
+
   document.addEventListener("DOMContentLoaded", () => {
     setVisibleCols(getVisibleCols());
     renderChips();
     fetchStatsAndRender();
     detectAndApplySticky();
+    updateSortIndicators();
   });
+
+  // kad columns_dnd_shared.js galėtų persiskaičiuoti sticky
+  window.applyStickyFirstCol = detectAndApplySticky;
 
 })();
 </script>
