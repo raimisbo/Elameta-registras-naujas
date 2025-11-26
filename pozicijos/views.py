@@ -23,7 +23,6 @@ SORTABLE_FIELDS = {
 }
 
 
-
 # ==== Skaitinis filtras Plotas / Svoris: min..max, >, <, == ==================
 
 def build_numeric_range_q(field_name: str, expr: str) -> Q:
@@ -157,10 +156,13 @@ def pozicijos_list(request):
     q = request.GET.get("q", "").strip()
     page_size = int(request.GET.get("page_size", 25))
 
+    # perskaitom sort + dir, kad perduotume į šabloną
+    current_sort = request.GET.get("sort", "")   # pvz. 'klientas'
+    current_dir = request.GET.get("dir", "asc")  # 'asc' arba 'desc'
+
     qs = Pozicija.objects.all()
     qs = _apply_filters(qs, request)
     qs = _apply_sorting(qs, request)[:page_size]
-    # qs = qs.order_by("-created", "-id")[:page_size]
 
     context = {
         "columns_schema": COLUMNS,
@@ -169,6 +171,8 @@ def pozicijos_list(request):
         "q": q,
         "page_size": page_size,
         "f": request.GET,  # šablonas naudoja dict_get
+        "current_sort": current_sort,
+        "current_dir": current_dir,
     }
     return render(request, "pozicijos/list.html", context)
 
@@ -177,10 +181,12 @@ def pozicijos_tbody(request):
     visible_cols = _visible_cols_from_request(request)
     page_size = int(request.GET.get("page_size", 25))
 
+    current_sort = request.GET.get("sort", "")
+    current_dir = request.GET.get("dir", "asc")
+
     qs = Pozicija.objects.all()
     qs = _apply_filters(qs, request)
     qs = _apply_sorting(qs, request)[:page_size]
-    # qs = qs.order_by("-created", "-id")[:page_size]
 
     return render(
         request,
@@ -189,6 +195,8 @@ def pozicijos_tbody(request):
             "columns_schema": COLUMNS,
             "visible_cols": visible_cols,
             "items": qs,
+            "current_sort": current_sort,
+            "current_dir": current_dir,
         },
     )
 
@@ -280,6 +288,7 @@ def brezinys_delete(request, pk, bid):
     br.delete()
     return redirect("pozicijos:detail", pk=pk)
 
+
 def pozicijos_import_csv(request):
     """
     Slaptas CSV importo puslapis.
@@ -305,3 +314,20 @@ def pozicijos_import_csv(request):
         },
     )
 
+
+def brezinys_3d(request, pk, bid):
+    """
+    Single-view 3D peržiūros puslapis STP brėžiniui.
+    Kol kas dar nerodome tikros STEP geometrijos – tik paruoštas viewerio puslapis.
+    """
+    poz = get_object_or_404(Pozicija, pk=pk)
+    br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
+
+    return render(
+        request,
+        "pozicijos/brezinys_3d.html",
+        {
+            "pozicija": poz,
+            "brezinys": br,
+        },
+    )

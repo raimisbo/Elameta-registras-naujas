@@ -1,0 +1,105 @@
+{% load static %}
+
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8">
+  <title>3D peržiūra – {{ brezinys.pavadinimas|default:brezinys.filename }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    .viewer-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #0f172a;
+    }
+    .viewer-bar {
+      padding: 6px 10px;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .viewer-bar a.btn {
+      padding: 4px 10px;
+      font-size: 13px;
+      border-radius: 6px;
+      text-decoration: none;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      color: #111827;
+    }
+    .viewer-bar a.btn:hover {
+      background: #e5e7eb;
+    }
+    .viewer-main {
+      flex: 1;
+      min-height: 0;
+      background: #111827;
+    }
+    .online_3d_viewer {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-shell">
+    <div class="viewer-bar">
+      <div>
+        <strong>3D peržiūra</strong>
+        – {{ brezinys.pavadinimas|default:brezinys.filename }}
+      </div>
+      <div>
+        <a href="{{ brezinys.failas.url }}" class="btn" style="margin-right:6px;">Atsisiųsti STEP</a>
+        <a href="{% url 'pozicijos:detail' brezinys.pozicija.pk %}" class="btn">← Atgal į poziciją</a>
+      </div>
+    </div>
+
+    <div class="viewer-main">
+      <div
+        id="ov-container"
+        class="online_3d_viewer"
+        model="{{ brezinys.failas.url }}"
+        camera="examine"
+        backgroundcolor="255,255,255"
+        defaultcolor="200,200,200"
+        controls="orbit, pan, zoom, fit"
+        style="width:100%; height:100%;"
+      ></div>
+    </div>
+  </div>
+
+  {# Pagrindinė Online3DViewer biblioteka – iš pozicijos app'o static #}
+  <script src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('3D peržiūra: DOMContentLoaded, OV =', window.OV);
+
+      if (!window.OV) {
+        alert("Online3DViewer biblioteka neįsikrovė (OV nedefinuotas).");
+        return;
+      }
+      try {
+        // Šitam o3dv.min.js build'ui libs jau yra viduje,
+        // todėl SetExternalLibLocation NEKVIENAM – tiesiog inicijuojam viewer'ius.
+        OV.Init3DViewerElements();
+        console.log('OV.Init3DViewerElements() iškviesta.');
+      } catch (e) {
+        console.error('Online3DViewer init error:', e);
+        alert("Nepavyko inicijuoti 3D peržiūros. Pažiūrėk į naršyklės Console.");
+      }
+    });
+  </script>
+</body>
+</html>

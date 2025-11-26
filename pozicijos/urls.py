@@ -35,4 +35,5 @@ urlpatterns = [
     path("kainos/<int:id>/aktuali/", kainos_views.kaina_set_aktuali, name="kaina_set_aktuali"),
     path("kainos/<int:id>/salinti/", kainos_views.kaina_delete, name="kaina_delete"),
     path("kainos/<int:id>/history/", kainos_views.kaina_history, name="kaina_history"),
+    path("<int:pk>/breziniai/<int:bid>/3d/", views.brezinys_3d, name="brezinys_3d"),
 ]

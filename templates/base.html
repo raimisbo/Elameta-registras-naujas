@@ -16,7 +16,7 @@
       color:#0f172a;
     }
 
-    /* header'o neber – tai nebėra ir šito fono */
+    /* globalus padding – tik šiek tiek „oro“ virš/apačioj */
     main{padding:18px 0}
 
     .container{max-width:1200px;margin:0 auto;padding:0 16px}
@@ -37,18 +37,14 @@
     .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:12px 0;background:#fff}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media(max-width:640px){.grid{grid-template-columns:1fr}}
-
-
   </style>
 
-  <link rel="stylesheet" href="{% static 'detaliu_registras/css/style.css' %}">
+  {# DĖMESIO: jokio detaliu_registras/css/style.css nebekraunam #}
   {% block page_css %}{% endblock %}
   {% block extra_head %}{% endblock %}
 </head>
 
 <body>
-  {# JUODOS JUOSTOS NEBĖRA #}
-
   <main>
     <div class="container">
       {% if messages %}

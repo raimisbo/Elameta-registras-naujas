@@ -135,6 +135,16 @@
               </div>
               <div class="card-actions">
                 <a class="btn-xxs" href="{{ b.failas.url }}" target="_blank" rel="noopener" title="Atidaryti">Atidaryti</a>
+
+                {# 3D mygtukas tik STP/STEP failams #}
+                {% if b.ext|lower == "stp" or b.ext|lower == "step" %}
+                  <a class="btn-xxs"
+                     href="{% url 'pozicijos:brezinys_3d' pozicija.pk b.pk %}"
+                     title="3D peržiūra">
+                    3D
+                  </a>
+                {% endif %}
+
                 <a class="btn-xxs danger" href="{% url 'pozicijos:brezinys_delete' pozicija.pk b.pk %}" title="Šalinti">Šalinti</a>
               </div>
             </div>
