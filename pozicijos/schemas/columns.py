@@ -39,17 +39,17 @@ COLUMNS = [
      "searchable": False, "width": 110, "default": False},
 
     # --- Paviršius / dažymas ---
-    {"key": "paruosimas",           "label": "Paruošimas",        "type": "text", "filter": "text",
+    {"key": "paruosimas",           "label": "Paruošimas",          "type": "text", "filter": "text",
      "searchable": True, "width": 150, "default": False},
-    {"key": "padengimas",           "label": "Padengimas",        "type": "text", "filter": "text",
+    {"key": "padengimas",           "label": "Padengimas",          "type": "text", "filter": "text",
      "searchable": True, "width": 150, "default": False},
     {"key": "padengimo_standartas", "label": "Padengimo standartas","type": "text","filter": "text",
      "searchable": True, "width": 140, "default": False},
-    {"key": "spalva",               "label": "Spalva",            "type": "text", "filter": "text",
+    {"key": "spalva",               "label": "Spalva",              "type": "text", "filter": "text",
      "searchable": True, "width": 100, "default": False},
-    {"key": "maskavimas",           "label": "Maskavimas",        "type": "text", "filter": "text",
+    {"key": "maskavimas",           "label": "Maskavimas",          "type": "text", "filter": "text",
      "searchable": True, "width": 160, "default": False},
-    {"key": "testai_kokybe",        "label": "Testai/kokybė",     "type": "text", "filter": "text",
+    {"key": "testai_kokybe",        "label": "Testai/kokybė",       "type": "text", "filter": "text",
      "searchable": True, "width": 180, "default": False},
 
     # --- Terminai ---
@@ -72,9 +72,7 @@ COLUMNS = [
     {"key": "kaina_eur", "label": "Kaina", "type": "number", "filter": "range",
      "searchable": False, "width": 120, "default": True},
 
-    # --- Dokumentai / pastabos ---
-    {"key": "dok_count", "label": "Dokumentai", "type": "virtual",
-     "filter": None, "searchable": False, "width": 120, "default": False},
+    # --- Pastabos ---
     {"key": "pastabos",  "label": "Pastabos",   "type": "text", "filter": "text",
      "searchable": True, "width": 240, "default": True},
 ]

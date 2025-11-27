@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import logging
+
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from .models import PozicijosBrezinys
-from .services.previews import generate_preview_for_instance
+from .thumbnails import generate_brezinys_thumbnail
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +15,22 @@ logger = logging.getLogger(__name__)
 @receiver(post_save, sender=PozicijosBrezinys)
 def auto_preview_on_create(sender, instance: PozicijosBrezinys, created: bool, **kwargs):
     """
-    Kiekvieno naujo brėžinio įkėlimo metu bandome sugeneruoti PNG peržiūrą.
-    PDF/TIFF → PNG (per PyMuPDF/Pillow), kiti vaizdai ↓sumenkinami.
-    Jei nepavyksta – neužkliūna request'o (tiesiog suloginam).
+    Kiekvieno naujo brėžinio įkėlimo metu bandome sugeneruoti PNG miniatiūrą.
+    JPG/PNG/TIFF → sumažintas vaizdas, PDF → 1 puslapio PNG (jei yra pdf2image),
+    STEP/STP → placeholder "3D". Jei nepavyksta – request'o negadinam, tik log.
     """
-    if not created:
+    if not created or not instance.failas:
         return
 
     try:
-        res = generate_preview_for_instance(instance)
-        if not res.ok:
-            logger.info("Preview not generated for id=%s: %s", instance.pk, res.message)
+        created_thumb = generate_brezinys_thumbnail(instance)
+        if created_thumb:
+            logger.debug("Preview generated for brezinys id=%s", instance.pk)
         else:
-            logger.debug("Preview saved for id=%s at %s", instance.pk, res.saved_path)
+            logger.info("Preview not generated for brezinys id=%s (maybe no handler).", instance.pk)
     except Exception as e:
         # niekada nemetam iš signalo – tik log'as
-        logger.exception("Preview generation failed for id=%s: %s", instance.pk, e)
+        logger.exception("Preview generation failed for brezinys id=%s: %s", instance.pk, e)
 
 
 @receiver(post_delete, sender=PozicijosBrezinys)
@@ -37,27 +38,47 @@ def cleanup_files_on_delete(sender, instance: PozicijosBrezinys, **kwargs):
     """
     Apsauginis valymas, kai įrašas ištrinamas ne per instance.delete(),
     o masiškai (QuerySet.delete) ar per admin bulk action:
+
     - pašalinam originalų failą, jei dar egzistuoja
-    - pašalinam sugeneruotą preview PNG
+    - pašalinam ImageField preview (jei yra)
+    - pašalinam senus preview PNG failus pagal _preview_relpath / _legacy_preview_relpath
     """
     storage = instance.failas.storage
-    orig = getattr(instance.failas, "name", None)
+    paths_to_delete: list[str] = []
 
-    # Preview kelias gaunamas iš helperio, net jei originalo jau nėra
+    # originalus failas
+    orig = getattr(instance.failas, "name", None)
+    if orig:
+        paths_to_delete.append(orig)
+
+    # ImageField preview failas (jei yra)
+    preview_name = instance.preview.name if getattr(instance, "preview", None) else None
+    if preview_name:
+        paths_to_delete.append(preview_name)
+
+    # naujas ir legacy preview keliai (jei helperiai veikia)
     try:
-        prev_rel = instance._preview_relpath()
+        rel_new = instance._preview_relpath()
+        if rel_new:
+            paths_to_delete.append(rel_new)
     except Exception:
-        prev_rel = None
+        rel_new = None
+
+    try:
+        rel_old = instance._legacy_preview_relpath()
+        if rel_old:
+            paths_to_delete.append(rel_old)
+    except Exception:
+        rel_old = None
 
     # trinam tyliai – jokių išimčių nekeliam
-    try:
-        if orig and storage.exists(orig):
-            storage.delete(orig)
-    except Exception:
-        logger.debug("Couldn't delete original file for id=%s (maybe already gone).", instance.pk)
-
-    try:
-        if prev_rel and storage.exists(prev_rel):
-            storage.delete(prev_rel)
-    except Exception:
-        logger.debug("Couldn't delete preview for id=%s (maybe already gone).", instance.pk)
+    for path in paths_to_delete:
+        try:
+            if path and storage.exists(path):
+                storage.delete(path)
+        except Exception:
+            logger.debug(
+                "Couldn't delete file '%s' for brezinys id=%s (maybe already gone).",
+                path,
+                instance.pk,
+            )

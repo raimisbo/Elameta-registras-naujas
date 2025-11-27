@@ -1,105 +1,166 @@
 {% load static %}
-
 <!doctype html>
 <html lang="lt">
 <head>
   <meta charset="utf-8">
   <title>3D peržiūra – {{ brezinys.pavadinimas|default:brezinys.filename }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  {# Online3DViewer website CSS – iš tavo bundle #}
+  <link rel="stylesheet" type="text/css"
+        href="{% static 'pozicijos/o3dv_website/o3dv.website.min.css' %}">
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-    }
-    .viewer-shell {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      background: #0f172a;
-    }
-    .viewer-bar {
-      padding: 6px 10px;
-      background: #0f172a;
-      color: #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 14px;
-    }
-    .viewer-bar a.btn {
-      padding: 4px 10px;
-      font-size: 13px;
-      border-radius: 6px;
-      text-decoration: none;
-      border: 1px solid #d1d5db;
-      background: #f9fafb;
-      color: #111827;
-    }
-    .viewer-bar a.btn:hover {
-      background: #e5e7eb;
-    }
-    .viewer-main {
-      flex: 1;
-      min-height: 0;
-      background: #111827;
-    }
-    .online_3d_viewer {
-      width: 100%;
-      height: 100%;
-    }
-  </style>
-</head>
-<body>
-  <div class="viewer-shell">
-    <div class="viewer-bar">
-      <div>
-        <strong>3D peržiūra</strong>
-        – {{ brezinys.pavadinimas|default:brezinys.filename }}
-      </div>
-      <div>
-        <a href="{{ brezinys.failas.url }}" class="btn" style="margin-right:6px;">Atsisiųsti STEP</a>
-        <a href="{% url 'pozicijos:detail' brezinys.pozicija.pk %}" class="btn">← Atgal į poziciją</a>
-      </div>
-    </div>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #111827;
+  }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
+                 "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    color: #e5e7eb;
+  }
+  .ov_header_title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .ov_header_subtitle {
+    font-size: 12px;
+    opacity: .8;
+  }
+  .intro_content h1,
+  .intro_content h2,
+  .intro_content p,
+  .intro_content ul {
+    margin: 0 0 .6rem;
+    padding: 0;
+  }
+  .intro_content ul {
+    list-style: none;
+    font-size: 13px;
+    opacity: .9;
+  }
 
-    <div class="viewer-main">
-      <div
-        id="ov-container"
-        class="online_3d_viewer"
-        model="{{ brezinys.failas.url }}"
-        camera="examine"
-        backgroundcolor="255,255,255"
-        defaultcolor="200,200,200"
-        controls="orbit, pan, zoom, fit"
-        style="width:100%; height:100%;"
-      ></div>
-    </div>
-  </div>
+  /* 🔹 Viewer’į ištempiam be rėmelių, be „langas lange“ efekto */
+  #main {
+    display: flex;
+    height: calc(100vh - 56px); /* jei header aukštis kitas – gali pakoreguot */
+    margin: 0;
+    padding: 0;
+  }
+  #main_viewer {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  #main_viewer * {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 
-  {# Pagrindinė Online3DViewer biblioteka – iš pozicijos app'o static #}
-  <script src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
+  /* 🔹 Intro overlay nebedengia viewer'io */
+  #intro {
+    display: none;
+  }
+</style>
+
+
+  {# ENGINE iš tavo static: static/pozicijos/js/o3dv.min.js #}
+  <script type="text/javascript"
+          src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      console.log('3D peržiūra: DOMContentLoaded, OV =', window.OV);
+    // STEP failo URL iš Django (tas pats, kurį matai "Atidaryti" mygtuke)
+    const STEP_MODEL_URL = "{{ brezinys.failas.url|escapejs }}";
 
+    window.addEventListener('load', () => {
       if (!window.OV) {
-        alert("Online3DViewer biblioteka neįsikrovė (OV nedefinuotas).");
+        console.error('OV objektas nerastas – nepasileido o3dv.min.js (patikrink static kelią).');
         return;
       }
+
+      const parent = document.getElementById('main_viewer');
+      if (!parent) {
+        console.error('Nerastas #main_viewer elementas 3D peržiūrai.');
+        return;
+      }
+
       try {
-        // Šitam o3dv.min.js build'ui libs jau yra viduje,
-        // todėl SetExternalLibLocation NEKVIENAM – tiesiog inicijuojam viewer'ius.
-        OV.Init3DViewerElements();
-        console.log('OV.Init3DViewerElements() iškviesta.');
+        // Inicijuojam viewer’į embedded režimu
+        const viewer = new OV.EmbeddedViewer(parent, {
+          backgroundColor : new OV.RGBAColor(17, 24, 39, 255),
+          defaultColor    : new OV.RGBColor(200, 200, 200)
+        });
+
+        // Užkraunam STEP failą iš tavo Django
+        viewer.LoadModelFromUrlList([STEP_MODEL_URL]);
       } catch (e) {
-        console.error('Online3DViewer init error:', e);
-        alert("Nepavyko inicijuoti 3D peržiūros. Pažiūrėk į naršyklės Console.");
+        console.error('Klaida inicijuojant 3D peržiūrą:', e);
       }
     });
   </script>
+</head>
+
+<body>
+  {# Šito nenaudojam tiesiogiai, bet to reikalauja Online3DViewer UI #}
+  <input type="file" id="open_file" style="display:none;" multiple>
+
+  <div class="header" id="header">
+    <div class="title">
+      <div class="title_left">
+        <span class="logo_text">
+          3D peržiūra
+        </span>
+        <span class="logo_separator">|</span>
+        <span class="ov_header_title">
+          {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}
+        </span>
+        <span class="ov_header_subtitle only_full_width">
+          {{ brezinys.pavadinimas|default:brezinys.filename }}
+        </span>
+      </div>
+      <div class="title_right" id="header_buttons"></div>
+      <div class="main_file_name only_full_width" id="main_file_name"></div>
+    </div>
+    <div class="toolbar" id="toolbar"></div>
+  </div>
+
+  <div class="main" id="main">
+    <div class="main_left_container only_full_width" id="main_left_container">
+      <div class="main_navigator ov_panel_set_container" id="main_navigator"></div>
+      <div class="main_splitter" id="main_navigator_splitter"></div>
+    </div>
+    <div class="main_viewer" id="main_viewer"></div>
+    <div class="main_right_container only_full_width" id="main_right_container">
+      <div class="main_splitter" id="main_sidebar_splitter"></div>
+      <div class="main_sidebar ov_panel_set_right_container" id="main_sidebar"></div>
+    </div>
+  </div>
+
+  <div class="intro ov_thin_scrollbar" id="intro">
+    <div class="intro_centered ov_common_form ov_thin_scrollbar" id="intro_center">
+      <div class="intro_logo"></div>
+      <div class="intro_content" id="intro_content">
+        <h1>3D modelio įkėlimas…</h1>
+        <p>Modelis: <strong>{{ brezinys.pavadinimas|default:brezinys.filename }}</strong></p>
+        <ul>
+          <li>• Sukimas: kairys pelės mygtukas + vilkimas.</li>
+          <li>• Priartinimas / atitolinimas: pelės ratukas.</li>
+          <li>• Pan: vidurinis / dešinys pelės mygtukas.</li>
+          <li>• Matavimai: naudok matavimo įrankį viršutinėje juostoje.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -1,3 +1,6 @@
+import os
+import hashlib
+
 from django.db import models
 from django.db.models import Q, Index, UniqueConstraint
 from django.core.exceptions import ValidationError
@@ -137,6 +140,15 @@ class PozicijosBrezinys(models.Model):
     failas = models.FileField("Brėžinys", upload_to="pozicijos/breziniai/%Y/%m/")
     uploaded = models.DateTimeField(auto_now_add=True)
 
+    # 🔹 NAUJAS LAUKAS – sugeneruota PNG miniatiūra
+    preview = models.ImageField(
+        "Miniatiūra",
+        upload_to="pozicijos/breziniai/previews/",
+        null=True,
+        blank=True,
+        help_text="Automatiškai sugeneruota PNG miniatiūra.",
+    )
+
     class Meta:
         ordering = ["-uploaded"]
 
@@ -146,20 +158,17 @@ class PozicijosBrezinys(models.Model):
     # ---- Helperiai UI ir preview keliui ----
     @property
     def filename(self) -> str:
-        import os
         name = getattr(self.failas, "name", "") or ""
         return os.path.basename(name)
 
     @property
     def ext(self) -> str:
-        import os
         name = (getattr(self.failas, "name", "") or "").lower()
         _, ext = os.path.splitext(name)
         return (ext or "").lstrip(".")
 
     def _preview_relpath(self) -> str:
         """Naujas kelias su hash (stabilus pavadinimas)."""
-        import os, hashlib
         name = getattr(self.failas, "name", "") or ""
         base, _ = os.path.splitext(os.path.basename(name))
         digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
@@ -167,7 +176,6 @@ class PozicijosBrezinys(models.Model):
 
     def _legacy_preview_relpath(self) -> str:
         """Senas kelias be hash — suderinamumui su anksčiau sugeneruotais PNG."""
-        import os
         name = getattr(self.failas, "name", "") or ""
         base, _ = os.path.splitext(os.path.basename(name))
         return f"pozicijos/breziniai/previews/{base}.png"
@@ -175,9 +183,19 @@ class PozicijosBrezinys(models.Model):
     @property
     def thumb_url(self) -> str | None:
         """
-        Jei sugeneruotas preview, grąžina URL. Pirma bandom naują (su hash),
-        jei jo nėra – tikrinam seną (legacy) pavadinimą be hash.
+        - jei yra ImageField preview → jo URL
+        - jei yra senas PNG disk'e → jo URL
+        - jei STP/STEP → statinė 3D ikona iš static
+        - kitaip None
         """
+        # 1) ImageField preview
+        if self.preview:
+            try:
+                return self.preview.url
+            except Exception:
+                pass
+
+        # 2) suderinamumas – senieji PNG failai saugykloje
         storage = self.failas.storage
         rel_new = self._preview_relpath()
         rel_old = self._legacy_preview_relpath()
@@ -188,13 +206,31 @@ class PozicijosBrezinys(models.Model):
                 return storage.url(rel_old)
         except Exception:
             pass
+
+        # 3) fallback – statinė ikona STP/STEP failams
+        from django.templatetags.static import static
+        ext = (self.ext or "").lower()
+        if ext in {"stp", "step"}:
+            return static("pozicijos/img/icon-3d.png")
+
         return None
+
 
     def preview_abspath(self) -> str | None:
         """
-        Grąžina absoliutų kelią iki sugeneruoto PNG preview,
-        jei jis egzistuoja (pirmiausia naujas hash pavadinimas, po to legacy).
+        Absoliutus kelias iki sugeneruoto PNG preview:
+        - pirma bandom ImageField preview.path
+        - tada naują hash pavadinimą
+        - tada legacy pavadinimą
         """
+        # 1) ImageField
+        if self.preview:
+            try:
+                return self.preview.path
+            except Exception:
+                pass
+
+        # 2) senasis mechanizmas
         storage = self.failas.storage
         rel_new = self._preview_relpath()
         rel_old = self._legacy_preview_relpath()
@@ -238,16 +274,18 @@ class PozicijosBrezinys(models.Model):
         """
         Trinant įrašą:
          - pašalina originalų failą
-         - pašalina naują ir seną preview (jei yra)
+         - pašalina ImageField preview (jei yra)
+         - pašalina naują ir seną preview failą (jei buvo sugeneruoti be ImageField)
         """
         storage = self.failas.storage
         orig = getattr(self.failas, "name", None)
         rel_new = self._preview_relpath()
         rel_old = self._legacy_preview_relpath()
+        preview_name = self.preview.name if self.preview else None
 
         super().delete(using=using, keep_parents=keep_parents)
 
-        for path in (orig, rel_new, rel_old):
+        for path in (orig, rel_new, rel_old, preview_name):
             try:
                 if path and storage.exists(path):
                     storage.delete(path)

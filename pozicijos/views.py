@@ -12,6 +12,7 @@ from .forms import PozicijaForm, PozicijosBrezinysForm
 from .schemas.columns import COLUMNS
 from .services.previews import generate_preview_for_instance
 from . import proposal_views  # pasiūlymo parengimui / pdf
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 
 # Kurie stulpeliai gali būti rikiuojami – pagal key -> realų DB lauką.
@@ -315,14 +316,14 @@ def pozicijos_import_csv(request):
     )
 
 
+@xframe_options_sameorigin
 def brezinys_3d(request, pk, bid):
     """
-    Single-view 3D peržiūros puslapis STP brėžiniui.
-    Kol kas dar nerodome tikros STEP geometrijos – tik paruoštas viewerio puslapis.
+    Pilnas 3D peržiūros puslapis su Online3DViewer website versija.
+    Naudoja .stp failą tiesiai iš media (brezinys.failas.url).
     """
     poz = get_object_or_404(Pozicija, pk=pk)
     br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
-
     return render(
         request,
         "pozicijos/brezinys_3d.html",
