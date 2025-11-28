@@ -3,6 +3,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from .models import Pozicija, PozicijosKaina, PozicijosBrezinys, KainosEilute
+from .schemas.columns import COLUMNS
 
 
 # =============================================================================
@@ -39,9 +40,66 @@ class PozicijaForm(forms.ModelForm):
             "kaina_eur",
             "pastabos",
         ]
-    widgets = {
-        "atlikimo_terminas": forms.DateInput(attrs={"type": "date"}),
-    }
+        widgets = {
+            "atlikimo_terminas": forms.DateInput(attrs={"type": "date"}),
+            "pastabos": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Papildomos pastabos..."
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # --- Label'ai iš COLUMNS (kad sutaptų su sąrašo stulpeliais) ---
+        label_map = {
+            col["key"]: col["label"]
+            for col in COLUMNS
+            if col.get("type") != "virtual"
+        }
+        for name, field in self.fields.items():
+            if name in label_map:
+                field.label = label_map[name]
+
+        # --- šiek tiek kosmetikos: class + placeholderiai ---
+        for name, field in self.fields.items():
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = (css + " poz-field").strip()
+
+            if isinstance(field.widget, forms.TextInput):
+                if name == "poz_kodas":
+                    field.widget.attrs.setdefault(
+                        "placeholder", "Brėžinio / detalės kodas"
+                    )
+                elif name == "poz_pavad":
+                    field.widget.attrs.setdefault(
+                        "placeholder", "Detalės pavadinimas"
+                    )
+                elif name == "klientas":
+                    field.widget.attrs.setdefault(
+                        "placeholder", "Klientas"
+                    )
+                elif name == "projektas":
+                    field.widget.attrs.setdefault(
+                        "placeholder", "Projektas"
+                    )
+
+        # Skaitiniams laukams – laisvesnis žingsnis
+        numeric_fields = [
+            "plotas",
+            "svoris",
+            "detaliu_kiekis_reme",
+            "faktinis_kiekis_reme",
+            "pakavimo_dienos_norma",
+            "pak_po_ktl",
+            "pak_po_milt",
+            "kaina_eur",
+        ]
+        for name in numeric_fields:
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("step", "any")
 
     def save(self, commit=True):
         """

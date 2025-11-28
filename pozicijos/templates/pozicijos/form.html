@@ -1,61 +1,463 @@
-{# templates/pozicijos/form.html #}
+{# pozicijos/templates/pozicijos/form.html #}
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{% if object %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}{% endblock %}
+{% block title %}
+  {% if form.instance.pk %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}
+{% endblock %}
+
+{% block page_css %}
+<style>
+  .page-title{
+    margin:0 0 10px;
+    font-size:1.4rem;
+    font-weight:600;
+  }
+  .page-title .code{
+    font-weight:400;
+    font-size:1rem;
+    color:#64748b;
+  }
+  .actions{
+    margin-bottom:12px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  form.poz-form{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns: minmax(0,1fr) minmax(260px,0.9fr);
+    gap:12px;
+  }
+  @media (max-width: 1000px){
+    .form-grid{
+      grid-template-columns:1fr;
+    }
+  }
+
+  .form-section{
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    background:#fff;
+  }
+
+  .form-section details{
+    padding:6px 10px 10px;
+  }
+
+  .form-section summary{
+    list-style:none;
+    cursor:pointer;
+    font-weight:600;
+    font-size:.95rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:4px 2px 6px;
+  }
+  .form-section summary::-webkit-details-marker{display:none;}
+  .form-section summary::after{
+    content:"▾";
+    font-size:.8rem;
+    opacity:.7;
+    transition:transform .15s;
+  }
+  .form-section details[open] summary::after{
+    transform:rotate(180deg);
+  }
+
+  .section-body{
+    margin-top:4px;
+    border-top:1px solid #e5e7eb;
+    padding-top:6px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px 12px;
+  }
+  .section-body.full-width{
+    grid-template-columns:1fr;
+  }
+  @media (max-width: 700px){
+    .section-body{
+      grid-template-columns:1fr;
+    }
+  }
+
+  .field-row{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+  }
+  .field-row label{
+    font-size:.8rem;
+    font-weight:500;
+    color:#4b5563;
+  }
+  .field-row input,
+  .field-row textarea{
+    width:100%;
+    box-sizing:border-box;
+    padding:6px 8px;
+    border-radius:4px;
+    border:1px solid #d1d5db;
+    font-size:.9rem;
+  }
+  .field-row textarea{
+    resize:vertical;
+    min-height:60px;
+  }
+  .field-row input:focus,
+  .field-row textarea:focus{
+    outline:2px solid #60a5fa;
+    outline-offset:1px;
+    border-color:#60a5fa;
+  }
+
+  .field-errors{
+    color:#b91c1c;
+    font-size:.8rem;
+  }
+
+  .form-errors{
+    border-radius:6px;
+    border:1px solid #fecaca;
+    background:#fef2f2;
+    color:#991b1b;
+    padding:6px 10px;
+    font-size:.9rem;
+  }
+
+  .side-info{
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:10px;
+    background:#f9fafb;
+    font-size:.85rem;
+    color:#4b5563;
+  }
+  .side-info h3{
+    margin:0 0 6px;
+    font-size:.95rem;
+  }
+  .side-info ul{
+    padding-left:18px;
+    margin:0 0 4px;
+  }
+
+  .form-footer{
+    margin-top:4px;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<h1>{% if object %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}</h1>
 
-<form method="post">
+<h1 class="page-title">
+  {% if form.instance.pk %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}
+  {% if form.instance.poz_kodas %}
+    <span class="code">– {{ form.instance.poz_kodas }}</span>
+  {% endif %}
+</h1>
+
+<div class="actions">
+  <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">← Atgal į sąrašą</a>
+  {% if form.instance.pk %}
+    <a href="{% url 'pozicijos:detail' form.instance.pk %}" class="btn btn-secondary">Pozicijos kortelė</a>
+  {% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data" class="poz-form">
   {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="form-errors">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
   <div class="form-grid">
-    {% for field in form %}
-      <div class="form-group">
-        <label for="{{ field.id_for_label }}">
-          {{ field.label }}{% if field.field.required %} *{% endif %}
-        </label>
-        {{ field }}
-        {% if field.help_text %}<small class="help">{{ field.help_text }}</small>{% endif %}
-        {% if field.errors %}
-          <div class="errorlist">{{ field.errors }}</div>
-        {% endif %}
+    <div class="main-cols">
+      {# 1. Pagrindiniai #}
+      <div class="form-section">
+        <details open>
+          <summary>Pagrindinė informacija</summary>
+          <div class="section-body">
+            <div class="field-row">
+              <label for="{{ form.klientas.id_for_label }}">{{ form.klientas.label }}</label>
+              {{ form.klientas }}
+              {% if form.klientas.errors %}
+                <div class="field-errors">{{ form.klientas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.projektas.id_for_label }}">{{ form.projektas.label }}</label>
+              {{ form.projektas }}
+              {% if form.projektas.errors %}
+                <div class="field-errors">{{ form.projektas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.poz_kodas.id_for_label }}">{{ form.poz_kodas.label }}</label>
+              {{ form.poz_kodas }}
+              {% if form.poz_kodas.errors %}
+                <div class="field-errors">{{ form.poz_kodas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.poz_pavad.id_for_label }}">{{ form.poz_pavad.label }}</label>
+              {{ form.poz_pavad }}
+              {% if form.poz_pavad.errors %}
+                <div class="field-errors">{{ form.poz_pavad.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
       </div>
-    {% endfor %}
+
+      {# 2. Specifikacija #}
+      <div class="form-section">
+        <details>
+          <summary>Specifikacija</summary>
+          <div class="section-body">
+            <div class="field-row">
+              <label for="{{ form.metalas.id_for_label }}">{{ form.metalas.label }}</label>
+              {{ form.metalas }}
+              {% if form.metalas.errors %}
+                <div class="field-errors">{{ form.metalas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.plotas.id_for_label }}">{{ form.plotas.label }}</label>
+              {{ form.plotas }}
+              {% if form.plotas.errors %}
+                <div class="field-errors">{{ form.plotas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.svoris.id_for_label }}">{{ form.svoris.label }}</label>
+              {{ form.svoris }}
+              {% if form.svoris.errors %}
+                <div class="field-errors">{{ form.svoris.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# 3. Kabinimas #}
+      <div class="form-section">
+        <details>
+          <summary>Kabinimas</summary>
+          <div class="section-body">
+            <div class="field-row">
+              <label for="{{ form.kabinimo_budas.id_for_label }}">{{ form.kabinimo_budas.label }}</label>
+              {{ form.kabinimo_budas }}
+              {% if form.kabinimo_budas.errors %}
+                <div class="field-errors">{{ form.kabinimo_budas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.kabinimas_reme.id_for_label }}">{{ form.kabinimas_reme.label }}</label>
+              {{ form.kabinimas_reme }}
+              {% if form.kabinimas_reme.errors %}
+                <div class="field-errors">{{ form.kabinimas_reme.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.detaliu_kiekis_reme.id_for_label }}">{{ form.detaliu_kiekis_reme.label }}</label>
+              {{ form.detaliu_kiekis_reme }}
+              {% if form.detaliu_kiekis_reme.errors %}
+                <div class="field-errors">{{ form.detaliu_kiekis_reme.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.faktinis_kiekis_reme.id_for_label }}">{{ form.faktinis_kiekis_reme.label }}</label>
+              {{ form.faktinis_kiekis_reme }}
+              {% if form.faktinis_kiekis_reme.errors %}
+                <div class="field-errors">{{ form.faktinis_kiekis_reme.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# 4. Paviršius / dažymas #}
+      <div class="form-section">
+        <details>
+          <summary>Paviršius / dažymas</summary>
+          <div class="section-body">
+            <div class="field-row">
+              <label for="{{ form.paruosimas.id_for_label }}">{{ form.paruosimas.label }}</label>
+              {{ form.paruosimas }}
+              {% if form.paruosimas.errors %}
+                <div class="field-errors">{{ form.paruosimas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.padengimas.id_for_label }}">{{ form.padengimas.label }}</label>
+              {{ form.padengimas }}
+              {% if form.padengimas.errors %}
+                <div class="field-errors">{{ form.padengimas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.padengimo_standartas.id_for_label }}">{{ form.padengimo_standartas.label }}</label>
+              {{ form.padengimo_standartas }}
+              {% if form.padengimo_standartas.errors %}
+                <div class="field-errors">{{ form.padengimo_standartas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.spalva.id_for_label }}">{{ form.spalva.label }}</label>
+              {{ form.spalva }}
+              {% if form.spalva.errors %}
+                <div class="field-errors">{{ form.spalva.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.maskavimas.id_for_label }}">{{ form.maskavimas.label }}</label>
+              {{ form.maskavimas }}
+              {% if form.maskavimas.errors %}
+                <div class="field-errors">{{ form.maskavimas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.testai_kokybe.id_for_label }}">{{ form.testai_kokybe.label }}</label>
+              {{ form.testai_kokybe }}
+              {% if form.testai_kokybe.errors %}
+                <div class="field-errors">{{ form.testai_kokybe.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# 5. Terminai #}
+      <div class="form-section">
+        <details>
+          <summary>Terminai</summary>
+          <div class="section-body full-width">
+            <div class="field-row">
+              <label for="{{ form.atlikimo_terminas.id_for_label }}">{{ form.atlikimo_terminas.label }}</label>
+              {{ form.atlikimo_terminas }}
+              {% if form.atlikimo_terminas.errors %}
+                <div class="field-errors">{{ form.atlikimo_terminas.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# 6. Pakavimas #}
+      <div class="form-section">
+        <details>
+          <summary>Pakavimas</summary>
+          <div class="section-body">
+            <div class="field-row">
+              <label for="{{ form.pakavimas.id_for_label }}">{{ form.pakavimas.label }}</label>
+              {{ form.pakavimas }}
+              {% if form.pakavimas.errors %}
+                <div class="field-errors">{{ form.pakavimas.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.instrukcija.id_for_label }}">{{ form.instrukcija.label }}</label>
+              {{ form.instrukcija }}
+              {% if form.instrukcija.errors %}
+                <div class="field-errors">{{ form.instrukcija.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.pakavimo_dienos_norma.id_for_label }}">{{ form.pakavimo_dienos_norma.label }}</label>
+              {{ form.pakavimo_dienos_norma }}
+              {% if form.pakavimo_dienos_norma.errors %}
+                <div class="field-errors">{{ form.pakavimo_dienos_norma.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.pak_po_ktl.id_for_label }}">{{ form.pak_po_ktl.label }}</label>
+              {{ form.pak_po_ktl }}
+              {% if form.pak_po_ktl.errors %}
+                <div class="field-errors">{{ form.pak_po_ktl.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="field-row">
+              <label for="{{ form.pak_po_milt.id_for_label }}">{{ form.pak_po_milt.label }}</label>
+              {{ form.pak_po_milt }}
+              {% if form.pak_po_milt.errors %}
+                <div class="field-errors">{{ form.pak_po_milt.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# 7. Kaina (senas laukas) #}
+      <div class="form-section">
+        <details open>
+          <summary>Kaina</summary>
+          <div class="section-body full-width">
+            <div class="field-row">
+              <label for="{{ form.kaina_eur.id_for_label }}">{{ form.kaina_eur.label }}</label>
+              {{ form.kaina_eur }}
+              {% if form.kaina_eur.errors %}
+                <div class="field-errors">{{ form.kaina_eur.errors }}</div>
+              {% endif %}
+            </div>
+            <p style="font-size:.8rem;color:#6b7280;margin-top:4px;">
+              Šis laukas yra „sena“ kaina sąrašo stulpeliui.
+              Detali kainų sistema (intervalai, fiksuotos kainos) valdoma per
+              mygtuką <strong>„Valdyti kainas“</strong> pozicijos kortelėje.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      {# 8. Pastabos #}
+      <div class="form-section">
+        <details open>
+          <summary>Pastabos</summary>
+          <div class="section-body full-width">
+            <div class="field-row">
+              <label for="{{ form.pastabos.id_for_label }}">{{ form.pastabos.label }}</label>
+              {{ form.pastabos }}
+              {% if form.pastabos.errors %}
+                <div class="field-errors">{{ form.pastabos.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <aside class="side-info">
+      <h3>Trumpai apie formą</h3>
+      <ul>
+        <li>Pagrindiniai laukai viršuje – klientas, projektas, kodas, pavadinimas.</li>
+        <li>Kaina čia – tik vienas skaičius, rodomas sąrašo „Kaina“ stulpelyje.</li>
+        <li>Detali kainų sistema (intervalai, „aktuali“ kaina) valdoma
+            per „Valdyti kainas“ pozicijos kortelėje.</li>
+      </ul>
+      <p>Privalomus laukus (be kurių negalima išsaugoti) sutarsime vėliau –
+      dabar visi laukai yra neprivalomi.</p>
+    </aside>
   </div>
 
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Išsaugoti</button>
-    <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal</a>
+  <div class="form-footer">
+    <button type="submit" class="btn">
+      {% if form.instance.pk %}Išsaugoti pakeitimus{% else %}Sukurti poziciją{% endif %}
+    </button>
   </div>
 </form>
 
-<style>
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 12px;
-  margin-bottom: 1rem;
-}
-.form-group label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 4px 6px;
-}
-.form-actions {
-  display: flex;
-  gap: 8px;
-}
-.errorlist {
-  color: #b91c1c;
-  font-size: .8rem;
-}
-</style>
 {% endblock %}
