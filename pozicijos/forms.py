@@ -6,9 +6,23 @@ from .models import Pozicija, PozicijosKaina, PozicijosBrezinys, KainosEilute
 from .schemas.columns import COLUMNS
 
 
-# =============================================================================
-#  PAGRINDINĖ POZICIJOS FORMA  (naudojama dabar)
-# =============================================================================
+# Laukai, kuriems rodysim pasiūlymus iš DB (datalist)
+SUGGESTION_FIELDS = [
+    "klientas",
+    "projektas",
+    "metalas",
+    "kabinimo_budas",
+    "kabinimas_reme",
+    "paruosimas",
+    "padengimas",
+    "padengimo_standartas",
+    "spalva",
+    "maskavimas",
+    "testai_kokybe",
+    "pakavimas",
+    "instrukcija",
+]
+
 
 class PozicijaForm(forms.ModelForm):
     class Meta:
@@ -63,7 +77,7 @@ class PozicijaForm(forms.ModelForm):
             if name in label_map:
                 field.label = label_map[name]
 
-        # --- šiek tiek kosmetikos: class + placeholderiai ---
+        # --- bendras CSS klasės priskyrimas + placeholderiai kai kuriems laukams ---
         for name, field in self.fields.items():
             css = field.widget.attrs.get("class", "")
             field.widget.attrs["class"] = (css + " poz-field").strip()
@@ -86,7 +100,12 @@ class PozicijaForm(forms.ModelForm):
                         "placeholder", "Projektas"
                     )
 
-        # Skaitiniams laukams – laisvesnis žingsnis
+        # --- datalist hook'ai tekstiniams laukams (sufleravimui iš DB) ---
+        for name in SUGGESTION_FIELDS:
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("list", f"dl-{name}")
+
+        # --- Skaitiniai laukai – be rodyklių, bet su skaitmenų klaviatūra ---
         numeric_fields = [
             "plotas",
             "svoris",
@@ -99,7 +118,11 @@ class PozicijaForm(forms.ModelForm):
         ]
         for name in numeric_fields:
             if name in self.fields:
-                self.fields[name].widget.attrs.setdefault("step", "any")
+                w = self.fields[name].widget
+                # vietoj type="number" -> type="text", kad nebūtų rodyklių
+                w.input_type = "text"
+                w.attrs.setdefault("inputmode", "decimal")
+                w.attrs.setdefault("placeholder", "0")
 
     def save(self, commit=True):
         """
@@ -147,7 +170,6 @@ class PozicijaForm(forms.ModelForm):
 
 # =============================================================================
 #  LEGACY: SENAS MODELIS PozicijosKaina (paliktas tik suderinamumui)
-#  ŠIOS FORMOS DABAR NĖRA NAUDOJAMOS NAUJOJE ARCHITEKTŪROJE.
 # =============================================================================
 
 class PozicijosKainaForm(forms.ModelForm):
@@ -174,7 +196,7 @@ PozicijosKainaFormSet = inlineformset_factory(
 
 
 # =============================================================================
-#  BRĖŽINIŲ FORMA  (naudojama dabar)
+#  BRĖŽINIŲ FORMA
 # =============================================================================
 
 class PozicijosBrezinysForm(forms.ModelForm):

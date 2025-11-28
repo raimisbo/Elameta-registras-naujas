@@ -4,15 +4,16 @@ from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from decimal import Decimal, InvalidOperation
+
 from .services.import_csv import import_pozicijos_from_csv
 from .models import Pozicija, PozicijosBrezinys
 from .forms import PozicijaForm, PozicijosBrezinysForm
 from .schemas.columns import COLUMNS
 from .services.previews import generate_preview_for_instance
 from . import proposal_views  # pasiūlymo parengimui / pdf
-from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 
 # Kurie stulpeliai gali būti rikiuojami – pagal key -> realų DB lauką.
@@ -22,6 +23,43 @@ SORTABLE_FIELDS = {
     for c in COLUMNS
     if c.get("type") != "virtual"
 }
+
+
+# Laukai, kuriems formoje rodysim pasiūlymus iš DB (datalist)
+FORM_SUGGEST_FIELDS = [
+    "klientas",
+    "projektas",
+    "metalas",
+    "kabinimo_budas",
+    "kabinimas_reme",
+    "paruosimas",
+    "padengimas",
+    "padengimo_standartas",
+    "spalva",
+    "maskavimas",
+    "testai_kokybe",
+    "pakavimas",
+    "instrukcija",
+]
+
+
+def _get_form_suggestions():
+    """
+    Surenka unikalius tekstinius laukų variantus iš esamų Pozicija įrašų,
+    kad forma galėtų rodyti pasiūlymus (datalist).
+    """
+    qs = Pozicija.objects.all()
+    suggestions = {}
+    for field in FORM_SUGGEST_FIELDS:
+        values = (
+            qs.order_by(field)
+            .values_list(field, flat=True)
+            .exclude(**{f"{field}__isnull": True})
+            .exclude(**{field: ""})
+            .distinct()
+        )
+        suggestions[field] = list(values)
+    return suggestions
 
 
 # ==== Skaitinis filtras Plotas / Svoris: min..max, >, <, == ==================
@@ -252,7 +290,13 @@ def pozicija_create(request):
             return redirect("pozicijos:detail", pk=obj.pk)
     else:
         form = PozicijaForm()
-    return render(request, "pozicijos/form.html", {"form": form})
+
+    context = {
+        "form": form,
+        "pozicija": None,
+        "suggestions": _get_form_suggestions(),
+    }
+    return render(request, "pozicijos/form.html", context)
 
 
 def pozicija_edit(request, pk):
@@ -264,7 +308,13 @@ def pozicija_edit(request, pk):
             return redirect("pozicijos:detail", pk=poz.pk)
     else:
         form = PozicijaForm(instance=poz)
-    return render(request, "pozicijos/form.html", {"form": form, "pozicija": poz})
+
+    context = {
+        "form": form,
+        "pozicija": poz,
+        "suggestions": _get_form_suggestions(),
+    }
+    return render(request, "pozicijos/form.html", context)
 
 
 @require_POST
