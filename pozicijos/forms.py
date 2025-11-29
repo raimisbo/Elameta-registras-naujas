@@ -23,6 +23,24 @@ SUGGESTION_FIELDS = [
     "instrukcija",
 ]
 
+# Privalomi laukai (loginė „būtina“ bazė)
+REQUIRED_FIELDS = [
+    "klientas",
+    "poz_kodas",
+    "poz_pavad",
+    "metalas",
+    "padengimas",
+]
+
+# Individualūs LT tekstai privalomiems laukams
+REQUIRED_MESSAGES = {
+    "klientas": "Nurodykite klientą.",
+    "poz_kodas": "Nurodykite brėžinio / detalės kodą.",
+    "poz_pavad": "Nurodykite detalės pavadinimą.",
+    "metalas": "Nurodykite metalo tipą.",
+    "padengimas": "Nurodykite padengimo tipą.",
+}
+
 
 class PozicijaForm(forms.ModelForm):
     class Meta:
@@ -77,6 +95,15 @@ class PozicijaForm(forms.ModelForm):
             if name in label_map:
                 field.label = label_map[name]
 
+        # --- Privalomi laukai + LT 'required' klaidos ---
+        for name in REQUIRED_FIELDS:
+            if name in self.fields:
+                field = self.fields[name]
+                field.required = True
+                # Individualus tekstas, jei turim, kitaip bendras
+                msg = REQUIRED_MESSAGES.get(name, "Šis laukas privalomas.")
+                field.error_messages["required"] = msg
+
         # --- bendras CSS klasės priskyrimas + placeholderiai kai kuriems laukams ---
         for name, field in self.fields.items():
             css = field.widget.attrs.get("class", "")
@@ -118,11 +145,17 @@ class PozicijaForm(forms.ModelForm):
         ]
         for name in numeric_fields:
             if name in self.fields:
-                w = self.fields[name].widget
+                field = self.fields[name]
+                w = field.widget
                 # vietoj type="number" -> type="text", kad nebūtų rodyklių
                 w.input_type = "text"
                 w.attrs.setdefault("inputmode", "decimal")
                 w.attrs.setdefault("placeholder", "0")
+                # LT klaida, kai įvestis ne skaičius
+                field.error_messages.setdefault(
+                    "invalid",
+                    "Įveskite skaičių (pvz. 12.5).",
+                )
 
     def save(self, commit=True):
         """

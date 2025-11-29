@@ -16,13 +16,15 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.pdfgen import canvas
 
 from .models import Pozicija
 
 
-# ===== LT šriftai ===========================================================
+# =====================================================================
+#  LT šriftai
+# =====================================================================
 
 def _register_fonts() -> tuple[str, str]:
     """
@@ -60,12 +62,14 @@ def _register_fonts() -> tuple[str, str]:
     return reg_alias, bold_alias
 
 
-# ===== Pagalbiniai duomenų ruošėjai =========================================
+# =====================================================================
+#  Pagalbiniai duomenų ruošėjai
+# =====================================================================
 
 def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
     """
-    Paruošia (label, value) sąrašą iš visų Pozicija laukų HTML peržiūrai.
-    Tušti laukai praleidžiami. Tai naudojama tik proposal_pdf.html šablone.
+    Grąžina (label, value) sąrašą visiems ne tuštiems Pozicija laukams.
+    Naudojama ir HTML peržiūrai, ir PDF „Pagrindinė informacija“ lentelėje.
     """
     rows: list[tuple[str, str]] = []
     skip = {"id", "created", "updated"}
@@ -73,11 +77,14 @@ def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
     for field in pozicija._meta.fields:
         if field.name in skip:
             continue
+
         value = getattr(pozicija, field.name, None)
         if value in (None, ""):
             continue
+
         label = str(field.verbose_name or field.name).capitalize()
         rows.append((label, str(value)))
+
     return rows
 
 
@@ -155,7 +162,9 @@ def _draw_wrapped_text(
     return y
 
 
-# ===== Views: UI puslapis ====================================================
+# =====================================================================
+#  UI puslapis pasiūlymo paruošimui
+# =====================================================================
 
 def proposal_prepare(request, pk: int):
     """
@@ -187,16 +196,24 @@ def proposal_prepare(request, pk: int):
     return render(request, "pozicijos/proposal_prepare.html", context)
 
 
-# ===== Views: PDF / HTML peržiūra ===========================================
+# =====================================================================
+#  PDF / HTML peržiūra
+# =====================================================================
 
 def proposal_pdf(request, pk: int):
     """
     Jei ?preview=1 – grąžina HTML (peržiūra su CSS, kaip puslapis).
     Kitu atveju – sugeneruoja PDF per ReportLab, su LT šriftais ir logotipu.
+
+    Struktūra:
+      - header (logo + rekvizitai + „PASIŪLYMAS“ + data)
+      - Pagrindinė informacija (tokia pati, kaip HTML field_rows)
+      - Kainos (jei pažymėta)
+      - Brėžinių miniatiūros (jei pažymėta)
+      - Pastabos / sąlygos iš formos (jei jos skiriasi nuo pozicijos pastabų)
     """
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
-    # tie patys parametrai, kaip ir proposal_prepare
     show_prices = bool(request.GET.get("show_prices"))
     show_drawings = bool(request.GET.get("show_drawings"))
     notes = request.GET.get("notes", "").strip()
@@ -217,6 +234,7 @@ def proposal_pdf(request, pk: int):
     brez = list(pozicija.breziniai.all())
     poz_pastabos = (pozicija.pastabos or "").strip()
 
+    # --------- HTML peržiūra (tas pats šablonas, kaip iki šiol) ----------
     if preview:
         ctx = {
             "pozicija": pozicija,
@@ -230,15 +248,17 @@ def proposal_pdf(request, pk: int):
         }
         return render(request, "pozicijos/proposal_pdf.html", ctx)
 
-    # ===== Tikras PDF =====
+    # =====================================================================
+    #  Tikras PDF
+    # =====================================================================
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
     font_regular, font_bold = _register_fonts()
 
-    margin_left = 22 * mm
-    margin_right = 22 * mm
+    margin_left = 18 * mm
+    margin_right = 18 * mm
     bottom_margin = 20 * mm
 
     # --- vidiniai helperiai -------------------------------------------------
@@ -247,62 +267,22 @@ def proposal_pdf(request, pk: int):
         c.showPage()
         return height - (new_y or 30 * mm)
 
-    def section_title(y: float, number: int, title: str) -> float:
-        """Sekcijos antraštė: '1. Detalės santrauka' + plona linija."""
+    def section_title(y: float, title: str) -> float:
+        """
+        Sekcijos antraštė kaip HTML <h2> – be numeracijos,
+        PO ja paliekam šiek tiek daugiau oro (tuščią eilutę).
+        """
         if y < bottom_margin + 30:
             y = new_page_with_y()
         c.setFont(font_bold, 12)
         c.setFillColor(colors.HexColor("#111827"))
-        c.drawString(margin_left, y, f"{number}. {title}")
-        y -= 4
+        c.drawString(margin_left, y, title)
+        y -= 5
         c.setStrokeColor(colors.HexColor("#e5e7eb"))
         c.setLineWidth(0.6)
         c.line(margin_left, y, width - margin_right, y)
-        return y - 10
-
-    def two_col_row(
-        y: float,
-        left_label: str,
-        left_val: str | None,
-        right_label: str | None = None,
-        right_val: str | None = None,
-    ) -> float:
-        """Vienos eilutės dviejų kolonų pora (label + value) su lengva linija apačioje."""
-        if y < bottom_margin + 18:
-            y = new_page_with_y()
-
-        label_color = colors.HexColor("#4b5563")
-        value_color = colors.HexColor("#111827")
-
-        col_gap = 20 * mm
-        col_width = (width - margin_left - margin_right - col_gap) / 2
-        mid_x = margin_left + col_width + col_gap
-
-        c.setFont(font_regular, 9.5)
-
-        base_y = y
-
-        # kairė kolona
-        if left_label and left_val:
-            c.setFillColor(label_color)
-            c.drawString(margin_left, base_y, left_label + ":")
-            c.setFillColor(value_color)
-            c.drawString(margin_left + 30 * mm, base_y, str(left_val))
-
-        # dešinė kolona
-        if right_label and right_val:
-            c.setFillColor(label_color)
-            c.drawString(mid_x, base_y, right_label + ":")
-            c.setFillColor(value_color)
-            c.drawString(mid_x + 30 * mm, base_y, str(right_val))
-
-        # švelni linija po eile
-        line_y = base_y - 3
-        c.setStrokeColor(colors.HexColor("#e5e7eb"))
-        c.setLineWidth(0.4)
-        c.line(margin_left, line_y, width - margin_right, line_y)
-
-        return line_y - 6  # tarpas iki kitos eilės
+        # + papildomas tarpas po linija (tuščia eilutė)
+        return y - 16
 
     # --- viršutinė juosta + logo + rekvizitai ------------------------------
 
@@ -332,7 +312,11 @@ def proposal_pdf(request, pk: int):
 
     company_name = getattr(settings, "OFFER_COMPANY_NAME", "") or "UAB Elameta"
     line1 = getattr(settings, "OFFER_COMPANY_LINE1", "Adresas, LT-00000, Miestas")
-    line2 = getattr(settings, "OFFER_COMPANY_LINE2", "Tel. +370 000 00000, el. paštas info@elameta.lt")
+    line2 = getattr(
+        settings,
+        "OFFER_COMPANY_LINE2",
+        "Tel. +370 000 00000, el. paštas info@elameta.lt",
+    )
     right_x = width - margin_right
 
     c.setFont(font_bold, 10)
@@ -349,7 +333,7 @@ def proposal_pdf(request, pk: int):
     # --- pavadinimas + data -------------------------------------------------
 
     top_bottom_y = height - top_bar_h
-    d = 11 * mm  # daugiau oro nuo pilkos juostos
+    d = 11 * mm  # tarpas nuo pilkos juostos
     title_y = top_bottom_y - d
 
     c.setFont(font_bold, 18)
@@ -373,195 +357,202 @@ def proposal_pdf(request, pk: int):
     c.line(margin_left, y, width - margin_right, y)
     y -= 18
 
-    # ===== 1. Detalės santrauka ============================================
-    y = section_title(y, 1, "Detalės santrauka")
+    # =====================================================================
+    #  Pagrindinė informacija (kaip HTML field_rows)
+    # =====================================================================
 
-    plotas_val = f"{pozicija.plotas} m²" if pozicija.plotas is not None else "—"
-    svoris_val = f"{pozicija.svoris} kg" if pozicija.svoris is not None else "—"
+    y = section_title(y, "Pagrindinė informacija")
 
-    y = two_col_row(
-        y,
-        "Klientas", pozicija.klientas or "—",
-        "Plotas", plotas_val,
-    )
-    y = two_col_row(
-        y,
-        "Projektas", pozicija.projektas or "—",
-        "Svoris", svoris_val,
-    )
-    y = two_col_row(
-        y,
-        "Brėžinio kodas", pozicija.poz_kodas or "—",
-        None, None,
-    )
-    y = two_col_row(
-        y,
-        "Detalės pavadinimas", pozicija.poz_pavad or "—",
-        None, None,
-    )
+    table_x = margin_left
+    table_w = width - margin_left - margin_right
+    label_w = 60 * mm
 
-    y -= 8
+    def label_row(y_pos: float, label: str, value: str | None) -> float:
+        """
+        Vienos eilutės label / value pora, kaip HTML lentelėje.
+        Eilutės aukštį padidinam ~1.5 karto, kad tarpų būtų daugiau.
+        """
+        row_h = 18  # buvo 13
+        if y_pos < bottom_margin + row_h + 5:
+            y_pos = new_page_with_y()
+            # pakartojam sekcijos pavadinimą puslapio viršuje
+            y_pos = section_title(y_pos, "Pagrindinė informacija")
 
-    # Pozicijos pastabos – jei yra, rodome čia, po santraukos
-    if poz_pastabos:
-        if y < bottom_margin + 60:
-            y = new_page_with_y()
-        c.setFont(font_bold, 11)
-        c.setFillColor(colors.HexColor("#111827"))
-        c.drawString(margin_left, y, "Pozicijos pastabos")
-        y -= 6
+        val = value if (value not in (None, "")) else "—"
+
+        # fonai
         c.setStrokeColor(colors.HexColor("#e5e7eb"))
-        c.setLineWidth(0.5)
-        c.line(margin_left, y, width - margin_right, y)
-        y -= 8
-
-        c.setFillColor(colors.HexColor("#111827"))
-        y = _draw_wrapped_text(
-            c=c,
-            text=poz_pastabos,
-            x=margin_left,
-            y=y,
-            max_width=width - margin_left - margin_right,
-            font_name=font_regular,
-            font_size=9.5,
-            page_width=width,
-            page_height=height,
-            bottom_margin=bottom_margin,
-        )
-        y -= 12
-
-    # ===== 2. Kainos =======================================================
-    if show_prices and kainos:
-        y = section_title(y, 2, "Kainos")
-
-        if y < bottom_margin + 70:
-            y = new_page_with_y()
-            y = section_title(y, 2, "Kainos")
-
-        # stulpelių X nuo kairės (mm)
-        col_x = [margin_left,
-                 margin_left + 25 * mm,
-                 margin_left + 45 * mm,
-                 margin_left + 68 * mm,
-                 margin_left + 88 * mm,
-                 margin_left + 110 * mm,
-                 margin_left + 133 * mm,
-                 margin_left + 155 * mm]
-
-        headers = [
-            "Kaina €",
-            "Matas",
-            "Tipas",
-            "Kiekis nuo",
-            "Kiekis iki",
-            "Fiks. kiekis",
-            "Galioja nuo",
-            "Galioja iki",
-        ]
-
-        # header fonas
-        header_h = 11
+        c.setLineWidth(0.4)
         c.setFillColor(colors.HexColor("#f9fafb"))
+        c.rect(table_x, y_pos - row_h + 3, label_w, row_h, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor("#ffffff"))
         c.rect(
-            margin_left,
-            y - header_h + 2,
-            width - margin_left - margin_right,
-            header_h,
+            table_x + label_w,
+            y_pos - row_h + 3,
+            table_w - label_w,
+            row_h,
             stroke=0,
             fill=1,
         )
 
+        # tekstai
         c.setFont(font_regular, 9)
-        c.setFillColor(colors.HexColor("#374151"))
-        for x_val, h in zip(col_x, headers):
-            c.drawString(x_val, y, h)
+        c.setFillColor(colors.HexColor("#4b5563"))
+        c.drawString(table_x + 2, y_pos, label)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(table_x + label_w + 3, y_pos, str(val))
 
-        y -= 3
+        # apatinė linija
         c.setStrokeColor(colors.HexColor("#e5e7eb"))
-        c.setLineWidth(0.5)
-        c.line(margin_left, y, width - margin_right, y)
-        y -= 7
+        c.line(table_x, y_pos - 1, table_x + table_w, y_pos - 1)
 
-        c.setFont(font_regular, 9)
-        zebra = False
+        return y_pos - row_h
 
-        for k in kainos:
-            if y < bottom_margin + 20:
-                y = new_page_with_y()
-                y = section_title(y, 2, "Kainos")
-
-                # header iš naujo
-                header_h = 11
-                c.setFillColor(colors.HexColor("#f9fafb"))
-                c.rect(
-                    margin_left,
-                    y - header_h + 2,
-                    width - margin_left - margin_right,
-                    header_h,
-                    stroke=0,
-                    fill=1,
-                )
-                c.setFont(font_regular, 9)
-                c.setFillColor(colors.HexColor("#374151"))
-                for x_val, h in zip(col_x, headers):
-                    c.drawString(x_val, y, h)
-                y -= 3
-                c.setStrokeColor(colors.HexColor("#e5e7eb"))
-                c.setLineWidth(0.5)
-                c.line(margin_left, y, width - margin_right, y)
-                y -= 7
-                c.setFont(font_regular, 9)
-                zebra = False
-
-            row_h = 10
-
-            # zebra fonas
-            if zebra:
-                c.setFillColor(colors.HexColor("#f9fafb"))
-                c.rect(
-                    margin_left,
-                    y - row_h + 2,
-                    width - margin_left - margin_right,
-                    row_h,
-                    stroke=0,
-                    fill=1,
-                )
-            zebra = not zebra
-
-            c.setFillColor(colors.HexColor("#111827"))
-            tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
-
-            c.drawString(col_x[0], y, f"{k.kaina}")
-            c.drawString(col_x[1], y, k.matas)
-            c.drawString(col_x[2], y, tipas)
-            c.drawString(col_x[3], y, str(k.kiekis_nuo or "—"))
-            c.drawString(col_x[4], y, str(k.kiekis_iki or "—"))
-            c.drawString(col_x[5], y, str(k.fiksuotas_kiekis or "—"))
-            c.drawString(
-                col_x[6],
-                y,
-                k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—",
-            )
-            c.drawString(
-                col_x[7],
-                y,
-                k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—",
-            )
-
-            y -= row_h
-
-        y -= 10
-
-    elif show_prices:
-        y = section_title(y, 2, "Kainos")
+    if field_rows:
+        for label, val in field_rows:
+            y = label_row(y, label, val)
+        y -= 8
+    else:
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
-        c.drawString(margin_left, y, "Aktyvių kainų eilučių šiai pozicijai nėra.")
+        c.drawString(margin_left, y, "Nėra duomenų.")
         y -= 12
 
-    # ===== 3. Brėžinių miniatiūros ========================================
+    # =====================================================================
+    #  Kainos
+    # =====================================================================
+
+    if show_prices:
+        y = section_title(y, "Kainos (aktualios eilutės)")
+
+        if kainos:
+            if y < bottom_margin + 70:
+                y = new_page_with_y()
+                y = section_title(y, "Kainos (aktualios eilutės)")
+
+            col_x = [
+                margin_left,
+                margin_left + 25 * mm,
+                margin_left + 45 * mm,
+                margin_left + 68 * mm,
+                margin_left + 88 * mm,
+                margin_left + 110 * mm,
+                margin_left + 133 * mm,
+                margin_left + 155 * mm,
+            ]
+
+            headers = [
+                "Kaina €",
+                "Matas",
+                "Tipas",
+                "Kiekis nuo",
+                "Kiekis iki",
+                "Fiks. kiekis",
+                "Galioja nuo",
+                "Galioja iki",
+            ]
+
+            header_h = 13
+            c.setFillColor(colors.HexColor("#f9fafb"))
+            c.rect(
+                margin_left,
+                y - header_h + 3,
+                width - margin_left - margin_right,
+                header_h,
+                stroke=0,
+                fill=1,
+            )
+
+            c.setFont(font_regular, 9)
+            c.setFillColor(colors.HexColor("#374151"))
+            for x_val, h_txt in zip(col_x, headers):
+                c.drawString(x_val, y, h_txt)
+
+            y -= 4
+            c.setStrokeColor(colors.HexColor("#e5e7eb"))
+            c.setLineWidth(0.5)
+            c.line(margin_left, y, width - margin_right, y)
+            y -= 8
+
+            c.setFont(font_regular, 9)
+            zebra = False
+            row_h_prices = 16  # buvo 12 – daugiau tarpo tarp eilučių
+
+            for k in kainos:
+                if y < bottom_margin + row_h_prices + 8:
+                    y = new_page_with_y()
+                    y = section_title(y, "Kainos (aktualios eilutės)")
+
+                    header_h = 13
+                    c.setFillColor(colors.HexColor("#f9fafb"))
+                    c.rect(
+                        margin_left,
+                        y - header_h + 3,
+                        width - margin_left - margin_right,
+                        header_h,
+                        stroke=0,
+                        fill=1,
+                    )
+                    c.setFont(font_regular, 9)
+                    c.setFillColor(colors.HexColor("#374151"))
+                    for x_val, h_txt in zip(col_x, headers):
+                        c.drawString(x_val, y, h_txt)
+                    y -= 4
+                    c.setStrokeColor(colors.HexColor("#e5e7eb"))
+                    c.setLineWidth(0.5)
+                    c.line(margin_left, y, width - margin_right, y)
+                    y -= 8
+                    c.setFont(font_regular, 9)
+                    zebra = False
+
+                # zebra fonas
+                if zebra:
+                    c.setFillColor(colors.HexColor("#f9fafb"))
+                    c.rect(
+                        margin_left,
+                        y - row_h_prices + 3,
+                        width - margin_left - margin_right,
+                        row_h_prices,
+                        stroke=0,
+                        fill=1,
+                    )
+                zebra = not zebra
+
+                c.setFillColor(colors.HexColor("#111827"))
+                tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
+
+                c.drawString(col_x[0], y, f"{k.kaina}")
+                c.drawString(col_x[1], y, k.matas)
+                c.drawString(col_x[2], y, tipas)
+                c.drawString(col_x[3], y, str(k.kiekis_nuo or "—"))
+                c.drawString(col_x[4], y, str(k.kiekis_iki or "—"))
+                c.drawString(col_x[5], y, str(k.fiksuotas_kiekis or "—"))
+                c.drawString(
+                    col_x[6],
+                    y,
+                    k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—",
+                )
+                c.drawString(
+                    col_x[7],
+                    y,
+                    k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—",
+                )
+
+                y -= row_h_prices
+
+            y -= 12
+        else:
+            c.setFont(font_regular, 9)
+            c.setFillColor(colors.HexColor("#6b7280"))
+            c.drawString(margin_left, y, "Aktyvių kainų eilučių šiai pozicijai nėra.")
+            y -= 12
+
+    # =====================================================================
+    #  Brėžinių miniatiūros
+    # =====================================================================
+
     if show_drawings and brez:
-        y = section_title(y, 3, "Brėžinių miniatiūros")
+        y = section_title(y, "Brėžinių miniatiūros")
 
         thumb_w = 48 * mm
         thumb_h = 34 * mm
@@ -570,7 +561,7 @@ def proposal_pdf(request, pk: int):
         for b in brez:
             if y < bottom_margin + thumb_h + 30:
                 y = new_page_with_y()
-                y = section_title(y, 3, "Brėžinių miniatiūros")
+                y = section_title(y, "Brėžinių miniatiūros")
                 x = margin_left
 
             img_path = None
@@ -614,12 +605,15 @@ def proposal_pdf(request, pk: int):
 
         y -= 12
 
-    # ===== 4. Pastabos / sąlygos iš formos =================================
+    # =====================================================================
+    #  Pastabos / sąlygos iš formos
+    # =====================================================================
+
     if notes and notes.strip() != poz_pastabos:
-        y = section_title(y, 4, "Pastabos / sąlygos")
+        y = section_title(y, "Pastabos / sąlygos")
         if y < bottom_margin + 60:
             y = new_page_with_y()
-            y = section_title(y, 4, "Pastabos / sąlygos")
+            y = section_title(y, "Pastabos / sąlygos")
 
         c.setFillColor(colors.HexColor("#111827"))
         y = _draw_wrapped_text(
@@ -651,5 +645,7 @@ def proposal_pdf(request, pk: int):
     buffer.close()
 
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="pasiulymas_{pozicija.poz_kodas}.pdf"'
+    response["Content-Disposition"] = (
+        f'inline; filename="pasiulymas_{pozicija.poz_kodas}.pdf"'
+    )
     return response

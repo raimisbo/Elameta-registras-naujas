@@ -7,8 +7,9 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    {# ATGAL mygtukas į pasiūlymo paruošimą, išlaikant varneles ir pastabas #}
-    <a href="{% url 'pozicijos:proposal_prepare' pozicija.pk %}{% if qs %}?{{ qs }}{% endif %}" class="btn btn-secondary">
+    {# ATGAL mygtukas į pasiūlymo paruošimą, išlaikant parametrus #}
+    <a href="{% url 'pozicijos:proposal_prepare' pozicija.pk %}{% if qs %}?{{ qs }}{% endif %}"
+       class="btn btn-secondary">
       ← Atgal
     </a>
     <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">
@@ -33,83 +34,217 @@
   {% endif %}
 </p>
 
-<div class="box" style="margin-bottom:12px;">
-  <h2 style="margin:0 0 6px;font-size:16px;">Pagrindinė informacija</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;">
-    <tbody>
-    {% if field_rows %}
-      {% for label, val in field_rows %}
-        <tr>
-          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;width:35%;background:#f9fafb;">
-            {{ label }}
-          </th>
-          <td style="padding:4px 6px;border-bottom:1px solid #e5e7eb;">
-            {{ val }}
-          </td>
-        </tr>
-      {% endfor %}
-    {% else %}
-      <tr>
-        <td style="padding:4px 6px;color:#6b7280;">Nėra duomenų.</td>
-      </tr>
-    {% endif %}
-    </tbody>
-  </table>
-</div>
-
-{% if show_prices and kainos %}
-  <div class="box" style="margin-bottom:12px;">
-    <h2 style="margin:0 0 6px;font-size:16px;">Kainos (aktualios eilutės)</h2>
+{# ===== PAGRINDINIS DVIEJŲ KOLONŲ BLOKAS: KAIRĖ – TECHNIKA, DEŠINĖ – BRĖŽINIAI ===== #}
+<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px;">
+  {# KAIRĖ: TECHNINĖ KORTELĖ #}
+  <div class="box" style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+    <h2 style="margin:0 0 6px;font-size:16px;">Techninė informacija</h2>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead>
-      <tr style="background:#f9fafb;">
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Kaina €</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Matas</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Tipas</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Kiekis nuo</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Kiekis iki</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Fiks. kiekis</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Galioja nuo</th>
-        <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Galioja iki</th>
-      </tr>
-      </thead>
       <tbody>
-      {% for k in kainos %}
+        {# --- Klientas / projektas / pozicija --- #}
         <tr>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.kaina }}</td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.matas }}</td>
+          <th colspan="2"
+              style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+            Klientas / projektas / pozicija
+          </th>
+        </tr>
+        <tr>
+          <th style="width:38%;padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Klientas</th>
           <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
-            {% if k.yra_fiksuota %}Fiksuota{% else %}Intervalinė{% endif %}
-          </td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.kiekis_nuo|default:"—" }}</td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.kiekis_iki|default:"—" }}</td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.fiksuotas_kiekis|default:"—" }}</td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
-            {% if k.galioja_nuo %}{{ k.galioja_nuo|date:"Y-m-d" }}{% else %}—{% endif %}
-          </td>
-          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
-            {% if k.galioja_iki %}{{ k.galioja_iki|date:"Y-m-d" }}{% else %}—{% endif %}
+            {{ pozicija.klientas|default:"—" }}
           </td>
         </tr>
-      {% endfor %}
+        <tr>
+          <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Projektas</th>
+          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+            {{ pozicija.projektas|default:"—" }}
+          </td>
+        </tr>
+        <tr>
+          <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Brėžinio kodas</th>
+          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+            {{ pozicija.poz_kodas|default:"—" }}
+          </td>
+        </tr>
+        <tr>
+          <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Detalės pavadinimas</th>
+          <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+            {{ pozicija.poz_pavad|default:"—" }}
+          </td>
+        </tr>
+
+        {# --- Specifikacija --- #}
+        {% if show_block_spec|default:1 %}
+          <tr>
+            <th colspan="2"
+                style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+              Specifikacija
+            </th>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Metalo tipas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.metalas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Plotas (m²)</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Svoris (kg)</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}
+            </td>
+          </tr>
+        {% endif %}
+
+        {# --- Kabinimas --- #}
+        {% if show_block_kabinimas|default:1 %}
+          <tr>
+            <th colspan="2"
+                style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+              Kabinimas
+            </th>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Kabinimo būdas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.kabinimo_budas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Kabinimas rėme</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.kabinimas_reme|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Detalių kiekis rėme</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.detaliu_kiekis_reme %}{{ pozicija.detaliu_kiekis_reme }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Faktinis kiekis rėme</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.faktinis_kiekis_reme %}{{ pozicija.faktinis_kiekis_reme }}{% else %}—{% endif %}
+            </td>
+          </tr>
+        {% endif %}
+
+        {# --- Paviršius / dažymas --- #}
+        {% if show_block_pavirsius|default:1 %}
+          <tr>
+            <th colspan="2"
+                style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+              Paviršius / dažymas
+            </th>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Paruošimas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.paruosimas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Padengimas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.padengimas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Padengimo standartas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.padengimo_standartas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Spalva</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.spalva|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Maskavimas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.maskavimas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Testai / kokybė</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.testai_kokybe|default:"—" }}
+            </td>
+          </tr>
+        {% endif %}
+
+        {# --- Pakavimas --- #}
+        {% if show_block_pakavimas|default:1 %}
+          <tr>
+            <th colspan="2"
+                style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+              Pakavimas
+            </th>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Pakavimas</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ pozicija.pakavimas|default:"—" }}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Pakavimo dienos norma</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.pakavimo_dienos_norma %}{{ pozicija.pakavimo_dienos_norma }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Pakavimas po KTL</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if pozicija.pak_po_ktl %}{{ pozicija.pak_po_ktl }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th style="padding:4px 6px;border-bottom:1px solid #f3f4f6;background:#f9fafb;">Pakavimas po miltelinio</th>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6%;">
+              {% if pozicija.pak_po_milt %}{{ pozicija.pak_po_milt }}{% else %}—{% endif %}
+            </td>
+          </tr>
+        {% endif %}
+
+        {# --- Pastabos iš pozicijos --- #}
+        {% if show_block_pastabos|default:1 %}
+          <tr>
+            <th colspan="2"
+                style="text-align:left;padding:4px 6px;background:#e5e7eb;border-bottom:1px solid #d1d5db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">
+              Pastabos (pozicijos kortelė)
+            </th>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:6px 6px;border-bottom:1px solid #f3f4f6;font-size:12px;">
+              {% if pozicija.pastabos %}
+                <div style="white-space:pre-wrap;">{{ pozicija.pastabos }}</div>
+              {% else %}
+                <span style="color:#9ca3af;">Nėra pastabų.</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
-{% elif show_prices %}
-  <div class="box" style="margin-bottom:12px;">
-    <h2 style="margin:0 0 6px;font-size:16px;">Kainos</h2>
-    <p style="margin:0;color:#6b7280;">Aktyvių kainų eilučių šiai pozicijai nėra.</p>
-  </div>
-{% endif %}
 
-{% if show_drawings %}
-  <div class="box" style="margin-bottom:12px;">
-    <h2 style="margin:0 0 6px;font-size:16px;">Brėžinių miniatiūros</h2>
-    {% if brez %}
-      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+  {# DEŠINĖ: BRĖŽINIAI #}
+  {% if show_drawings and brez %}
+    <div class="box" style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+      <h2 style="margin:0 0 6px;font-size:16px;">Brėžinių miniatiūros</h2>
+      <div style="display:flex;flex-direction:column;gap:8px;">
         {% for b in brez %}
-          <div style="width:160px;border:1px solid #e5e7eb;border-radius:6px;padding:6px;background:#f9fafb;">
-            <div style="width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;border-radius:4px;margin-bottom:4px;">
+          <div style="border:1px solid #e5e7eb;border-radius:6px;padding:6px;background:#f9fafb;display:flex;flex-direction:column;gap:4px;">
+            <div style="width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;border-radius:4px;">
               {% if b.thumb_url %}
                 <img src="{{ b.thumb_url }}" alt="" style="max-width:100%;max-height:100%;display:block;">
               {% elif b.failas.url %}
@@ -120,19 +255,74 @@
             </div>
             <div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               {{ b.pavadinimas|default:b.filename }}
+              {% if b.ext %}<span style="color:#6b7280;"> · .{{ b.ext }}</span>{% endif %}
             </div>
           </div>
         {% endfor %}
       </div>
-    {% else %}
-      <p style="margin:0;color:#6b7280;">Brėžinių nėra.</p>
-    {% endif %}
+    </div>
+  {% elif show_drawings %}
+    <div class="box" style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+      <h2 style="margin:0 0 6px;font-size:16px;">Brėžinių miniatiūros</h2>
+      <p style="margin:0;color:#6b7280;font-size:13px;">Brėžinių nėra arba jie nepažymėti pasiūlymui.</p>
+    </div>
+  {% endif %}
+</div>
+
+{# ===== KAINOS BLOKAS ===== #}
+{% if show_prices and kainos %}
+  <div class="box" style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+    <h2 style="margin:0 0 6px;font-size:16px;">Kainos (aktualios eilutės)</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#f9fafb;">
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Kaina €</th>
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Matas</th>
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Tipas</th>
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Kiekis</th>
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Galiojimo intervalas</th>
+          <th style="text-align:left;padding:4px 6px;border-bottom:1px solid #e5e7eb;">Pastaba</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kainos %}
+          <tr>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.kaina }}</td>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">{{ k.matas }}</td>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if k.yra_fiksuota %}Fiksuota{% else %}Intervalinė{% endif %}
+            </td>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if k.yra_fiksuota %}
+                {{ k.fiksuotas_kiekis|default:"—" }}
+              {% else %}
+                {{ k.kiekis_nuo|default:"—" }} – {{ k.kiekis_iki|default:"∞" }}
+              {% endif %}
+            </td>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {% if k.galioja_nuo %}{{ k.galioja_nuo|date:"Y-m-d" }}{% else %}—{% endif %}
+              –
+              {% if k.galioja_iki %}{{ k.galioja_iki|date:"Y-m-d" }}{% else %}∞{% endif %}
+            </td>
+            <td style="padding:4px 6px;border-bottom:1px solid #f3f4f6;">
+              {{ k.pastaba|default:"" }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% elif show_prices %}
+  <div class="box" style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+    <h2 style="margin:0 0 6px;font-size:16px;">Kainos</h2>
+    <p style="margin:0;color:#6b7280;font-size:13px;">Aktyvių kainų eilučių šiai pozicijai nėra.</p>
   </div>
 {% endif %}
 
+{# ===== PAPILDOMOS SĄLYGOS IŠ FORMOS 'notes' ===== #}
 {% if notes %}
-  <div class="box" style="margin-bottom:12px;">
-    <h2 style="margin:0 0 6px;font-size:16px;">Pastabos / sąlygos</h2>
+  <div class="box" style="margin-bottom:12px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fff;">
+    <h2 style="margin:0 0 6px;font-size:16px;">Papildomos sąlygos / komentarai</h2>
     <pre style="margin:0;font-family:inherit;white-space:pre-wrap;font-size:13px;">{{ notes }}</pre>
   </div>
 {% endif %}
