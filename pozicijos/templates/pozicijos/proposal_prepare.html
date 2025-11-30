@@ -13,6 +13,15 @@
 <form id="proposal-form" method="get" action="">
   <div class="box" style="max-width:520px;display:flex;flex-direction:column;gap:12px">
 
+    {# Kalbos pasirinkimas #}
+    <label style="display:flex;align-items:center;gap:6px;">
+      <span>Kalba / Language:</span>
+      <select name="lang" id="proposal-lang">
+        <option value="lt" {% if lang == "lt" %}selected{% endif %}>Lietuvių</option>
+        <option value="en" {% if lang == "en" %}selected{% endif %}>English</option>
+      </select>
+    </label>
+
     <label style="display:flex;align-items:center;gap:6px;">
       <input type="checkbox" name="show_prices" value="1"
              {% if show_prices %}checked{% endif %}>
@@ -59,6 +68,7 @@
     const notesField = form.querySelector('textarea[name="notes"]');
     const showPricesField = form.querySelector('input[name="show_prices"]');
     const showDrawingsField = form.querySelector('input[name="show_drawings"]');
+    const langField = form.querySelector('select[name="lang"]');
 
     function buildParams() {
       const params = new URLSearchParams();
@@ -68,6 +78,9 @@
       }
       if (showDrawingsField && showDrawingsField.checked) {
         params.set('show_drawings', '1');
+      }
+      if (langField && langField.value) {
+        params.set('lang', langField.value);
       }
       if (notesField) {
         const notesVal = notesField.value.trim();

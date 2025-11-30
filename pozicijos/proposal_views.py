@@ -23,6 +23,150 @@ from .models import Pozicija
 
 
 # =====================================================================
+#  Kalbos ir label'iai
+# =====================================================================
+
+LANG_LABELS = {
+    "lt": {
+        "offer_title": "PASIŪLYMAS",
+        "date_label": "Data",
+
+        "section_main": "Pagrindinė informacija",
+        "section_prices": "Kainos (aktualios eilutės)",
+        "section_prices_short": "Kainos",
+        "section_drawings": "Brėžinių miniatiūros",
+        "section_notes": "Pastabos / sąlygos",
+
+        "summary_detail": "Detalė",
+        "summary_customer": "Klientas",
+        "summary_project": "Projektas",
+
+        "no_data": "Nėra duomenų.",
+        "no_prices": "Aktyvių kainų eilučių šiai pozicijai nėra.",
+        "no_drawings": "Brėžinių nėra.",
+        "no_preview": "Nėra peržiūros",
+
+        "col_price": "Kaina €",
+        "col_unit": "Matas",
+        "col_type": "Tipas",
+        "col_qty_from": "Kiekis nuo",
+        "col_qty_to": "Kiekis iki",
+        "col_fixed_qty": "Fiks. kiekis",
+        "col_valid_from": "Galioja nuo",
+        "col_valid_to": "Galioja iki",
+
+        "type_fixed": "Fiksuota",
+        "type_interval": "Intervalinė",
+
+        "preview_hint": "Peržiūra (HTML) – tai, ką maždaug matysite PDF'e",
+    },
+    "en": {
+        "offer_title": "OFFER",
+        "date_label": "Date",
+
+        "section_main": "Main information",
+        "section_prices": "Prices (current lines)",
+        "section_prices_short": "Prices",
+        "section_drawings": "Drawing thumbnails",
+        "section_notes": "Notes / terms",
+
+        "summary_detail": "Part",
+        "summary_customer": "Customer",
+        "summary_project": "Project",
+
+        "no_data": "No data.",
+        "no_prices": "There are no active price lines for this position.",
+        "no_drawings": "No drawings.",
+        "no_preview": "No preview",
+
+        "col_price": "Price €",
+        "col_unit": "Unit",
+        "col_type": "Type",
+        "col_qty_from": "Qty from",
+        "col_qty_to": "Qty to",
+        "col_fixed_qty": "Fixed qty",
+        "col_valid_from": "Valid from",
+        "col_valid_to": "Valid until",
+
+        "type_fixed": "Fixed",
+        "type_interval": "Interval",
+
+        "preview_hint": "HTML preview – approximate PDF view",
+    },
+}
+
+
+# Label'iai konkretiesiems Pozicija laukams (lentelė "Pagrindinė informacija")
+FIELD_LABELS = {
+    "lt": {
+        "klientas": "Klientas",
+        "projektas": "Projektas",
+        "poz_kodas": "Brėžinio kodas",
+        "poz_pavad": "Detalės pavadinimas",
+        "metalas": "Metalo tipas",
+        "plotas": "Plotas (m²)",
+        "svoris": "Svoris (kg)",
+        "kabinimo_budas": "Kabinimo būdas",
+        "kabinimas_reme": "Kabinimas rėme",
+        "detaliu_kiekis_reme": "Detalių kiekis rėme",
+        "faktinis_kiekis_reme": "Faktinis kiekis rėme",
+        "paruosimas": "Paruošimas",
+        "padengimas": "Padengimas",
+        "padengimo_standartas": "Padengimo standartas",
+        "spalva": "Spalva",
+        "maskavimas": "Maskavimas",
+        "atlikimo_terminas": "Atlikimo terminas",
+        "testai_kokybe": "Testai / kokybė",
+        "pakavimas": "Pakavimas",
+        "instrukcija": "Instrukcija",
+        "pakavimo_dienos_norma": "Pakavimo dienos norma",
+        "pak_po_ktl": "Pakavimas po KTL",
+        "pak_po_milt": "Pakavimas po miltelinio",
+        "kaina_eur": "Kaina €",
+        "pastabos": "Pastabos",
+    },
+    "en": {
+        "klientas": "Customer",
+        "projektas": "Project",
+        "poz_kodas": "Drawing code",
+        "poz_pavad": "Part name",
+        "metalas": "Metal type",
+        "plotas": "Area (m²)",
+        "svoris": "Weight (kg)",
+        "kabinimo_budas": "Hanging method",
+        "kabinimas_reme": "Hanging on frame",
+        "detaliu_kiekis_reme": "Parts per frame",
+        "faktinis_kiekis_reme": "Actual qty per frame",
+        "paruosimas": "Pre-treatment",
+        "padengimas": "Coating",
+        "padengimo_standartas": "Coating standard",
+        "spalva": "Colour",
+        "maskavimas": "Masking",
+        "atlikimo_terminas": "Lead time",
+        "testai_kokybe": "Tests / quality",
+        "pakavimas": "Packaging",
+        "instrukcija": "Instruction",
+        "pakavimo_dienos_norma": "Daily packing capacity",
+        "pak_po_ktl": "Packing after KTL",
+        "pak_po_milt": "Packing after powder",
+        "kaina_eur": "Price €",
+        "pastabos": "Notes",
+    },
+}
+
+
+def _get_lang(request) -> str:
+    """
+    Paprastas kalbos pasirinkimas per ?lang=lt / ?lang=en.
+    Jei kas nors kito – default lt.
+    """
+    lang = (request.GET.get("lang") or "lt").lower()
+    if lang.startswith("en"):
+        return "en"
+    return "lt"
+
+
+# =====================================================================
 #  LT šriftai
 # =====================================================================
 
@@ -66,13 +210,16 @@ def _register_fonts() -> tuple[str, str]:
 #  Pagalbiniai duomenų ruošėjai
 # =====================================================================
 
-def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
+def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
     """
     Grąžina (label, value) sąrašą visiems ne tuštiems Pozicija laukams.
+    Label'ai imami iš FIELD_LABELS[lang], o jei nerasime – iš verbose_name.
     Naudojama ir HTML peržiūrai, ir PDF „Pagrindinė informacija“ lentelėje.
     """
     rows: list[tuple[str, str]] = []
     skip = {"id", "created", "updated"}
+
+    labels_map = FIELD_LABELS.get(lang, FIELD_LABELS["lt"])
 
     for field in pozicija._meta.fields:
         if field.name in skip:
@@ -82,7 +229,11 @@ def _build_field_rows(pozicija: Pozicija) -> list[tuple[str, str]]:
         if value in (None, ""):
             continue
 
-        label = str(field.verbose_name or field.name).capitalize()
+        label = labels_map.get(field.name)
+        if not label:
+            vn = field.verbose_name or field.name
+            label = str(vn).capitalize()
+
         rows.append((label, str(value)))
 
     return rows
@@ -168,10 +319,11 @@ def _draw_wrapped_text(
 
 def proposal_prepare(request, pk: int):
     """
-    UI puslapis pasiūlymo paruošimui (varnelės + pastabos).
+    UI puslapis pasiūlymo paruošimui (varnelės + pastabos + kalba).
     Nieko neredaguoja DB, tik ruošia GET parametrus PDF/HTML peržiūrai.
     """
     pozicija = get_object_or_404(Pozicija, pk=pk)
+    lang = _get_lang(request)
 
     show_prices = bool(request.GET.get("show_prices"))
     show_drawings = bool(request.GET.get("show_drawings"))
@@ -184,6 +336,8 @@ def proposal_prepare(request, pk: int):
         params["show_drawings"] = "1"
     if notes:
         params["notes"] = notes
+    if lang:
+        params["lang"] = lang
     qs = urlencode(params)
 
     context = {
@@ -192,6 +346,7 @@ def proposal_prepare(request, pk: int):
         "show_drawings": show_drawings,
         "notes": notes,
         "qs": qs,
+        "lang": lang,
     }
     return render(request, "pozicijos/proposal_prepare.html", context)
 
@@ -204,15 +359,11 @@ def proposal_pdf(request, pk: int):
     """
     Jei ?preview=1 – grąžina HTML (peržiūra su CSS, kaip puslapis).
     Kitu atveju – sugeneruoja PDF per ReportLab, su LT šriftais ir logotipu.
-
-    Struktūra:
-      - header (logo + rekvizitai + „PASIŪLYMAS“ + data)
-      - Pagrindinė informacija (tokia pati, kaip HTML field_rows)
-      - Kainos (jei pažymėta)
-      - Brėžinių miniatiūros (jei pažymėta)
-      - Pastabos / sąlygos iš formos (jei jos skiriasi nuo pozicijos pastabų)
     """
     pozicija = get_object_or_404(Pozicija, pk=pk)
+
+    lang = _get_lang(request)
+    labels = LANG_LABELS.get(lang, LANG_LABELS["lt"])
 
     show_prices = bool(request.GET.get("show_prices"))
     show_drawings = bool(request.GET.get("show_drawings"))
@@ -227,14 +378,16 @@ def proposal_pdf(request, pk: int):
         params["show_drawings"] = "1"
     if notes:
         params["notes"] = notes
+    if lang:
+        params["lang"] = lang
     qs = urlencode(params)
 
-    field_rows = _build_field_rows(pozicija)
+    field_rows = _build_field_rows(pozicija, lang)
     kainos = _get_kainos_for_pdf(pozicija)
     brez = list(pozicija.breziniai.all())
     poz_pastabos = (pozicija.pastabos or "").strip()
 
-    # --------- HTML peržiūra (tas pats šablonas, kaip iki šiol) ----------
+    # --------- HTML peržiūra ---------------------------------------------
     if preview:
         ctx = {
             "pozicija": pozicija,
@@ -245,6 +398,8 @@ def proposal_pdf(request, pk: int):
             "show_drawings": show_drawings,
             "notes": notes,
             "qs": qs,
+            "lang": lang,
+            "labels": labels,
         }
         return render(request, "pozicijos/proposal_pdf.html", ctx)
 
@@ -338,14 +493,14 @@ def proposal_pdf(request, pk: int):
 
     c.setFont(font_bold, 18)
     c.setFillColor(colors.HexColor("#111827"))
-    c.drawCentredString(width / 2, title_y, "PASIŪLYMAS")
+    c.drawCentredString(width / 2, title_y, labels["offer_title"])
 
     c.setFont(font_regular, 9)
     date_y = title_y - 4 * mm
     c.drawRightString(
         width - margin_right,
         date_y,
-        datetime.now().strftime("Data: %Y-%m-%d"),
+        datetime.now().strftime(f"{labels['date_label']}: %Y-%m-%d"),
     )
 
     # turinio pradžia
@@ -358,10 +513,10 @@ def proposal_pdf(request, pk: int):
     y -= 18
 
     # =====================================================================
-    #  Pagrindinė informacija (kaip HTML field_rows)
+    #  Pagrindinė informacija (field_rows)
     # =====================================================================
 
-    y = section_title(y, "Pagrindinė informacija")
+    y = section_title(y, labels["section_main"])
 
     table_x = margin_left
     table_w = width - margin_left - margin_right
@@ -370,13 +525,12 @@ def proposal_pdf(request, pk: int):
     def label_row(y_pos: float, label: str, value: str | None) -> float:
         """
         Vienos eilutės label / value pora, kaip HTML lentelėje.
-        Eilutės aukštį padidinam ~1.5 karto, kad tarpų būtų daugiau.
+        Eilutės aukštis padidintas, kad būtų daugiau oro.
         """
-        row_h = 18  # buvo 13
+        row_h = 18
         if y_pos < bottom_margin + row_h + 5:
             y_pos = new_page_with_y()
-            # pakartojam sekcijos pavadinimą puslapio viršuje
-            y_pos = section_title(y_pos, "Pagrindinė informacija")
+            y_pos = section_title(y_pos, labels["section_main"])
 
         val = value if (value not in (None, "")) else "—"
 
@@ -415,7 +569,7 @@ def proposal_pdf(request, pk: int):
     else:
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
-        c.drawString(margin_left, y, "Nėra duomenų.")
+        c.drawString(margin_left, y, labels["no_data"])
         y -= 12
 
     # =====================================================================
@@ -423,12 +577,12 @@ def proposal_pdf(request, pk: int):
     # =====================================================================
 
     if show_prices:
-        y = section_title(y, "Kainos (aktualios eilutės)")
+        y = section_title(y, labels["section_prices"])
 
         if kainos:
             if y < bottom_margin + 70:
                 y = new_page_with_y()
-                y = section_title(y, "Kainos (aktualios eilutės)")
+                y = section_title(y, labels["section_prices"])
 
             col_x = [
                 margin_left,
@@ -442,14 +596,14 @@ def proposal_pdf(request, pk: int):
             ]
 
             headers = [
-                "Kaina €",
-                "Matas",
-                "Tipas",
-                "Kiekis nuo",
-                "Kiekis iki",
-                "Fiks. kiekis",
-                "Galioja nuo",
-                "Galioja iki",
+                labels["col_price"],
+                labels["col_unit"],
+                labels["col_type"],
+                labels["col_qty_from"],
+                labels["col_qty_to"],
+                labels["col_fixed_qty"],
+                labels["col_valid_from"],
+                labels["col_valid_to"],
             ]
 
             header_h = 13
@@ -476,12 +630,12 @@ def proposal_pdf(request, pk: int):
 
             c.setFont(font_regular, 9)
             zebra = False
-            row_h_prices = 16  # buvo 12 – daugiau tarpo tarp eilučių
+            row_h_prices = 16
 
             for k in kainos:
                 if y < bottom_margin + row_h_prices + 8:
                     y = new_page_with_y()
-                    y = section_title(y, "Kainos (aktualios eilutės)")
+                    y = section_title(y, labels["section_prices"])
 
                     header_h = 13
                     c.setFillColor(colors.HexColor("#f9fafb"))
@@ -505,7 +659,6 @@ def proposal_pdf(request, pk: int):
                     c.setFont(font_regular, 9)
                     zebra = False
 
-                # zebra fonas
                 if zebra:
                     c.setFillColor(colors.HexColor("#f9fafb"))
                     c.rect(
@@ -519,7 +672,7 @@ def proposal_pdf(request, pk: int):
                 zebra = not zebra
 
                 c.setFillColor(colors.HexColor("#111827"))
-                tipas = "Fiksuota" if k.yra_fiksuota else "Intervalinė"
+                tipas = labels["type_fixed"] if k.yra_fiksuota else labels["type_interval"]
 
                 c.drawString(col_x[0], y, f"{k.kaina}")
                 c.drawString(col_x[1], y, k.matas)
@@ -544,7 +697,7 @@ def proposal_pdf(request, pk: int):
         else:
             c.setFont(font_regular, 9)
             c.setFillColor(colors.HexColor("#6b7280"))
-            c.drawString(margin_left, y, "Aktyvių kainų eilučių šiai pozicijai nėra.")
+            c.drawString(margin_left, y, labels["no_prices"])
             y -= 12
 
     # =====================================================================
@@ -552,7 +705,7 @@ def proposal_pdf(request, pk: int):
     # =====================================================================
 
     if show_drawings and brez:
-        y = section_title(y, "Brėžinių miniatiūros")
+        y = section_title(y, labels["section_drawings"])
 
         thumb_w = 48 * mm
         thumb_h = 34 * mm
@@ -561,7 +714,7 @@ def proposal_pdf(request, pk: int):
         for b in brez:
             if y < bottom_margin + thumb_h + 30:
                 y = new_page_with_y()
-                y = section_title(y, "Brėžinių miniatiūros")
+                y = section_title(y, labels["section_drawings"])
                 x = margin_left
 
             img_path = None
@@ -605,15 +758,23 @@ def proposal_pdf(request, pk: int):
 
         y -= 12
 
+    elif show_drawings:
+        # pažymėta "rodyti brėžinius", bet jų nėra
+        y = section_title(y, labels["section_drawings"])
+        c.setFont(font_regular, 9)
+        c.setFillColor(colors.HexColor("#6b7280"))
+        c.drawString(margin_left, y, labels["no_drawings"])
+        y -= 12
+
     # =====================================================================
     #  Pastabos / sąlygos iš formos
     # =====================================================================
 
     if notes and notes.strip() != poz_pastabos:
-        y = section_title(y, "Pastabos / sąlygos")
+        y = section_title(y, labels["section_notes"])
         if y < bottom_margin + 60:
             y = new_page_with_y()
-            y = section_title(y, "Pastabos / sąlygos")
+            y = section_title(y, labels["section_notes"])
 
         c.setFillColor(colors.HexColor("#111827"))
         y = _draw_wrapped_text(
