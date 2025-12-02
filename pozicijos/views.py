@@ -152,15 +152,21 @@ def pozicijos_stats(request):
 def pozicija_detail(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
 
+    # VISI brėžiniai (įskaitant .stp / .step) šiai pozicijai
+    breziniai = PozicijosBrezinys.objects.filter(pozicija=poz).order_by("id")
+
     # AKTUALIOS kainos (rodom kortelėje)
     kainos_akt = poz.aktualios_kainos()
 
     context = {
         "pozicija": poz,
-        "columns_schema": COLUMNS,   # kad detail‘e eitume per visą schemą
+        "columns_schema": COLUMNS,   # jei ateity norėsim eiti per schemą
+        "breziniai": breziniai,      # <- svarbu: čia keliauja į detail.html
         "kainos_akt": kainos_akt,    # lentelė „Kainos (aktualios)“
     }
     return render(request, "pozicijos/detail.html", context)
+
+
 
 
 def pozicija_create(request):
