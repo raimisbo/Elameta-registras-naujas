@@ -1,28 +1,23 @@
 # pozicijos/views.py
+from __future__ import annotations
+
 from django.contrib import messages
-from django.db.models import Q, Count
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
-
-from decimal import Decimal, InvalidOperation
 
 from .services.import_csv import import_pozicijos_from_csv
 from .models import Pozicija, PozicijosBrezinys
 from .forms import PozicijaForm, PozicijosBrezinysForm
 from .schemas.columns import COLUMNS
 from .services.previews import generate_preview_for_instance
-from . import proposal_views  # pasiūlymo parengimui / pdf
-
-
-# Kurie stulpeliai gali būti rikiuojami – pagal key -> realų DB lauką.
-# Virtualūs ('brez_count', 'dok_count', ir pan.) čia nepatenka.
-SORTABLE_FIELDS = {
-    c["key"]: c.get("order_field", c["key"])
-    for c in COLUMNS
-    if c.get("type") != "virtual"
-}
+from .services.listing import (
+    visible_cols_from_request,
+    apply_filters,
+    apply_sorting,
+)
 
 
 # Laukai, kuriems formoje rodysim pasiūlymus iš DB (datalist)
@@ -43,165 +38,47 @@ FORM_SUGGEST_FIELDS = [
 ]
 
 
-def _get_form_suggestions():
+# =============================================================================
+#  Pagalbinė funkcija formos pasiūlymams (datalist)
+# =============================================================================
+
+def _get_form_suggestions() -> dict[str, list[str]]:
     """
-    Surenka unikalius tekstinius laukų variantus iš esamų Pozicija įrašų,
-    kad forma galėtų rodyti pasiūlymus (datalist).
+    Iš DB ištraukiam unikalias reikšmes tekstiniams laukams, kad formoje būtų
+    datalist pasiūlymai. Nefiltruojam pagal jokį klientą/projektą – tiesiog
+    visos kada nors naudotos reikšmės.
     """
+    suggestions: dict[str, list[str]] = {}
+
     qs = Pozicija.objects.all()
-    suggestions = {}
     for field in FORM_SUGGEST_FIELDS:
         values = (
             qs.order_by(field)
             .values_list(field, flat=True)
-            .exclude(**{f"{field}__isnull": True})
-            .exclude(**{field: ""})
             .distinct()
         )
-        suggestions[field] = list(values)
+        # pašalinam tuščias reikšmes
+        suggestions[field] = [v for v in values if v]
+
     return suggestions
 
 
-# ==== Skaitinis filtras Plotas / Svoris: min..max, >, <, == ==================
-
-def build_numeric_range_q(field_name: str, expr: str) -> Q:
-    """
-    Vieno lauko (plotas/svoris) filtro interpretacija, kai ateina per f[field]:
-
-      "10..20"  -> >=10 ir <=20
-      ">5"      -> >=5
-      "<12.5"   -> <=12.5
-      "15"      -> ==15
-
-    Kablelį leidžiam kaip dešimtainį skirtuką: "12,5" -> 12.5.
-    Jei išraiška nekorektiška – grąžinam tuščią Q() (t.y. nefiltuojam).
-    """
-    raw = (expr or "").strip()
-    if not raw:
-        return Q()
-
-    # LT vartotojas dažnai rašo kablelį; Decimal nori taško
-    s = raw.replace(",", ".").strip()
-
-    min_val = None
-    max_val = None
-
-    try:
-        if ".." in s:
-            left, right = s.split("..", 1)
-            left = left.strip()
-            right = right.strip()
-            if left:
-                min_val = Decimal(left)
-            if right:
-                max_val = Decimal(right)
-        elif s.startswith(">"):
-            val = s[1:].strip()
-            if val:
-                min_val = Decimal(val)
-        elif s.startswith("<"):
-            val = s[1:].strip()
-            if val:
-                max_val = Decimal(val)
-        else:
-            # tikslus skaičius – traktuojam kaip == value
-            value = Decimal(s)
-            min_val = value
-            max_val = value
-    except (InvalidOperation, ValueError):
-        # blogai įvestas skaičius – nedarom filtro, bet ir nekertam klaidos
-        return Q()
-
-    q = Q()
-    if min_val is not None:
-        q &= Q(**{f"{field_name}__gte": min_val})
-    if max_val is not None:
-        q &= Q(**{f"{field_name}__lte": max_val})
-    return q
-
-
-def _visible_cols_from_request(request):
-    cols_param = request.GET.get("cols")
-    if cols_param:
-        return [c for c in cols_param.split(",") if c]
-    return [c["key"] for c in COLUMNS if c.get("default")]
-
-
-def _apply_filters(qs, request):
-    q_global = request.GET.get("q", "").strip()
-    if q_global:
-        qs = qs.filter(
-            Q(klientas__icontains=q_global)
-            | Q(projektas__icontains=q_global)
-            | Q(poz_kodas__icontains=q_global)
-            | Q(poz_pavad__icontains=q_global)
-        )
-
-    for key, value in request.GET.items():
-        if not key.startswith("f["):
-            continue
-        field = key[2:-1]
-        value = value.strip()
-        if not value:
-            continue
-
-        # tekstiniai filtrai – icontains
-        if field in [
-            "klientas", "projektas", "poz_kodas", "poz_pavad",
-            "metalas", "padengimas", "spalva",
-            "pakavimas", "maskavimas", "testai_kokybe",
-        ]:
-            qs = qs.filter(**{f"{field}__icontains": value})
-
-        # skaitmeniniai filtrai su min..max, >, <, == sintakse
-        elif field in ["plotas", "svoris"]:
-            qs = qs.filter(build_numeric_range_q(field, value))
-
-        # visi kiti – tikslus atitikimas
-        else:
-            qs = qs.filter(**{field: value})
-
-    return qs
-
-
-def _apply_sorting(qs, request):
-    """
-    Rikiavimas pagal ?sort=key&dir=asc/desc
-    - sort: vienas iš COLUMNS key (pvz. 'klientas', 'poz_kodas', 'kaina_eur', ...)
-    - virtualūs key (pvz. 'brez_count', 'dok_count') ignoruojami.
-    - jei sort nėra arba neatpažįstamas -> pagal naujausią (created desc, id desc)
-    """
-    sort = request.GET.get("sort")
-    direction = request.GET.get("dir", "asc")
-
-    # Jei niekas nenurodyta – laikomės seno default'o
-    if not sort:
-        return qs.order_by("-created", "-id")
-
-    field = SORTABLE_FIELDS.get(sort)
-    if not field:
-        # jei prašo rikiuoti pagal virtualų ar neegzistuojantį – grįžtam prie default
-        return qs.order_by("-created", "-id")
-
-    if direction == "desc":
-        field = "-" + field
-
-    # Antrinis rikiavimas pagal id, kad būtų stabilu
-    return qs.order_by(field, "-id")
-
+# =============================================================================
+#  Pozicijų sąrašas + AJAX tbody + statistika (donut)
+# =============================================================================
 
 def pozicijos_list(request):
-    visible_cols = _visible_cols_from_request(request)
+    visible_cols = visible_cols_from_request(request)
     q = request.GET.get("q", "").strip()
     page_size = int(request.GET.get("page_size", 25))
 
     # perskaitom sort + dir, kad perduotume į šabloną
-    current_sort = request.GET.get("sort", "")   # pvz. 'klientas'
-    current_dir = request.GET.get("dir", "asc")  # 'asc' arba 'desc'
+    current_sort = request.GET.get("sort", "")   # pvz. "klientas"
+    current_dir = request.GET.get("dir", "asc")  # "asc" arba "desc"
 
     qs = Pozicija.objects.all()
-    qs = _apply_filters(qs, request)
-    qs = _apply_sorting(qs, request)[:page_size]
+    qs = apply_filters(qs, request)
+    qs = apply_sorting(qs, request)[:page_size]
 
     context = {
         "columns_schema": COLUMNS,
@@ -217,15 +94,15 @@ def pozicijos_list(request):
 
 
 def pozicijos_tbody(request):
-    visible_cols = _visible_cols_from_request(request)
+    visible_cols = visible_cols_from_request(request)
     page_size = int(request.GET.get("page_size", 25))
 
     current_sort = request.GET.get("sort", "")
     current_dir = request.GET.get("dir", "asc")
 
     qs = Pozicija.objects.all()
-    qs = _apply_filters(qs, request)
-    qs = _apply_sorting(qs, request)[:page_size]
+    qs = apply_filters(qs, request)
+    qs = apply_sorting(qs, request)[:page_size]
 
     return render(
         request,
@@ -242,7 +119,7 @@ def pozicijos_tbody(request):
 
 def pozicijos_stats(request):
     qs = Pozicija.objects.all()
-    qs = _apply_filters(qs, request)
+    qs = apply_filters(qs, request)
 
     data = (
         qs.values("klientas")
@@ -250,8 +127,8 @@ def pozicijos_stats(request):
         .order_by("-cnt")
     )
 
-    labels = []
-    values = []
+    labels: list[str] = []
+    values: list[int] = []
     total = 0
     for row in data:
         name = row["klientas"] or "Nepriskirta"
@@ -267,6 +144,10 @@ def pozicijos_stats(request):
         }
     )
 
+
+# =============================================================================
+#  Pozicijos kortelė + create/edit formos
+# =============================================================================
 
 def pozicija_detail(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
@@ -317,17 +198,28 @@ def pozicija_edit(request, pk):
     return render(request, "pozicijos/form.html", context)
 
 
+# =============================================================================
+#  Brėžiniai: upload + delete + 3D
+# =============================================================================
+
 @require_POST
 def brezinys_upload(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
     if request.method == "POST" and request.FILES.get("failas"):
         f = request.FILES["failas"]
         title = request.POST.get("pavadinimas", "").strip()
-        br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
+        br = PozicijosBrezinys.objects.create(
+            pozicija=poz,
+            failas=f,
+            pavadinimas=title,
+        )
         # Po įkėlimo – bandome sugeneruoti preview
         res = generate_preview_for_instance(br)
         if not res.ok:
-            messages.info(request, f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}")
+            messages.info(
+                request,
+                f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}",
+            )
         else:
             messages.success(request, "Įkelta ir sugeneruota peržiūra.")
     return redirect("pozicijos:detail", pk=poz.pk)
@@ -339,6 +231,28 @@ def brezinys_delete(request, pk, bid):
     br.delete()
     return redirect("pozicijos:detail", pk=pk)
 
+
+@xframe_options_sameorigin
+def brezinys_3d(request, pk, bid):
+    """
+    Pilnas 3D peržiūros puslapis su Online3DViewer website versija.
+    Naudoja .stp failą tiesiai iš media (brezinys.failas.url).
+    """
+    poz = get_object_or_404(Pozicija, pk=pk)
+    br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
+    return render(
+        request,
+        "pozicijos/brezinys_3d.html",
+        {
+            "pozicija": poz,
+            "brezinys": br,
+        },
+    )
+
+
+# =============================================================================
+#  CSV importas (slaptas)
+# =============================================================================
 
 def pozicijos_import_csv(request):
     """
@@ -362,23 +276,5 @@ def pozicijos_import_csv(request):
         {
             "result": result,
             "dry_run": dry_run,
-        },
-    )
-
-
-@xframe_options_sameorigin
-def brezinys_3d(request, pk, bid):
-    """
-    Pilnas 3D peržiūros puslapis su Online3DViewer website versija.
-    Naudoja .stp failą tiesiai iš media (brezinys.failas.url).
-    """
-    poz = get_object_or_404(Pozicija, pk=pk)
-    br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
-    return render(
-        request,
-        "pozicijos/brezinys_3d.html",
-        {
-            "pozicija": poz,
-            "brezinys": br,
         },
     )
