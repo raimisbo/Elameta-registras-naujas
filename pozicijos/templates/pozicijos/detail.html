@@ -540,13 +540,19 @@
           </div>
           <div class="poz-field-row">
             <span class="poz-field-label">Faktinis kiekis rėme</span>
-            <span class="poz-field-value poz-field-value--blink-red">
-              {% if pozicija.faktinis_kiekis_reme %}
-                {{ pozicija.faktinis_kiekis_reme }}
+            {% with det=pozicija.detaliu_kiekis_reme fak=pozicija.faktinis_kiekis_reme %}
+              {% if det != fak %}
+                <span class="poz-field-value poz-field-value--blink-red">
               {% else %}
-                —
+                <span class="poz-field-value">
               {% endif %}
-            </span>
+                  {% if fak %}
+                    {{ fak }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </span>
+            {% endwith %}
           </div>
         </div>
       </section>
