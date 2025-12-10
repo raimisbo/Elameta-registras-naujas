@@ -541,32 +541,29 @@
           <div class="poz-field-row">
             <span class="poz-field-label">Faktinis kiekis rėme</span>
             {% with det=pozicija.detaliu_kiekis_reme fak=pozicija.faktinis_kiekis_reme %}
-              {% if det != fak %}
-                <span class="poz-field-value poz-field-value--blink-red">
-              {% else %}
-                <span class="poz-field-value">
-              {% endif %}
-                  {% if fak %}
-                    {{ fak }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </span>
+              <span class="poz-field-value{% if det != fak %} poz-field-value--blink-red{% endif %}">
+                {% if fak %}
+                  {{ fak }}
+                {% else %}
+                  —
+                {% endif %}
+              </span>
             {% endwith %}
           </div>
+
         </div>
       </section>
 
-      {# 5. Dažymas #}
+      {# 5. Paslauga (buvęs "Dažymas") #}
       <section class="poz-card">
-        <h2 class="poz-card-title">Dažymas</h2>
+        <h2 class="poz-card-title">Paslauga</h2>
         <div class="poz-fields">
           <div class="poz-field-row">
             <span class="poz-field-label">Paruošimas</span>
             <span class="poz-field-value">{{ pozicija.paruosimas|default:"—" }}</span>
           </div>
           <div class="poz-field-row">
-            <span class="poz-field-label">Padengimas</span>
+            <span class="poz-field-label">Paslaugos tipas (padengimas)</span>
             <span class="poz-field-value">{{ pozicija.padengimas|default:"—" }}</span>
           </div>
           <div class="poz-field-row">
@@ -577,6 +574,13 @@
             <span class="poz-field-label">Spalva</span>
             <span class="poz-field-value">{{ pozicija.spalva|default:"—" }}</span>
           </div>
+        </div>
+      </section>
+
+      {# 6. Maskavimas – atskiras blokas #}
+      <section class="poz-card">
+        <h2 class="poz-card-title">Maskavimas</h2>
+        <div class="poz-fields">
           <div class="poz-field-row">
             <span class="poz-field-label">Maskavimas</span>
             <span class="poz-field-value">{{ pozicija.maskavimas|default:"—" }}</span>
@@ -584,7 +588,7 @@
         </div>
       </section>
 
-      {# 6. Pakavimas #}
+      {# 7. Pakavimas #}
       <section class="poz-card">
         <h2 class="poz-card-title">Pakavimas</h2>
         <div class="poz-fields">
@@ -613,7 +617,7 @@
         </div>
       </section>
 
-      {# 7. Terminai #}
+      {# 8. Terminai #}
       <section class="poz-card">
         <h2 class="poz-card-title">Terminai</h2>
         <div class="poz-fields">
@@ -630,7 +634,7 @@
         </div>
       </section>
 
-      {# 8. Kaina #}
+      {# 9. Kaina #}
       <section class="poz-card poz-card--full">
         <h2 class="poz-card-title">Kaina</h2>
         <div class="poz-fields">
@@ -710,7 +714,7 @@
         </div>
       </section>
 
-      {# 9. Sistemos informacija #}
+      {# 10. Sistemos informacija #}
       <section class="poz-card">
         <h2 class="poz-card-title">Sistemos informacija</h2>
         <div class="poz-meta">
@@ -757,7 +761,7 @@
         </div>
       </section>
 
-      {# 10. Pastabos #}
+      {# 11. Pastabos #}
       <section class="poz-card poz-card--full">
         <h2 class="poz-card-title">Pastabos</h2>
         {% if pozicija.pastabos %}

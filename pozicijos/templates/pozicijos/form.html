@@ -1,476 +1,594 @@
-{# pozicijos/templates/pozicijos/form.html #}
 {% extends "base.html" %}
 {% load static %}
 
 {% block title %}
-  {% if pozicija %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}
+  {% if pozicija %}
+    Redaguoti poziciją {{ pozicija.poz_kodas|default:pozicija.id }}
+  {% else %}
+    Nauja pozicija
+  {% endif %}
 {% endblock %}
 
 {% block page_css %}
 <style>
-  .poz-form-wrapper{margin-top:8px;}
-  .poz-form-header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
-  .poz-form-header h1{margin:0;font-size:1.3rem;font-weight:600;}
-  .poz-form-header .actions{display:flex;gap:6px;flex-wrap:wrap;}
-
-  .poz-form{display:flex;flex-direction:column;gap:12px;}
-
-  .poz-block{
-    border:1px solid #e5e7eb;
-    border-radius:8px;
-    padding:10px 12px 12px;
-    background:#fff;
+  .pozicija-form-page {
+    background:#f3f3f3;
   }
-  .poz-block legend{
-    padding:0 4px;
-    font-size:.95rem;
+
+  .pozicija-form-page .poz-form-container {
+    max-width:1200px;
+    margin:0 auto;
+    padding:16px 20px 32px;
+  }
+
+  .pozicija-form-page .form-header-bar {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:16px;
+  }
+
+  .pozicija-form-page .form-header-main {
+    min-width:0;
+  }
+
+  .pozicija-form-page .form-header-title {
+    margin:0 0 4px;
+    font-size:1.35rem;
     font-weight:600;
-    color:#111827;
   }
 
-  .poz-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;}
-  .poz-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 16px;}
-  @media(max-width:900px){
-    .poz-grid-2,.poz-grid-3{grid-template-columns:1fr;}
+  .pozicija-form-page .form-header-sub {
+    margin:0;
+    font-size:0.9rem;
+    color:#666;
   }
 
-  .poz-field-row{
+  .pozicija-form-page .form-header-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:flex-end;
+  }
+
+  .pozicija-form-page .btn-action {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:6px 10px;
+    font-size:0.85rem;
+    border-radius:4px;
+    border:1px solid #ccc;
+    background:#fff;
+    color:#333;
+    text-decoration:none;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .pozicija-form-page .btn-action:hover {
+    background:#f0f0f0;
+  }
+
+  .pozicija-form-page .btn-primary {
+    border-color:#2563eb;
+    background:#2563eb;
+    color:#fff;
+  }
+
+  .pozicija-form-page .btn-primary:hover {
+    background:#1d4ed8;
+  }
+
+  .pozicija-form-page .btn-secondary {
+    background:#e5e7eb;
+    border-color:#d1d5db;
+  }
+
+  .pozicija-form-page .poz-form-grid {
+    display:grid;
+    grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+    gap:16px;
+    align-items:flex-start;
+  }
+
+  .pozicija-form-page .poz-form-column {
     display:flex;
     flex-direction:column;
-    gap:2px;
+    gap:16px;
   }
-  .poz-field-row label{
-    font-size:.85rem;
+
+  .pozicija-form-page fieldset.poz-fieldset {
+    border:1px solid #e5e7eb;
+    border-radius:6px;
+    padding:10px 12px 8px;
+    background:#fff;
+  }
+
+  .pozicija-form-page fieldset.poz-fieldset legend {
+    padding:0 4px;
+    font-size:0.9rem;
+    font-weight:600;
     color:#374151;
   }
-  .poz-field-row input,
-  .poz-field-row textarea{
+
+  .pozicija-form-page .poz-field-row {
+    display:grid;
+    grid-template-columns:minmax(0,38%) minmax(0,62%);
+    column-gap:8px;
+    align-items:flex-start;
+    font-size:0.9rem;
+    padding:3px 0;
+  }
+
+  .pozicija-form-page .poz-field-label {
+    color:#555;
+    padding-top:4px;
+  }
+
+  .pozicija-form-page .poz-field-widget {
+    min-width:0;
+  }
+
+  .pozicija-form-page .poz-field-widget input,
+  .pozicija-form-page .poz-field-widget select,
+  .pozicija-form-page .poz-field-widget textarea {
     width:100%;
     box-sizing:border-box;
-    padding:6px 8px;
-    border-radius:6px;
+    padding:5px 7px;
+    border-radius:4px;
     border:1px solid #d1d5db;
-    font-size:.9rem;
-  }
-  .poz-field-row input:focus,
-  .poz-field-row textarea:focus{
-    outline:2px solid #60a5fa;
-    outline-offset:1px;
-    border-color:#60a5fa;
+    font-size:0.9rem;
+    font-family:inherit;
   }
 
-  /* Required indikatorius prie label */
-  .poz-field-row.is-required > label::after{
-    content:" *";
-    margin-left:3px;
-    color:#b91c1c;
-    font-weight:600;
+  .pozicija-form-page .poz-field-widget textarea {
+    min-height:70px;
+    resize:vertical;
   }
 
-  /* Klaidos – raudonas rėmelis ir tekstas po lauku */
-  .poz-field-row.has-error input,
-  .poz-field-row.has-error textarea{
-    border-color:#dc2626;
-  }
-  .poz-field-row .field-errors{
-    margin-top:1px;
-    font-size:.78rem;
+  .pozicija-form-page .field-errors {
+    margin-top:2px;
+    font-size:0.78rem;
     color:#b91c1c;
   }
-  .poz-field-row .field-errors ul{
-    margin:0;
-    padding-left:16px;
-  }
 
-  .poz-help{
-    font-size:.8rem;
-    color:#6b7280;
-    margin-top:1px;
-  }
-
-  .poz-form-errors{
+  .pozicija-form-page .non-field-errors {
+    margin-bottom:12px;
+    padding:8px 10px;
+    border-radius:6px;
     border:1px solid #fecaca;
     background:#fef2f2;
     color:#7f1d1d;
-    border-radius:8px;
-    padding:8px 10px;
-    margin-bottom:10px;
-    font-size:.85rem;
-  }
-  .poz-form-errors ul{
-    margin:4px 0 0 18px;
-    padding:0;
+    font-size:0.88rem;
   }
 
-  .poz-form-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
+  .pozicija-form-page .form-footer {
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+  }
+
+  .pozicija-form-page .form-footer-left {
+    font-size:0.8rem;
+    color:#6b7280;
+  }
+
+  .pozicija-form-page .form-footer-right {
+    display:flex;
+    gap:8px;
+  }
+
+  @media (max-width: 900px) {
+    .pozicija-form-page .poz-form-grid {
+      grid-template-columns:1fr;
+    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="poz-form-wrapper">
-  <div class="poz-form-header">
-    <h1>
-      {% if pozicija %}
-        Redaguoti poziciją {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}
-      {% else %}
-        Nauja pozicija
-      {% endif %}
-    </h1>
-    <div class="actions">
-      <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">← Atgal į sąrašą</a>
-      {% if pozicija %}
-        <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Pozicijos kortelė</a>
-      {% endif %}
-    </div>
-  </div>
-
-  <form method="post" enctype="multipart/form-data" class="poz-form">
-    {% csrf_token %}
-
-    {# Non-field klaidos (jei būtų) #}
-    {% if form.non_field_errors %}
-      <div class="poz-form-errors">
-        <ul>
-          {% for err in form.non_field_errors %}
-            <li>{{ err }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
-
-    {# Pagrindinė informacija #}
-    <fieldset class="poz-block">
-      <legend>Pagrindinė informacija</legend>
-      <div class="poz-grid-2">
-        <div class="poz-field-row{% if form.klientas.field.required %} is-required{% endif %}{% if form.klientas.errors %} has-error{% endif %}">
-          {{ form.klientas.label_tag }}
-          {{ form.klientas }}
-          <div class="poz-help">Kliento pavadinimas taip, kaip turės būti matomas pasiūlymuose ir ataskaitose.</div>
-          {% if form.klientas.errors %}
-            <div class="field-errors">{{ form.klientas.errors }}</div>
+<div class="pozicija-form-page">
+  <div class="poz-form-container">
+    <div class="form-header-bar">
+      <div class="form-header-main">
+        <h1 class="form-header-title">
+          {% if pozicija %}
+            Redaguoti poziciją
+            {% if pozicija.poz_kodas %}{{ pozicija.poz_kodas }}{% else %}#{{ pozicija.id }}{% endif %}
+          {% else %}
+            Nauja pozicija
           {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.projektas.field.required %} is-required{% endif %}{% if form.projektas.errors %} has-error{% endif %}">
-          {{ form.projektas.label_tag }}
-          {{ form.projektas }}
-          <div class="poz-help">Vidinis projekto pavadinimas arba kliento projekto kodas.</div>
-          {% if form.projektas.errors %}
-            <div class="field-errors">{{ form.projektas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.poz_kodas.field.required %} is-required{% endif %}{% if form.poz_kodas.errors %} has-error{% endif %}">
-          {{ form.poz_kodas.label_tag }}
-          {{ form.poz_kodas }}
-          <div class="poz-help">Brėžinio / detalės kodas. Pageidautina unikalus konkrečiam klientui ir projektui.</div>
-          {% if form.poz_kodas.errors %}
-            <div class="field-errors">{{ form.poz_kodas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.poz_pavad.field.required %} is-required{% endif %}{% if form.poz_pavad.errors %} has-error{% endif %}">
-          {{ form.poz_pavad.label_tag }}
-          {{ form.poz_pavad }}
-          <div class="poz-help">Trumpas ir aiškus detalės pavadinimas, kuriuo vėliau bus patogu ieškoti.</div>
-          {% if form.poz_pavad.errors %}
-            <div class="field-errors">{{ form.poz_pavad.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Specifikacija #}
-    <fieldset class="poz-block">
-      <legend>Specifikacija</legend>
-      <div class="poz-grid-3">
-        <div class="poz-field-row{% if form.metalas.field.required %} is-required{% endif %}{% if form.metalas.errors %} has-error{% endif %}">
-          {{ form.metalas.label_tag }}
-          {{ form.metalas }}
-          <div class="poz-help">Metalo tipas: pvz. S235, S355, aliuminis, cinkuotas ir pan.</div>
-          {% if form.metalas.errors %}
-            <div class="field-errors">{{ form.metalas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.plotas.field.required %} is-required{% endif %}{% if form.plotas.errors %} has-error{% endif %}">
-          {{ form.plotas.label_tag }}
-          {{ form.plotas }}
-          <div class="poz-help">Bendras dažomo paviršiaus plotas m² vienai detalei (jei žinomas).</div>
-          {% if form.plotas.errors %}
-            <div class="field-errors">{{ form.plotas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.svoris.field.required %} is-required{% endif %}{% if form.svoris.errors %} has-error{% endif %}">
-          {{ form.svoris.label_tag }}
-          {{ form.svoris }}
-          <div class="poz-help">Vienos detalės svoris kg (padeda skaičiuoti pakavimą ir logistiką).</div>
-          {% if form.svoris.errors %}
-            <div class="field-errors">{{ form.svoris.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Kabinimas #}
-    <fieldset class="poz-block">
-      <legend>Kabinimas</legend>
-      <div class="poz-grid-2">
-        <div class="poz-field-row{% if form.kabinimo_budas.field.required %} is-required{% endif %}{% if form.kabinimo_budas.errors %} has-error{% endif %}">
-          {{ form.kabinimo_budas.label_tag }}
-          {{ form.kabinimo_budas }}
-          <div class="poz-help">Trumpai: kabliukai, skylės, sriegiai ir pan. – kaip detalė bus pakabinta.</div>
-          {% if form.kabinimo_budas.errors %}
-            <div class="field-errors">{{ form.kabinimo_budas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.kabinimas_reme.field.required %} is-required{% endif %}{% if form.kabinimas_reme.errors %} has-error{% endif %}">
-          {{ form.kabinimas_reme.label_tag }}
-          {{ form.kabinimas_reme }}
-          <div class="poz-help">Aprašymas, kaip detalė kabinama dažymo rėme (orientacija, tvirtinimo taškai).</div>
-          {% if form.kabinimas_reme.errors %}
-            <div class="field-errors">{{ form.kabinimas_reme.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.detaliu_kiekis_reme.field.required %} is-required{% endif %}{% if form.detaliu_kiekis_reme.errors %} has-error{% endif %}">
-          {{ form.detaliu_kiekis_reme.label_tag }}
-          {{ form.detaliu_kiekis_reme }}
-          <div class="poz-help">Teorinis detalių skaičius viename dažymo rėme.</div>
-          {% if form.detaliu_kiekis_reme.errors %}
-            <div class="field-errors">{{ form.detaliu_kiekis_reme.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.faktinis_kiekis_reme.field.required %} is-required{% endif %}{% if form.faktinis_kiekis_reme.errors %} has-error{% endif %}">
-          {{ form.faktinis_kiekis_reme.label_tag }}
-          {{ form.faktinis_kiekis_reme }}
-          <div class="poz-help">Realiai pasiektas detalių skaičius rėme (naudinga efektyvumui vertinti).</div>
-          {% if form.faktinis_kiekis_reme.errors %}
-            <div class="field-errors">{{ form.faktinis_kiekis_reme.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Paviršius / dažymas #}
-    <fieldset class="poz-block">
-      <legend>Paviršius / dažymas</legend>
-      <div class="poz-grid-3">
-        <div class="poz-field-row{% if form.paruosimas.field.required %} is-required{% endif %}{% if form.paruosimas.errors %} has-error{% endif %}">
-          {{ form.paruosimas.label_tag }}
-          {{ form.paruosimas }}
-          <div class="poz-help">Paviršiaus paruošimas: smėliavimas, nuvalymas, fosfatavimas ir pan.</div>
-          {% if form.paruosimas.errors %}
-            <div class="field-errors">{{ form.paruosimas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.padengimas.field.required %} is-required{% endif %}{% if form.padengimas.errors %} has-error{% endif %}">
-          {{ form.padengimas.label_tag }}
-          {{ form.padengimas }}
-          <div class="poz-help">Padengimo tipas: karštas cinkavimas, KTL, miltelinis dažymas ir t.t.</div>
-          {% if form.padengimas.errors %}
-            <div class="field-errors">{{ form.padengimas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.padengimo_standartas.field.required %} is-required{% endif %}{% if form.padengimo_standartas.errors %} has-error{% endif %}">
-          {{ form.padengimo_standartas.label_tag }}
-          {{ form.padengimo_standartas }}
-          <div class="poz-help">Taikomas standartas ar technologijos aprašas (pvz. ISO, gamintojo specifikacija).</div>
-          {% if form.padengimo_standartas.errors %}
-            <div class="field-errors">{{ form.padengimo_standartas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.spalva.field.required %} is-required{% endif %}{% if form.spalva.errors %} has-error{% endif %}">
-          {{ form.spalva.label_tag }}
-          {{ form.spalva }}
-          <div class="poz-help">Spalva / RAL kodas arba kitas sutartas žymėjimas.</div>
-          {% if form.spalva.errors %}
-            <div class="field-errors">{{ form.spalva.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.maskavimas.field.required %} is-required{% endif %}{% if form.maskavimas.errors %} has-error{% endif %}">
-          {{ form.maskavimas.label_tag }}
-          {{ form.maskavimas }}
-          <div class="poz-help">Kur neturi būti dangos: sriegiai, paviršiai, paslėptos vietos ir pan.</div>
-          {% if form.maskavimas.errors %}
-            <div class="field-errors">{{ form.maskavimas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.testai_kokybe.field.required %} is-required{% endif %}{% if form.testai_kokybe.errors %} has-error{% endif %}">
-          {{ form.testai_kokybe.label_tag }}
-          {{ form.testai_kokybe }}
-          <div class="poz-help">Reikalingi bandymai / kokybės reikalavimai (pvz. sluoksnio storis, adhezijos testai).</div>
-          {% if form.testai_kokybe.errors %}
-            <div class="field-errors">{{ form.testai_kokybe.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Terminai #}
-    <fieldset class="poz-block">
-      <legend>Terminai</legend>
-      <div class="poz-grid-2">
-        <div class="poz-field-row{% if form.atlikimo_terminas.field.required %} is-required{% endif %}{% if form.atlikimo_terminas.errors %} has-error{% endif %}">
-          {{ form.atlikimo_terminas.label_tag }}
-          {{ form.atlikimo_terminas }}
-          <div class="poz-help">Pageidaujamas gamybos / dažymo terminas. Jei nenustatyta – galima palikti tuščią.</div>
-          {% if form.atlikimo_terminas.errors %}
-            <div class="field-errors">{{ form.atlikimo_terminas.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Pakavimas #}
-    <fieldset class="poz-block">
-      <legend>Pakavimas</legend>
-      <div class="poz-grid-3">
-        <div class="poz-field-row{% if form.pakavimas.field.required %} is-required{% endif %}{% if form.pakavimas.errors %} has-error{% endif %}">
-          {{ form.pakavimas.label_tag }}
-          {{ form.pakavimas }}
-          <div class="poz-help">Kaip bus pakuojama: dėžės, padėklai, folija, maišai ir pan.</div>
-          {% if form.pakavimas.errors %}
-            <div class="field-errors">{{ form.pakavimas.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.instrukcija.field.required %} is-required{% endif %}{% if form.instrukcija.errors %} has-error{% endif %}">
-          {{ form.instrukcija.label_tag }}
-          {{ form.instrukcija }}
-          <div class="poz-help">Specialios pakavimo, žymėjimo ar transportavimo instrukcijos.</div>
-          {% if form.instrukcija.errors %}
-            <div class="field-errors">{{ form.instrukcija.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.pakavimo_dienos_norma.field.required %} is-required{% endif %}{% if form.pakavimo_dienos_norma.errors %} has-error{% endif %}">
-          {{ form.pakavimo_dienos_norma.label_tag }}
-          {{ form.pakavimo_dienos_norma }}
-          <div class="poz-help">Kiek vienetų realiai galima supakuoti per dieną (planavimui).</div>
-          {% if form.pakavimo_dienos_norma.errors %}
-            <div class="field-errors">{{ form.pakavimo_dienos_norma.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.pak_po_ktl.field.required %} is-required{% endif %}{% if form.pak_po_ktl.errors %} has-error{% endif %}">
-          {{ form.pak_po_ktl.label_tag }}
-          {{ form.pak_po_ktl }}
-          <div class="poz-help">Ar ir kaip pakuojama po KTL operacijos.</div>
-          {% if form.pak_po_ktl.errors %}
-            <div class="field-errors">{{ form.pak_po_ktl.errors }}</div>
-          {% endif %}
-        </div>
-        <div class="poz-field-row{% if form.pak_po_milt.field.required %} is-required{% endif %}{% if form.pak_po_milt.errors %} has-error{% endif %}">
-          {{ form.pak_po_milt.label_tag }}
-          {{ form.pak_po_milt }}
-          <div class="poz-help">Ar ir kaip pakuojama po miltelinio dažymo.</div>
-          {% if form.pak_po_milt.errors %}
-            <div class="field-errors">{{ form.pak_po_milt.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Kaina #}
-    <fieldset class="poz-block">
-      <legend>Kaina</legend>
-      <div class="poz-grid-2">
-        <div class="poz-field-row{% if form.kaina_eur.field.required %} is-required{% endif %}{% if form.kaina_eur.errors %} has-error{% endif %}">
-          {{ form.kaina_eur.label_tag }}
-          {{ form.kaina_eur }}
-          <div class="poz-help">
-            Įvesta kaina automatiškai sinchronizuojama su naująja „KainosEilute“ sistema
-            kaip bazinė kaina (€/vnt., be kiekio ribų, būsena „aktuali“).
-          </div>
-          {% if form.kaina_eur.errors %}
-            <div class="field-errors">{{ form.kaina_eur.errors }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </fieldset>
-
-    {# Pastabos #}
-    <fieldset class="poz-block">
-      <legend>Pastabos</legend>
-      <div class="poz-field-row{% if form.pastabos.field.required %} is-required{% endif %}{% if form.pastabos.errors %} has-error{% endif %}">
-        {{ form.pastabos.label_tag }}
-        {{ form.pastabos }}
-        <div class="poz-help">Vidinės pastabos ir komentarai. Prireikus dalį jų galima perkelti į pasiūlymą.</div>
-        {% if form.pastabos.errors %}
-          <div class="field-errors">{{ form.pastabos.errors }}</div>
+        </h1>
+        {% if pozicija %}
+          <p class="form-header-sub">
+            Klientas: {{ pozicija.klientas|default:"—" }}{% if pozicija.projektas %} · Projektas: {{ pozicija.projektas }}{% endif %}
+          </p>
         {% endif %}
       </div>
-    </fieldset>
-
-    <div class="poz-form-footer">
-      <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atšaukti</a>
-      <button type="submit" class="btn">
-        {% if pozicija %}Išsaugoti{% else %}Sukurti poziciją{% endif %}
-      </button>
+      <div class="form-header-actions">
+        {% if pozicija %}
+          <a href="{% url 'pozicijos:detail' pozicija.id %}" class="btn-action btn-secondary">Atgal į poziciją</a>
+        {% else %}
+          <a href="{% url 'pozicijos:list' %}" class="btn-action btn-secondary">Atgal į sąrašą</a>
+        {% endif %}
+      </div>
     </div>
 
-    {# ---- DATALIST'ai iš suggestions (auto-suggest iš DB) ---- #}
-    {% if suggestions %}
-      <datalist id="dl-klientas">
-        {% for v in suggestions.klientas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-projektas">
-        {% for v in suggestions.projektas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-metalas">
-        {% for v in suggestions.metalas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-kabinimo_budas">
-        {% for v in suggestions.kabinimo_budas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-kabinimas_reme">
-        {% for v in suggestions.kabinimas_reme %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-paruosimas">
-        {% for v in suggestions.paruosimas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-padengimas">
-        {% for v in suggestions.padengimas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-padengimo_standartas">
-        {% for v in suggestions.padengimo_standartas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-spalva">
-        {% for v in suggestions.spalva %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-maskavimas">
-        {% for v in suggestions.maskavimas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-testai_kokybe">
-        {% for v in suggestions.testai_kokybe %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-pakavimas">
-        {% for v in suggestions.pakavimas %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="dl-instrukcija">
-        {% for v in suggestions.instrukcija %}
-          <option value="{{ v }}"></option>
-        {% endfor %}
-      </datalist>
-    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
 
-  </form>
+      {% if form.non_field_errors %}
+        <div class="non-field-errors">
+          {% for err in form.non_field_errors %}
+            <div>{{ err }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="poz-form-grid">
+        <div class="poz-form-column">
+
+          {# 1. Pagrindinė informacija #}
+          <fieldset class="poz-fieldset">
+            <legend>Pagrindinė informacija</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.klientas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.klientas }}
+                {% if form.klientas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.klientas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.projektas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.projektas }}
+                {% if form.projektas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.projektas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.poz_kodas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.poz_kodas }}
+                {% if form.poz_kodas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.poz_kodas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.poz_pavad.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.poz_pavad }}
+                {% if form.poz_pavad.errors %}
+                  <div class="field-errors">
+                    {% for e in form.poz_pavad.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 2. Specifikacija #}
+          <fieldset class="poz-fieldset">
+            <legend>Specifikacija</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.metalas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.metalas }}
+                {% if form.metalas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.metalas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.plotas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.plotas }}
+                {% if form.plotas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.plotas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.svoris.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.svoris }}
+                {% if form.svoris.errors %}
+                  <div class="field-errors">
+                    {% for e in form.svoris.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.testai_kokybe.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.testai_kokybe }}
+                {% if form.testai_kokybe.errors %}
+                  <div class="field-errors">
+                    {% for e in form.testai_kokybe.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 3. Kabinimas #}
+          <fieldset class="poz-fieldset">
+            <legend>Kabinimas</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.kabinimo_budas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.kabinimo_budas }}
+                {% if form.kabinimo_budas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.kabinimo_budas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.kabinimas_reme.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.kabinimas_reme }}
+                {% if form.kabinimas_reme.errors %}
+                  <div class="field-errors">
+                    {% for e in form.kabinimas_reme.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.detaliu_kiekis_reme.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.detaliu_kiekis_reme }}
+                {% if form.detaliu_kiekis_reme.errors %}
+                  <div class="field-errors">
+                    {% for e in form.detaliu_kiekis_reme.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.faktinis_kiekis_reme.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.faktinis_kiekis_reme }}
+                {% if form.faktinis_kiekis_reme.errors %}
+                  <div class="field-errors">
+                    {% for e in form.faktinis_kiekis_reme.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 4. Paslauga (buvęs "Paviršius / dažymas") #}
+          <fieldset class="poz-fieldset">
+            <legend>Paslauga</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.paruosimas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.paruosimas }}
+                {% if form.paruosimas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.paruosimas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.padengimas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.padengimas }}
+                {% if form.padengimas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.padengimas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.padengimo_standartas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.padengimo_standartas }}
+                {% if form.padengimo_standartas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.padengimo_standartas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.spalva.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.spalva }}
+                {% if form.spalva.errors %}
+                  <div class="field-errors">
+                    {% for e in form.spalva.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+        </div>
+
+        <div class="poz-form-column">
+
+          {# 5. Maskavimas – atskiras blokas #}
+          <fieldset class="poz-fieldset">
+            <legend>Maskavimas</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.maskavimas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.maskavimas }}
+                {% if form.maskavimas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.maskavimas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 6. Terminai #}
+          <fieldset class="poz-fieldset">
+            <legend>Terminai</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.atlikimo_terminas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.atlikimo_terminas }}
+                {% if form.atlikimo_terminas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.atlikimo_terminas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 7. Pakavimas #}
+          <fieldset class="poz-fieldset">
+            <legend>Pakavimas</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.pakavimas.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.pakavimas }}
+                {% if form.pakavimas.errors %}
+                  <div class="field-errors">
+                    {% for e in form.pakavimas.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.instrukcija.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.instrukcija }}
+                {% if form.instrukcija.errors %}
+                  <div class="field-errors">
+                    {% for e in form.instrukcija.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.pakavimo_dienos_norma.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.pakavimo_dienos_norma }}
+                {% if form.pakavimo_dienos_norma.errors %}
+                  <div class="field-errors">
+                    {% for e in form.pakavimo_dienos_norma.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.pak_po_ktl.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.pak_po_ktl }}
+                {% if form.pak_po_ktl.errors %}
+                  <div class="field-errors">
+                    {% for e in form.pak_po_ktl.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.pak_po_milt.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.pak_po_milt }}
+                {% if form.pak_po_milt.errors %}
+                  <div class="field-errors">
+                    {% for e in form.pak_po_milt.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 8. Kaina #}
+          <fieldset class="poz-fieldset">
+            <legend>Kaina</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.kaina_eur.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.kaina_eur }}
+                {% if form.kaina_eur.errors %}
+                  <div class="field-errors">
+                    {% for e in form.kaina_eur.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+          {# 9. Pastabos #}
+          <fieldset class="poz-fieldset">
+            <legend>Pastabos</legend>
+            <div class="poz-field-row">
+              <div class="poz-field-label">{{ form.pastabos.label_tag }}</div>
+              <div class="poz-field-widget">
+                {{ form.pastabos }}
+                {% if form.pastabos.errors %}
+                  <div class="field-errors">
+                    {% for e in form.pastabos.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </fieldset>
+
+        </div>
+      </div>
+
+      <div class="form-footer">
+        <div class="form-footer-left">
+          {% if pozicija %}
+            Sukurta: {% if pozicija.created %}{{ pozicija.created|date:"Y-m-d H:i" }}{% else %}—{% endif %},
+            atnaujinta: {% if pozicija.updated %}{{ pozicija.updated|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+          {% else %}
+            Nauja pozicija (dar neišsaugota)
+          {% endif %}
+        </div>
+        <div class="form-footer-right">
+          {% if pozicija %}
+            <a href="{% url 'pozicijos:detail' pozicija.id %}" class="btn-action btn-secondary">Atšaukti</a>
+          {% else %}
+            <a href="{% url 'pozicijos:list' %}" class="btn-action btn-secondary">Atšaukti</a>
+          {% endif %}
+          <button type="submit" class="btn-action btn-primary">Išsaugoti</button>
+        </div>
+      </div>
+    </form>
+
+    {# Datalist'ai iš suggestions – kad veiktų pasiūlymai #}
+    {% if suggestions %}
+      {% for field_name, values in suggestions.items %}
+        <datalist id="suggest-{{ field_name }}">
+          {% for v in values %}
+            <option value="{{ v }}"></option>
+          {% endfor %}
+        </datalist>
+      {% endfor %}
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
