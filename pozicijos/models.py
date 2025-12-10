@@ -9,6 +9,7 @@ from simple_history.models import HistoricalRecords
 
 # ======================= Pagrindas: Pozicija =======================
 
+
 class Pozicija(models.Model):
     # pagrindiniai
     klientas = models.CharField("Klientas", max_length=255, null=True, blank=True)
@@ -32,6 +33,46 @@ class Pozicija(models.Model):
     padengimas = models.CharField("Padengimas", max_length=200, null=True, blank=True)
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, null=True, blank=True)
     spalva = models.CharField("Spalva", max_length=120, null=True, blank=True)
+
+    # Paslaugos (KTL / Miltai / Paruošimas (Chemetall))
+    turi_ktl = models.BooleanField(
+        "KTL",
+        default=False,
+        help_text="Pažymėkite, jei pozicijai taikomas KTL procesas (pvz. BASF CG 570).",
+    )
+    turi_miltus = models.BooleanField(
+        "Miltelinis dažymas",
+        default=False,
+        help_text="Pažymėkite, jei pozicijai taikomas miltelinis dažymas.",
+    )
+    turi_paruosima = models.BooleanField(
+        "Paruošimas (Chemetall)",
+        default=False,
+        help_text="Tik paruošimas Chemetall be KTL.",
+    )
+
+    miltai_kodas = models.CharField(
+        "Miltelių kodas",
+        max_length=100,
+        blank=True,
+    )
+    miltai_tiekejas = models.CharField(
+        "Miltelių tiekėjas",
+        max_length=100,
+        blank=True,
+    )
+    miltai_blizgumas = models.CharField(
+        "Blizgumas",
+        max_length=50,
+        blank=True,
+    )
+    miltai_kaina = models.DecimalField(
+        "Miltelių kaina",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
 
     # kiti
     maskavimas = models.CharField("Maskavimas", max_length=200, null=True, blank=True)
@@ -105,6 +146,7 @@ class Pozicija(models.Model):
 
 # ======================= Sena suderinamumui =======================
 
+
 class PozicijosKaina(models.Model):
     MATAS_CHOICES = [
         ("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2"),
@@ -133,6 +175,7 @@ class PozicijosKaina(models.Model):
 
 
 # ======================= Brėžiniai (su preview helperiais) =======================
+
 
 class PozicijosBrezinys(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="breziniai")
@@ -215,7 +258,6 @@ class PozicijosBrezinys(models.Model):
 
         return None
 
-
     def preview_abspath(self) -> str | None:
         """
         Absoliutus kelias iki sugeneruoto PNG preview:
@@ -294,6 +336,7 @@ class PozicijosBrezinys(models.Model):
 
 
 # ======================= Naujas modelis: KainosEilute =======================
+
 
 class KainosEilute(models.Model):
     MATAS_CHOICES = [("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2")]

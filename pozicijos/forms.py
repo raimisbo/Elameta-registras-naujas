@@ -57,10 +57,19 @@ class PozicijaForm(forms.ModelForm):
             "kabinimas_reme",
             "detaliu_kiekis_reme",
             "faktinis_kiekis_reme",
+            # Paslauga
             "paruosimas",
+            "turi_ktl",
+            "turi_miltus",
+            "turi_paruosima",
             "padengimas",
             "padengimo_standartas",
             "spalva",
+            "miltai_kodas",
+            "miltai_tiekejas",
+            "miltai_blizgumas",
+            "miltai_kaina",
+            # kiti
             "maskavimas",
             "atlikimo_terminas",
             "testai_kokybe",
@@ -132,7 +141,7 @@ class PozicijaForm(forms.ModelForm):
             if name in self.fields:
                 self.fields[name].widget.attrs.setdefault("list", f"dl-{name}")
 
-        # --- Skaitiniai laukai – be rodyklių, bet su skaitmenų klaviatūra ---
+        # --- Skaitmeniniai laukai – be rodyklių, bet su skaitmenų klaviatūra ---
         numeric_fields = [
             "plotas",
             "svoris",
@@ -142,6 +151,7 @@ class PozicijaForm(forms.ModelForm):
             "pak_po_ktl",
             "pak_po_milt",
             "kaina_eur",
+            "miltai_kaina",
         ]
         for name in numeric_fields:
             if name in self.fields:
@@ -156,6 +166,69 @@ class PozicijaForm(forms.ModelForm):
                     "invalid",
                     "Įveskite skaičių (pvz. 12.5).",
                 )
+
+        # Patogesni label'ai boolean laukams
+        if "turi_ktl" in self.fields:
+            self.fields["turi_ktl"].label = "KTL"
+        if "turi_miltus" in self.fields:
+            self.fields["turi_miltus"].label = "Miltelinis dažymas"
+        if "turi_paruosima" in self.fields:
+            self.fields["turi_paruosima"].label = "Paruošimas (Chemetall)"
+
+    def clean(self):
+        cleaned = super().clean()
+
+        turi_ktl = cleaned.get("turi_ktl") or False
+        turi_miltus = cleaned.get("turi_miltus") or False
+        turi_paruosima = cleaned.get("turi_paruosima") or False
+
+        paruosimas = (cleaned.get("paruosimas") or "").strip()
+        padengimo_standartas = (cleaned.get("padengimo_standartas") or "").strip()
+
+        miltai_kodas = (cleaned.get("miltai_kodas") or "").strip()
+        miltai_tiekejas = (cleaned.get("miltai_tiekejas") or "").strip()
+        miltai_blizgumas = (cleaned.get("miltai_blizgumas") or "").strip()
+        miltai_kaina = cleaned.get("miltai_kaina")
+
+        # --- Kombinacijos taisyklės ---
+        # Negalima KTL + Paruošimas (Chemetall)
+        if turi_ktl and turi_paruosima:
+            self.add_error(
+                "turi_paruosima",
+                "Negalima kartu žymėti KTL ir atskiro paruošimo – KTL jau turi Chemetall paruošimą.",
+            )
+
+        # --- KTL taisyklės ---
+        if turi_ktl:
+            # būtinas KTL standartas / procesas (pvz. BASF CG 570)
+            if not padengimo_standartas:
+                self.add_error(
+                    "padengimo_standartas",
+                    "Pasirinkus KTL, būtina nurodyti KTL standartą / procesą (pvz. BASF CG 570).",
+                )
+            # paruošimas = Chemetall (perrašom į švarų pavadinimą)
+            cleaned["paruosimas"] = "Chemetall"
+        else:
+            # Jei nėra KTL, bet yra tik paruošimas – irgi Chemetall
+            if turi_paruosima:
+                cleaned["paruosimas"] = "Chemetall"
+            else:
+                cleaned["paruosimas"] = paruosimas or None
+
+        # --- Miltai taisyklės ---
+        if turi_miltus:
+            if not miltai_kodas:
+                self.add_error("miltai_kodas", "Pasirinkus Miltus, būtinas miltelių kodas.")
+            if miltai_kaina in (None, ""):
+                self.add_error("miltai_kaina", "Pasirinkus Miltus, būtina nurodyti miltelių kainą.")
+        else:
+            # jei Miltai nenaudojami – išvalom Miltų laukus
+            cleaned["miltai_kodas"] = ""
+            cleaned["miltai_tiekejas"] = ""
+            cleaned["miltai_blizgumas"] = ""
+            cleaned["miltai_kaina"] = None
+
+        return cleaned
 
     def save(self, commit=True):
         """
@@ -205,6 +278,7 @@ class PozicijaForm(forms.ModelForm):
 #  LEGACY: SENAS MODELIS PozicijosKaina (paliktas tik suderinamumui)
 # =============================================================================
 
+
 class PozicijosKainaForm(forms.ModelForm):
     class Meta:
         model = PozicijosKaina
@@ -231,6 +305,7 @@ PozicijosKainaFormSet = inlineformset_factory(
 # =============================================================================
 #  BRĖŽINIŲ FORMA
 # =============================================================================
+
 
 class PozicijosBrezinysForm(forms.ModelForm):
     class Meta:
