@@ -7,6 +7,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+
+PAKAVIMO_TIPAS_CHOICES = [
+    ("palaidas", "Palaidas"),
+    ("standartinis", "Standartinis"),
+    ("geras", "Geras"),
+    ("individualus", "Individualus"),
+]
+
 # ======================= Pagrindas: Pozicija =======================
 
 
@@ -79,8 +87,22 @@ class Pozicija(models.Model):
     atlikimo_terminas = models.DateField("Atlikimo terminas", null=True, blank=True)
 
     testai_kokybe = models.CharField("Testai / kokybė", max_length=255, null=True, blank=True)
-    pakavimas = models.CharField("Pakavimas", max_length=255, null=True, blank=True)
-    instrukcija = models.TextField("Instrukcija", null=True, blank=True)
+
+    # Dropdown – rodys užrašą „Pakavimas“
+    pakavimo_tipas = models.CharField(
+        "Pakavimas",
+        max_length=20,
+        choices=PAKAVIMO_TIPAS_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    # Tekstinis laukas – „Aprašymas“
+    pakavimas = models.CharField("Aprašymas", max_length=255, null=True, blank=True)
+
+    # Buvo „Instrukcija“ – dabar „Pastabos“ (pakavimo pastabos)
+    instrukcija = models.TextField("Pastabos", null=True, blank=True)
+
     pakavimo_dienos_norma = models.CharField("Pakavimo dienos norma", max_length=120, null=True, blank=True)
     pak_po_ktl = models.CharField("Pakavimas po KTL", max_length=255, null=True, blank=True)
     pak_po_milt = models.CharField("Pakavimas po miltelinio", max_length=255, null=True, blank=True)

@@ -520,9 +520,24 @@
         <h2 class="poz-card-title">Pakavimas</h2>
 
         <div class="field-row">
+          <div class="field-label">{{ form.pakavimo_tipas.label }}</div>
+          <div class="field-control">
+            {{ form.pakavimo_tipas }}
+            <div class="field-help">Pasirinkite: Palaidas, Standartinis, Geras arba Individualus.</div>
+            {% if form.pakavimo_tipas.errors %}
+              <div class="field-errors">{{ form.pakavimo_tipas.errors|striptags }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
           <div class="field-label">{{ form.pakavimas.label }}</div>
           <div class="field-control">
             {{ form.pakavimas }}
+            <div class="field-help">
+              Pasirinkus pakavimo būdą, galime pasiūlyti šabloninį aprašymą.
+              Aprašymas visada privalomas – galite jį paredaguoti pagal poreikį.
+            </div>
             {% if form.pakavimas.errors %}
               <div class="field-errors">{{ form.pakavimas.errors|striptags }}</div>
             {% endif %}
@@ -535,36 +550,6 @@
             {{ form.instrukcija }}
             {% if form.instrukcija.errors %}
               <div class="field-errors">{{ form.instrukcija.errors|striptags }}</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field-label">{{ form.pakavimo_dienos_norma.label }}</div>
-          <div class="field-control">
-            {{ form.pakavimo_dienos_norma }}
-            {% if form.pakavimo_dienos_norma.errors %}
-              <div class="field-errors">{{ form.pakavimo_dienos_norma.errors|striptags }}</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field-label">{{ form.pak_po_ktl.label }}</div>
-          <div class="field-control">
-            {{ form.pak_po_ktl }}
-            {% if form.pak_po_ktl.errors %}
-              <div class="field-errors">{{ form.pak_po_ktl.errors|striptags }}</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field-label">{{ form.pak_po_milt.label }}</div>
-          <div class="field-control">
-            {{ form.pak_po_milt }}
-            {% if form.pak_po_milt.errors %}
-              <div class="field-errors">{{ form.pak_po_milt.errors|striptags }}</div>
             {% endif %}
           </div>
         </div>
@@ -630,12 +615,46 @@
       box.style.display = chk.checked ? "" : "none";
     }
 
+    function setupPakavimasTemplate() {
+      var select = document.getElementById("id_pakavimo_tipas");
+      var textarea = document.getElementById("id_pakavimas");
+      if (!select || !textarea) return;
+
+      var templates = {
+        "palaidas": "Palaidas pakavimas.",
+        "standartinis": "Standartinis pakavimas.",
+        "geras": "Geras pakavimas."
+        // "individualus" – be šablono, vartotojas pats aprašo
+      };
+      var templateValues = Object.values(templates);
+
+      function isTemplateValue(text) {
+        var t = (text || "").trim();
+        return templateValues.indexOf(t) !== -1;
+      }
+
+      function onChange() {
+        var val = select.value;
+        if (templates[val]) {
+          var current = textarea.value || "";
+          // perrašom tik jei tuščias arba buvo ankstesnis šablonas
+          if (!current.trim() || isTemplateValue(current)) {
+            textarea.value = templates[val];
+          }
+        }
+      }
+
+      select.addEventListener("change", onChange);
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
       updateMiltaiBlock();
       var chk = document.getElementById("id_turi_miltus");
       if (chk) {
         chk.addEventListener("change", updateMiltaiBlock);
       }
+
+      setupPakavimasTemplate();
     });
   })();
 </script>

@@ -30,6 +30,8 @@ REQUIRED_FIELDS = [
     "poz_pavad",
     "metalas",
     "padengimas",
+    "pakavimo_tipas",
+    "pakavimas",
 ]
 
 # Individualūs LT tekstai privalomiems laukams
@@ -39,6 +41,8 @@ REQUIRED_MESSAGES = {
     "poz_pavad": "Nurodykite detalės pavadinimą.",
     "metalas": "Nurodykite metalo tipą.",
     "padengimas": "Nurodykite padengimo tipą.",
+    "pakavimo_tipas": "Pasirinkite pakavimo būdą.",
+    "pakavimas": "Aprašymas privalomas.",
 }
 
 
@@ -46,38 +50,49 @@ class PozicijaForm(forms.ModelForm):
     class Meta:
         model = Pozicija
         fields = [
+            # pagrindinė info
             "klientas",
             "projektas",
             "poz_kodas",
             "poz_pavad",
+
+            # specifikacija
             "metalas",
             "plotas",
             "svoris",
+
+            # kabinimas
             "kabinimo_budas",
             "kabinimas_reme",
             "detaliu_kiekis_reme",
             "faktinis_kiekis_reme",
-            # Paslauga
+
+            # paslauga (paviršius / dažymas)
             "paruosimas",
-            "turi_ktl",
-            "turi_miltus",
-            "turi_paruosima",
             "padengimas",
             "padengimo_standartas",
             "spalva",
+
+            "turi_ktl",
+            "turi_miltus",
+            "turi_paruosima",
+
             "miltai_kodas",
             "miltai_tiekejas",
             "miltai_blizgumas",
             "miltai_kaina",
-            # kiti
+
+            # kiti techniniai
             "maskavimas",
             "atlikimo_terminas",
             "testai_kokybe",
+
+            # pakavimas (NŪ – dropdown + aprašymas)
+            "pakavimo_tipas",
             "pakavimas",
             "instrukcija",
-            "pakavimo_dienos_norma",
-            "pak_po_ktl",
-            "pak_po_milt",
+
+            # kaina / pastabos
             "kaina_eur",
             "pastabos",
         ]
@@ -87,6 +102,12 @@ class PozicijaForm(forms.ModelForm):
                 attrs={
                     "rows": 3,
                     "placeholder": "Papildomos pastabos..."
+                }
+            ),
+            "pakavimas": forms.Textarea(
+                attrs={
+                    "rows": 2,
+                    "placeholder": "Pakavimo aprašymas...",
                 }
             ),
         }
@@ -109,7 +130,6 @@ class PozicijaForm(forms.ModelForm):
             if name in self.fields:
                 field = self.fields[name]
                 field.required = True
-                # Individualus tekstas, jei turim, kitaip bendras
                 msg = REQUIRED_MESSAGES.get(name, "Šis laukas privalomas.")
                 field.error_messages["required"] = msg
 
@@ -147,9 +167,6 @@ class PozicijaForm(forms.ModelForm):
             "svoris",
             "detaliu_kiekis_reme",
             "faktinis_kiekis_reme",
-            "pakavimo_dienos_norma",
-            "pak_po_ktl",
-            "pak_po_milt",
             "kaina_eur",
             "miltai_kaina",
         ]
@@ -157,11 +174,9 @@ class PozicijaForm(forms.ModelForm):
             if name in self.fields:
                 field = self.fields[name]
                 w = field.widget
-                # vietoj type="number" -> type="text", kad nebūtų rodyklių
-                w.input_type = "text"
+                w.input_type = "text"   # vietoj number – be rodyklių
                 w.attrs.setdefault("inputmode", "decimal")
                 w.attrs.setdefault("placeholder", "0")
-                # LT klaida, kai įvestis ne skaičius
                 field.error_messages.setdefault(
                     "invalid",
                     "Įveskite skaičių (pvz. 12.5).",
@@ -178,6 +193,7 @@ class PozicijaForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
 
+        # --- Paslaugos logika ---
         turi_ktl = cleaned.get("turi_ktl") or False
         turi_miltus = cleaned.get("turi_miltus") or False
         turi_paruosima = cleaned.get("turi_paruosima") or False
@@ -190,7 +206,6 @@ class PozicijaForm(forms.ModelForm):
         miltai_blizgumas = (cleaned.get("miltai_blizgumas") or "").strip()
         miltai_kaina = cleaned.get("miltai_kaina")
 
-        # --- Kombinacijos taisyklės ---
         # Negalima KTL + Paruošimas (Chemetall)
         if turi_ktl and turi_paruosima:
             self.add_error(
@@ -198,35 +213,50 @@ class PozicijaForm(forms.ModelForm):
                 "Negalima kartu žymėti KTL ir atskiro paruošimo – KTL jau turi Chemetall paruošimą.",
             )
 
-        # --- KTL taisyklės ---
+        # KTL
         if turi_ktl:
-            # būtinas KTL standartas / procesas (pvz. BASF CG 570)
             if not padengimo_standartas:
                 self.add_error(
                     "padengimo_standartas",
                     "Pasirinkus KTL, būtina nurodyti KTL standartą / procesą (pvz. BASF CG 570).",
                 )
-            # paruošimas = Chemetall (perrašom į švarų pavadinimą)
             cleaned["paruosimas"] = "Chemetall"
         else:
-            # Jei nėra KTL, bet yra tik paruošimas – irgi Chemetall
             if turi_paruosima:
                 cleaned["paruosimas"] = "Chemetall"
             else:
                 cleaned["paruosimas"] = paruosimas or None
 
-        # --- Miltai taisyklės ---
+        # Miltai
         if turi_miltus:
             if not miltai_kodas:
                 self.add_error("miltai_kodas", "Pasirinkus Miltus, būtinas miltelių kodas.")
             if miltai_kaina in (None, ""):
                 self.add_error("miltai_kaina", "Pasirinkus Miltus, būtina nurodyti miltelių kainą.")
         else:
-            # jei Miltai nenaudojami – išvalom Miltų laukus
             cleaned["miltai_kodas"] = ""
             cleaned["miltai_tiekejas"] = ""
             cleaned["miltai_blizgumas"] = ""
             cleaned["miltai_kaina"] = None
+
+        # --- Pakavimas ---
+        pakavimo_tipas = cleaned.get("pakavimo_tipas")
+        pakavimas = (cleaned.get("pakavimas") or "").strip()
+
+        # Abu turi būti užpildyti – privalomi visais atvejais
+        if not pakavimo_tipas:
+            self.add_error(
+                "pakavimo_tipas",
+                "Pasirinkite pakavimą.",
+            )
+
+        if not pakavimas:
+            self.add_error(
+                "pakavimas",
+                "Aprašymas privalomas.",
+            )
+
+        cleaned["pakavimas"] = pakavimas or None
 
         return cleaned
 

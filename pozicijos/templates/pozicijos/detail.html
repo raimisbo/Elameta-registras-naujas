@@ -589,33 +589,38 @@
       </section>
 
       {# 7. Pakavimas #}
-      <section class="poz-card">
-        <h2 class="poz-card-title">Pakavimas</h2>
-        <div class="poz-fields">
-          <div class="poz-field-row">
-            <span class="poz-field-label">Pakavimas</span>
-            <span class="poz-field-value">{{ pozicija.pakavimas|default:"—" }}</span>
-          </div>
-          <div class="poz-field-row">
-            <span class="poz-field-label">Instrukcija</span>
-            <span class="poz-field-value">{{ pozicija.instrukcija|default:"—" }}</span>
-          </div>
-          <div class="poz-field-row">
-            <span class="poz-field-label">Pakavimo dienos norma</span>
-            <span class="poz-field-value">
-              {% if pozicija.pakavimo_dienos_norma %}{{ pozicija.pakavimo_dienos_norma }}{% else %}—{% endif %}
-            </span>
-          </div>
-          <div class="poz-field-row">
-            <span class="poz-field-label">Pakavimas po KTL</span>
-            <span class="poz-field-value">{{ pozicija.pak_po_ktl|default:"—" }}</span>
-          </div>
-          <div class="poz-field-row">
-            <span class="poz-field-label">Pakavimas po milt. dažymo</span>
-            <span class="poz-field-value">{{ pozicija.pak_po_milt|default:"—" }}</span>
-          </div>
+    <section class="poz-card">
+      <h2 class="poz-card-title">Pakavimas</h2>
+      <div class="poz-fields">
+        <div class="poz-field-row">
+          <span class="poz-field-label">Pakavimas</span>
+          <span class="poz-field-value">
+            {% if pozicija.pakavimo_tipas %}
+              {{ pozicija.get_pakavimo_tipas_display }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
         </div>
-      </section>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Aprašymas</span>
+          <span class="poz-field-value">
+            {{ pozicija.pakavimas|default:"—" }}
+          </span>
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Pastabos</span>
+          <span class="poz-field-value">
+            {% if pozicija.instrukcija %}
+              {{ pozicija.instrukcija|linebreaksbr }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </section>
+
 
       {# 8. Terminai #}
       <section class="poz-card">
