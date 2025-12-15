@@ -1,9 +1,19 @@
 {% load attr %}
+
 {% for it in items %}
 <tr onclick="location.href='{% url 'pozicijos:detail' it.id %}'" style="cursor:pointer;">
   {% for c in columns_schema %}
     {% if c.key in visible_cols %}
-      <td data-key="{{ c.key }}">{{ it|attr:c.key }}</td>
+      <td data-key="{{ c.key }}">
+        {# Specialūs atvaizdavimai pasirinkimams (choices) #}
+        {% if c.key == "maskavimo_tipas" %}
+          {{ it.get_maskavimo_tipas_display|default:"—" }}
+        {% elif c.key == "pakavimo_tipas" %}
+          {{ it.get_pakavimo_tipas_display|default:"—" }}
+        {% else %}
+          {{ it|attr:c.key }}
+        {% endif %}
+      </td>
     {% endif %}
   {% endfor %}
 </tr>

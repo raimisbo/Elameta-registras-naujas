@@ -44,7 +44,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <main>
     <div class="container">
       {% if messages %}

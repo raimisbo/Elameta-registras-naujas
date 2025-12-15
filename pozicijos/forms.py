@@ -1,4 +1,3 @@
-# pozicijos/forms.py
 from django import forms
 from django.forms import inlineformset_factory
 
@@ -18,7 +17,6 @@ SUGGESTION_FIELDS = [
     "padengimo_standartas",
     "spalva",
     "maskavimas",
-    "testai_kokybe",
     "pakavimas",
     "instrukcija",
 ]
@@ -30,8 +28,6 @@ REQUIRED_FIELDS = [
     "poz_pavad",
     "metalas",
     "padengimas",
-    "pakavimo_tipas",
-    "pakavimas",
 ]
 
 # Individualūs LT tekstai privalomiems laukams
@@ -41,8 +37,6 @@ REQUIRED_MESSAGES = {
     "poz_pavad": "Nurodykite detalės pavadinimą.",
     "metalas": "Nurodykite metalo tipą.",
     "padengimas": "Nurodykite padengimo tipą.",
-    "pakavimo_tipas": "Pasirinkite pakavimo būdą.",
-    "pakavimas": "Aprašymas privalomas.",
 }
 
 
@@ -50,49 +44,41 @@ class PozicijaForm(forms.ModelForm):
     class Meta:
         model = Pozicija
         fields = [
-            # pagrindinė info
             "klientas",
             "projektas",
             "poz_kodas",
             "poz_pavad",
-
-            # specifikacija
             "metalas",
             "plotas",
             "svoris",
-
-            # kabinimas
             "kabinimo_budas",
             "kabinimas_reme",
             "detaliu_kiekis_reme",
             "faktinis_kiekis_reme",
-
-            # paslauga (paviršius / dažymas)
+            # Paslaugos blokas
+            "paslauga_ktl",
+            "paslauga_miltai",
+            "paslauga_paruosimas",
             "paruosimas",
             "padengimas",
             "padengimo_standartas",
             "spalva",
-
-            "turi_ktl",
-            "turi_miltus",
-            "turi_paruosima",
-
-            "miltai_kodas",
-            "miltai_tiekejas",
-            "miltai_blizgumas",
-            "miltai_kaina",
-
-            # kiti techniniai
+            "miltu_kodas",
+            "miltu_spalva",
+            "miltu_tiekejas",
+            "miltu_blizgumas",
+            "miltu_kaina",
+            # Maskavimas
+            "maskavimo_tipas",
             "maskavimas",
+            # Terminai / testai
             "atlikimo_terminas",
             "testai_kokybe",
-
-            # pakavimas (NŪ – dropdown + aprašymas)
+            # Pakavimas
             "pakavimo_tipas",
             "pakavimas",
             "instrukcija",
-
-            # kaina / pastabos
+            # Kaina + pastabos
             "kaina_eur",
             "pastabos",
         ]
@@ -102,12 +88,6 @@ class PozicijaForm(forms.ModelForm):
                 attrs={
                     "rows": 3,
                     "placeholder": "Papildomos pastabos..."
-                }
-            ),
-            "pakavimas": forms.Textarea(
-                attrs={
-                    "rows": 2,
-                    "placeholder": "Pakavimo aprašymas...",
                 }
             ),
         }
@@ -161,20 +141,21 @@ class PozicijaForm(forms.ModelForm):
             if name in self.fields:
                 self.fields[name].widget.attrs.setdefault("list", f"dl-{name}")
 
-        # --- Skaitmeniniai laukai – be rodyklių, bet su skaitmenų klaviatūra ---
+        # --- Skaitiniai laukai – be rodyklių, bet su skaitmenų klaviatūra ---
         numeric_fields = [
             "plotas",
             "svoris",
             "detaliu_kiekis_reme",
             "faktinis_kiekis_reme",
             "kaina_eur",
-            "miltai_kaina",
+            "miltu_kaina",
         ]
         for name in numeric_fields:
             if name in self.fields:
                 field = self.fields[name]
                 w = field.widget
-                w.input_type = "text"   # vietoj number – be rodyklių
+                # vietoj type="number" -> type="text", kad nebūtų rodyklių
+                w.input_type = "text"
                 w.attrs.setdefault("inputmode", "decimal")
                 w.attrs.setdefault("placeholder", "0")
                 field.error_messages.setdefault(
@@ -182,81 +163,75 @@ class PozicijaForm(forms.ModelForm):
                     "Įveskite skaičių (pvz. 12.5).",
                 )
 
-        # Patogesni label'ai boolean laukams
-        if "turi_ktl" in self.fields:
-            self.fields["turi_ktl"].label = "KTL"
-        if "turi_miltus" in self.fields:
-            self.fields["turi_miltus"].label = "Miltelinis dažymas"
-        if "turi_paruosima" in self.fields:
-            self.fields["turi_paruosima"].label = "Paruošimas (Chemetall)"
-
     def clean(self):
         cleaned = super().clean()
 
-        # --- Paslaugos logika ---
-        turi_ktl = cleaned.get("turi_ktl") or False
-        turi_miltus = cleaned.get("turi_miltus") or False
-        turi_paruosima = cleaned.get("turi_paruosima") or False
+        # --- Paslaugos: KTL / Miltai / Paruošimas ---
+        ktl = cleaned.get("paslauga_ktl")
+        miltai = cleaned.get("paslauga_miltai")
+        par_flag = cleaned.get("paslauga_paruosimas")
 
         paruosimas = (cleaned.get("paruosimas") or "").strip()
-        padengimo_standartas = (cleaned.get("padengimo_standartas") or "").strip()
+        padengimas = (cleaned.get("padengimas") or "").strip()
 
-        miltai_kodas = (cleaned.get("miltai_kodas") or "").strip()
-        miltai_tiekejas = (cleaned.get("miltai_tiekejas") or "").strip()
-        miltai_blizgumas = (cleaned.get("miltai_blizgumas") or "").strip()
-        miltai_kaina = cleaned.get("miltai_kaina")
+        # KTL + Paruošimas kartu negalima
+        if ktl and par_flag:
+            self.add_error("paslauga_paruosimas", "Negalima žymėti „Paruošimas“, kai pasirinktas KTL.")
 
-        # Negalima KTL + Paruošimas (Chemetall)
-        if turi_ktl and turi_paruosima:
-            self.add_error(
-                "turi_paruosima",
-                "Negalima kartu žymėti KTL ir atskiro paruošimo – KTL jau turi Chemetall paruošimą.",
-            )
+        # Jei yra KTL arba Paruošimas – privalomas paruošimas
+        if (ktl or par_flag) and not paruosimas:
+            self.add_error("paruosimas", "KTL / Paruošimo atveju paruošimas yra privalomas.")
 
-        # KTL
-        if turi_ktl:
-            if not padengimo_standartas:
-                self.add_error(
-                    "padengimo_standartas",
-                    "Pasirinkus KTL, būtina nurodyti KTL standartą / procesą (pvz. BASF CG 570).",
-                )
-            cleaned["paruosimas"] = "Chemetall"
-        else:
-            if turi_paruosima:
-                cleaned["paruosimas"] = "Chemetall"
-            else:
-                cleaned["paruosimas"] = paruosimas or None
+        # Jei KTL – privalomas padengimas
+        if ktl and not padengimas:
+            self.add_error("padengimas", "KTL atveju privalomas padengimas.")
 
-        # Miltai
-        if turi_miltus:
-            if not miltai_kodas:
-                self.add_error("miltai_kodas", "Pasirinkus Miltus, būtinas miltelių kodas.")
-            if miltai_kaina in (None, ""):
-                self.add_error("miltai_kaina", "Pasirinkus Miltus, būtina nurodyti miltelių kainą.")
-        else:
-            cleaned["miltai_kodas"] = ""
-            cleaned["miltai_tiekejas"] = ""
-            cleaned["miltai_blizgumas"] = ""
-            cleaned["miltai_kaina"] = None
+        # Miltai – privalomi kodas ir kaina
+        miltu_kodas = (cleaned.get("miltu_kodas") or "").strip()
+        miltu_kaina = cleaned.get("miltu_kaina")
+
+        if miltai:
+            if not miltu_kodas:
+                self.add_error("miltu_kodas", "Miltų paslaugai būtinas kodas.")
+            if miltu_kaina in (None, ""):
+                self.add_error("miltu_kaina", "Miltų paslaugai būtina kaina.")
+
+        cleaned["paruosimas"] = paruosimas or None
+        cleaned["padengimas"] = padengimas or None
+        cleaned["miltu_kodas"] = miltu_kodas or None
 
         # --- Pakavimas ---
         pakavimo_tipas = cleaned.get("pakavimo_tipas")
         pakavimas = (cleaned.get("pakavimas") or "").strip()
 
-        # Abu turi būti užpildyti – privalomi visais atvejais
-        if not pakavimo_tipas:
-            self.add_error(
-                "pakavimo_tipas",
-                "Pasirinkite pakavimą.",
-            )
+        PAK_TEMPLATES = {
+            "palaidas": "Palaidas pakavimas pagal standartinę procedūrą.",
+            "standartinis": "Standartinis pakavimas: kartoninė dėžė, apsauga nuo pažeidimų.",
+            "geras": "Pagerintas pakavimas su papildoma apsauga ir atskyrimu.",
+            "individualus": "Individualus pakavimas pagal kliento poreikius.",
+        }
 
-        if not pakavimas:
-            self.add_error(
-                "pakavimas",
-                "Aprašymas privalomas.",
-            )
+        if pakavimo_tipas in PAK_TEMPLATES and not pakavimas:
+            pakavimas = PAK_TEMPLATES[pakavimo_tipas]
+
+        if pakavimo_tipas == "individualus" and not pakavimas:
+            self.add_error("pakavimas", "Individualiam pakavimui aprašymas yra privalomas.")
 
         cleaned["pakavimas"] = pakavimas or None
+
+        # --- Maskavimas ---
+        maskavimo_tipas = cleaned.get("maskavimo_tipas")
+        maskavimas = (cleaned.get("maskavimas") or "").strip()
+
+        MAS_TEMPLATES = {
+            "iprastas": "Įprastas maskavimas pagal standartinę schemą.",
+            "specialus": "Specialus maskavimas pagal atskirą susitarimą ir brėžinio nurodymus.",
+        }
+
+        if maskavimo_tipas in MAS_TEMPLATES and not maskavimas:
+            maskavimas = MAS_TEMPLATES[maskavimo_tipas]
+
+        cleaned["maskavimas"] = maskavimas or None
 
         return cleaned
 
@@ -308,7 +283,6 @@ class PozicijaForm(forms.ModelForm):
 #  LEGACY: SENAS MODELIS PozicijosKaina (paliktas tik suderinamumui)
 # =============================================================================
 
-
 class PozicijosKainaForm(forms.ModelForm):
     class Meta:
         model = PozicijosKaina
@@ -335,7 +309,6 @@ PozicijosKainaFormSet = inlineformset_factory(
 # =============================================================================
 #  BRĖŽINIŲ FORMA
 # =============================================================================
-
 
 class PozicijosBrezinysForm(forms.ModelForm):
     class Meta:

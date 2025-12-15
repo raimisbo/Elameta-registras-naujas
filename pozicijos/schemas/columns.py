@@ -8,9 +8,8 @@ Visų pozicijų sąrašo stulpelių schema.
 - type:   "char" | "number" | "date" | "virtual"
 - filter: "text" | "range" | "date" | None
 - searchable: ar dalyvauja globalioje q paieškoje
-- width:  numanomam stulpelio pločiui (px) – tik UI patogumui
+- width:  numanomam stulpelio pločiui (px)
 - default: ar rodomas pagal nutylėjimą
-- order_field: jei rikiuojam ne pagal tą patį lauką
 """
 
 COLUMNS: list[dict] = [
@@ -161,9 +160,9 @@ COLUMNS: list[dict] = [
         "default": False,
     },
 
-    # ---------------- Kiti techniniai ----------------
+    # ---------------- Maskavimas ----------------
     {
-        "key": "maskavimas",
+        "key": "maskavimo_tipas",
         "label": "Maskavimas",
         "type": "char",
         "filter": "text",
@@ -171,13 +170,15 @@ COLUMNS: list[dict] = [
         "width": 140,
         "default": False,
     },
+
+    # ---------------- Kiti techniniai ----------------
     {
         "key": "testai_kokybe",
         "label": "Testai / kokybė",
         "type": "char",
         "filter": "text",
         "searchable": False,
-        "width": 160,
+        "width": 180,
         "default": False,
     },
     {
@@ -190,10 +191,10 @@ COLUMNS: list[dict] = [
         "default": False,
     },
 
-    # ---------------- Pakavimas (tik viršutinis langelis) ----------------
+    # ---------------- Pakavimas ----------------
     {
         "key": "pakavimo_tipas",
-        "label": "Pakavimas",  # dropdown reikšmė: Palaidas/Standartinis/Geras/Individualus
+        "label": "Pakavimas",
         "type": "char",
         "filter": "text",
         "searchable": False,

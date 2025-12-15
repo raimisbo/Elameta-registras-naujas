@@ -1,3 +1,4 @@
+# pozicijos/models.py
 import os
 import hashlib
 
@@ -8,6 +9,8 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 
+# ======================= Choices =======================
+
 PAKAVIMO_TIPAS_CHOICES = [
     ("palaidas", "Palaidas"),
     ("standartinis", "Standartinis"),
@@ -15,10 +18,27 @@ PAKAVIMO_TIPAS_CHOICES = [
     ("individualus", "Individualus"),
 ]
 
+MASKAVIMO_TIPAS_CHOICES = [
+    ("iprastas", "Įprastas"),
+    ("specialus", "Specialus"),
+]
+
+
 # ======================= Pagrindas: Pozicija =======================
 
-
 class Pozicija(models.Model):
+    # pasirinkimai (choices)
+    MASKAVIMO_TIPAS_CHOICES = [
+        ("iprastas", "Įprastas"),
+        ("specialus", "Specialus"),
+    ]
+    PAKAVIMO_TIPAS_CHOICES = [
+        ("palaidas", "Palaidas"),
+        ("standartinis", "Standartinis"),
+        ("geras", "Geras"),
+        ("individualus", "Individualus"),
+    ]
+
     # pagrindiniai
     klientas = models.CharField("Klientas", max_length=255, null=True, blank=True)
     projektas = models.CharField("Projektas", max_length=255, null=True, blank=True)
@@ -36,59 +56,38 @@ class Pozicija(models.Model):
     detaliu_kiekis_reme = models.IntegerField("Detalių kiekis rėme", null=True, blank=True)
     faktinis_kiekis_reme = models.IntegerField("Faktinis kiekis rėme", null=True, blank=True)
 
-    # paviršius / dažymas
+    # paviršius / dažymas – bendra dalis
     paruosimas = models.CharField("Paruošimas", max_length=200, null=True, blank=True)
     padengimas = models.CharField("Padengimas", max_length=200, null=True, blank=True)
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, null=True, blank=True)
     spalva = models.CharField("Spalva", max_length=120, null=True, blank=True)
 
-    # Paslaugos (KTL / Miltai / Paruošimas (Chemetall))
-    turi_ktl = models.BooleanField(
-        "KTL",
-        default=False,
-        help_text="Pažymėkite, jei pozicijai taikomas KTL procesas (pvz. BASF CG 570).",
-    )
-    turi_miltus = models.BooleanField(
-        "Miltelinis dažymas",
-        default=False,
-        help_text="Pažymėkite, jei pozicijai taikomas miltelinis dažymas.",
-    )
-    turi_paruosima = models.BooleanField(
-        "Paruošimas (Chemetall)",
-        default=False,
-        help_text="Tik paruošimas Chemetall be KTL.",
-    )
+    # Paslaugos logika: KTL / Miltai / Paruošimas
+    paslauga_ktl = models.BooleanField("KTL", default=False)
+    paslauga_miltai = models.BooleanField("Miltai", default=False)
+    paslauga_paruosimas = models.BooleanField("Paruošimas", default=False)
 
-    miltai_kodas = models.CharField(
-        "Miltelių kodas",
-        max_length=100,
-        blank=True,
-    )
-    miltai_tiekejas = models.CharField(
-        "Miltelių tiekėjas",
-        max_length=100,
-        blank=True,
-    )
-    miltai_blizgumas = models.CharField(
-        "Blizgumas",
-        max_length=50,
-        blank=True,
-    )
-    miltai_kaina = models.DecimalField(
-        "Miltelių kaina",
-        max_digits=10,
-        decimal_places=2,
+    miltu_kodas = models.CharField("Miltelių kodas", max_length=100, null=True, blank=True)
+    miltu_spalva = models.CharField("Miltelių spalva", max_length=120, null=True, blank=True)
+    miltu_tiekejas = models.CharField("Miltelių tiekėjas", max_length=120, null=True, blank=True)
+    miltu_blizgumas = models.CharField("Blizgumas", max_length=50, null=True, blank=True)
+    miltu_kaina = models.DecimalField("Miltelių kaina", max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # Maskavimas + kiti
+    maskavimo_tipas = models.CharField(
+        "Maskavimas",
+        max_length=20,
+        choices=MASKAVIMO_TIPAS_CHOICES,
         null=True,
         blank=True,
     )
+    maskavimas = models.CharField("Maskavimo aprašymas", max_length=200, null=True, blank=True)
 
-    # kiti
-    maskavimas = models.CharField("Maskavimas", max_length=200, null=True, blank=True)
     atlikimo_terminas = models.DateField("Atlikimo terminas", null=True, blank=True)
 
     testai_kokybe = models.CharField("Testai / kokybė", max_length=255, null=True, blank=True)
 
-    # Dropdown – rodys užrašą „Pakavimas“
+    # Pakavimas
     pakavimo_tipas = models.CharField(
         "Pakavimas",
         max_length=20,
@@ -96,17 +95,15 @@ class Pozicija(models.Model):
         null=True,
         blank=True,
     )
+    pakavimas = models.CharField("Pakavimo aprašymas", max_length=255, null=True, blank=True)
+    instrukcija = models.TextField("Pakavimo pastabos", null=True, blank=True)
 
-    # Tekstinis laukas – „Aprašymas“
-    pakavimas = models.CharField("Aprašymas", max_length=255, null=True, blank=True)
-
-    # Buvo „Instrukcija“ – dabar „Pastabos“ (pakavimo pastabos)
-    instrukcija = models.TextField("Pastabos", null=True, blank=True)
-
+    # seni laukai, UI jau nenaudojam, bet paliekam DB suderinamumui
     pakavimo_dienos_norma = models.CharField("Pakavimo dienos norma", max_length=120, null=True, blank=True)
     pak_po_ktl = models.CharField("Pakavimas po KTL", max_length=255, null=True, blank=True)
     pak_po_milt = models.CharField("Pakavimas po miltelinio", max_length=255, null=True, blank=True)
 
+    # kaina (trumpasis „headline“ laukas)
     kaina_eur = models.DecimalField("Dabartinė kaina (EUR)", max_digits=12, decimal_places=2, null=True, blank=True)
 
     pastabos = models.TextField("Pastabos", null=True, blank=True)
@@ -168,7 +165,6 @@ class Pozicija(models.Model):
 
 # ======================= Sena suderinamumui =======================
 
-
 class PozicijosKaina(models.Model):
     MATAS_CHOICES = [
         ("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2"),
@@ -198,14 +194,13 @@ class PozicijosKaina(models.Model):
 
 # ======================= Brėžiniai (su preview helperiais) =======================
 
-
 class PozicijosBrezinys(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="breziniai")
     pavadinimas = models.CharField("Pavadinimas", max_length=255, blank=True)
     failas = models.FileField("Brėžinys", upload_to="pozicijos/breziniai/%Y/%m/")
     uploaded = models.DateTimeField(auto_now_add=True)
 
-    # 🔹 NAUJAS LAUKAS – sugeneruota PNG miniatiūra
+    # sugeneruota PNG miniatiūra
     preview = models.ImageField(
         "Miniatiūra",
         upload_to="pozicijos/breziniai/previews/",
@@ -358,7 +353,6 @@ class PozicijosBrezinys(models.Model):
 
 
 # ======================= Naujas modelis: KainosEilute =======================
-
 
 class KainosEilute(models.Model):
     MATAS_CHOICES = [("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2")]
