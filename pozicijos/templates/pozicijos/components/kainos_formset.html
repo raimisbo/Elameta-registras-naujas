@@ -1,0 +1,205 @@
+{# pozicijos/templates/pozicijos/components/kainos_formset.html #}
+
+{{ formset.management_form }}
+
+{% if formset.non_form_errors %}
+  <div class="errorlist nonform" style="margin-bottom:8px;color:#b91c1c;">
+    {% for err in formset.non_form_errors %}
+      <div>{{ err }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="kainos-head">
+  <div class="kainos-head__text">Kainų eilutės sudaro galutinę kainą.</div>
+  <button type="button" class="btn btn-secondary" id="kainos-add-row">
+    + Pridėti eilutę
+  </button>
+</div>
+
+<div class="kainos-table-wrap">
+  <table class="table zebra kainos-table">
+    <thead>
+      <tr>
+        <th class="col-kaina">Kaina €</th>
+        <th class="col-matas">Matas</th>
+        <th class="col-fiks">Fiks.</th>
+        <th class="col-qty">Nuo</th>
+        <th class="col-qty">Iki</th>
+        <th class="col-fxq">Fx</th>
+        <th class="col-gal">Galiojimas</th>
+        <th class="col-bus">Būsena</th>
+        <th class="col-past">Pastabos</th>
+        <th class="col-del">Šal.</th>
+      </tr>
+    </thead>
+
+    <tbody id="kainu-formset-body">
+      {% for form in formset %}
+        {% with st=form.instance.busena %}
+        <tr class="kaina-row {% if st == 'aktuali' %}kaina-row--aktuali{% else %}kaina-row--neaktuali{% endif %}">
+          <td class="cell-kaina">{{ form.id }}{{ form.kaina }}</td>
+          <td>{{ form.matas }}</td>
+
+          <td style="text-align:center;">
+            {{ form.yra_fiksuota }}
+          </td>
+
+          <td>{{ form.kiekis_nuo }}</td>
+          <td>{{ form.kiekis_iki }}</td>
+          <td>{{ form.fiksuotas_kiekis }}</td>
+
+          <td>
+            <div class="date-stack">
+              {{ form.galioja_nuo }}
+              {{ form.galioja_iki }}
+            </div>
+          </td>
+
+          <td>
+            <select name="{{ form.busena.html_name }}">
+              <option value="aktuali" {% if st == "aktuali" %}selected{% endif %}>Aktuali</option>
+              <option value="sena" {% if st != "aktuali" %}selected{% endif %}>Neaktuali</option>
+            </select>
+          </td>
+
+          <td>
+            {{ form.pastaba }}
+          </td>
+
+          <td style="text-align:center;">{{ form.DELETE }}</td>
+        </tr>
+        {% endwith %}
+      {% empty %}
+        <tr>
+          <td colspan="10" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="kainos-help">
+  <strong>Pastaba:</strong>
+  Intervalinei kainai naudokite „Nuo / Iki“. Fiksuotai – pažymėkite „Fiks.“ ir pildykite „Fx“.
+</p>
+
+<template id="kainos-empty-template">
+  {% with form=formset.empty_form %}
+  <tr class="kaina-row kaina-row--neaktuali">
+    <td class="cell-kaina">{{ form.id }}{{ form.kaina }}</td>
+    <td>{{ form.matas }}</td>
+    <td style="text-align:center;">{{ form.yra_fiksuota }}</td>
+    <td>{{ form.kiekis_nuo }}</td>
+    <td>{{ form.kiekis_iki }}</td>
+    <td>{{ form.fiksuotas_kiekis }}</td>
+    <td><div class="date-stack">{{ form.galioja_nuo }}{{ form.galioja_iki }}</div></td>
+    <td>
+      <select name="{{ form.busena.html_name }}">
+        <option value="aktuali">Aktuali</option>
+        <option value="sena" selected>Neaktuali</option>
+      </select>
+    </td>
+    <td>{{ form.pastaba }}</td>
+    <td style="text-align:center;">{{ form.DELETE }}</td>
+  </tr>
+  {% endwith %}
+</template>
+
+<style>
+  .kainos-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .kainos-head__text{ font-size:14px; color:#4b5563; }
+
+  .kainos-table-wrap{ overflow:auto; }
+
+  .kainos-table{
+    width:100%;
+    min-width:980px;
+    table-layout:fixed;
+  }
+  .kainos-table th, .kainos-table td{
+    vertical-align:top;
+    white-space:normal;
+    word-break:break-word;
+  }
+
+  /* Suspaudžiam “skaičius” stulpelius */
+  .col-kaina{ width:90px; }
+  .col-matas{ width:70px; }
+  .col-fiks{ width:55px; }
+  .col-qty{ width:70px; }
+  .col-fxq{ width:70px; }
+  .col-gal{ width:120px; }
+  .col-bus{ width:110px; }
+  .col-del{ width:55px; }
+
+  /* Pastabos – maksimaliai platus (pasiima likutį) */
+  .col-past{ width:auto; }
+
+  .date-stack{ display:flex; flex-direction:column; gap:4px; }
+
+  /* Pastabų laukui priverčiam normalų plotį ir aukštį */
+  .kainos-table td textarea,
+  .kainos-table td textarea[name$="-pastaba"]{
+    width:100%;
+    min-height:70px;
+    resize:vertical;
+    box-sizing:border-box;
+  }
+
+  .kaina-row--aktuali td{ background:#ecfdf5; }
+  .kaina-row--neaktuali td{ background:#f9fafb; color:#6b7280; }
+
+  .kainos-help{ margin-top:10px; font-size:12px; color:#6b7280; }
+</style>
+
+<script>
+(function () {
+  const body = document.getElementById('kainu-formset-body');
+  const addBtn = document.getElementById('kainos-add-row');
+  const totalInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+  const tmpl = document.getElementById('kainos-empty-template');
+
+  if (!body || !addBtn || !totalInput || !tmpl) return;
+
+  function initRow(row) {
+    const chk = row.querySelector('input[name$="-yra_fiksuota"]');
+    const nuo = row.querySelector('input[name$="-kiekis_nuo"]');
+    const iki = row.querySelector('input[name$="-kiekis_iki"]');
+    const fx  = row.querySelector('input[name$="-fiksuotas_kiekis"]');
+    if (!chk || !nuo || !iki || !fx) return;
+
+    function sync() {
+      const fixed = chk.checked;
+      nuo.disabled = fixed;
+      iki.disabled = fixed;
+      fx.disabled = !fixed;
+      if (fixed) { nuo.value = ""; iki.value = ""; }
+      else { fx.value = ""; }
+    }
+
+    chk.addEventListener('change', sync);
+    sync();
+  }
+
+  body.querySelectorAll('tr.kaina-row').forEach(initRow);
+
+  addBtn.addEventListener('click', function () {
+    const i = parseInt(totalInput.value || '0', 10);
+    const html = tmpl.innerHTML.replace(/__prefix__/g, i);
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = html.trim();
+    const row = tmp.querySelector('tr');
+    body.appendChild(row);
+    totalInput.value = i + 1;
+    initRow(row);
+  });
+})();
+</script>

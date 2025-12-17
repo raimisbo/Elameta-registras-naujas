@@ -1,18 +1,33 @@
 # pozicijos/forms_kainos.py
-from decimal import Decimal
+from __future__ import annotations
 
 from django import forms
-from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 
 from .models import Pozicija, KainosEilute
 
 
-class KainaForm(forms.ModelForm):
+# UI rodome tik 2 būsenas, bet DB turi: "aktuali", "sena", "pasiulymas"
+# Mes pasirenkam: Neaktuali -> "sena"
+BUSENA_UI_CHOICES = [
+    ("aktuali", "Aktuali"),
+    ("neaktuali", "Neaktuali"),
+]
+
+
+class KainosEiluteForm(forms.ModelForm):
     """
-    Vienos KainosEilute eilutės forma.
-    Naudojama inline formsete ant Pozicija (variantas A – vienas langas).
+    Vienos kainos eilutės forma pozicijos formsete.
+
+    - UI: busena tik "Aktuali" / "Neaktuali"
+    - DB: "Neaktuali" map'inama į "sena"
     """
+
+    busena_ui = forms.ChoiceField(
+        label="Būsena",
+        choices=BUSENA_UI_CHOICES,
+        required=True,
+    )
 
     class Meta:
         model = KainosEilute
@@ -20,97 +35,87 @@ class KainaForm(forms.ModelForm):
             "kaina",
             "matas",
             "yra_fiksuota",
-            "fiksuotas_kiekis",
             "kiekis_nuo",
             "kiekis_iki",
+            "fiksuotas_kiekis",
             "galioja_nuo",
             "galioja_iki",
-            "busena",
-            "prioritetas",
             "pastaba",
+            # busena DB lauko tiesiogiai nerodom – naudojam busena_ui
         ]
         widgets = {
-            "kaina": forms.NumberInput(attrs={
-                "step": "0.01",
-                "min": "0",
-                "style": "width:100px",
-            }),
-            "matas": forms.Select(attrs={"style": "width:80px"}),
-            "yra_fiksuota": forms.CheckboxInput(),
-            "fiksuotas_kiekis": forms.NumberInput(attrs={"style": "width:80px"}),
-            "kiekis_nuo": forms.NumberInput(attrs={"style": "width:80px"}),
-            "kiekis_iki": forms.NumberInput(attrs={"style": "width:80px"}),
-            "galioja_nuo": forms.DateInput(attrs={
-                "type": "date",
-                "style": "width:130px",
-            }),
-            "galioja_iki": forms.DateInput(attrs={
-                "type": "date",
-                "style": "width:130px",
-            }),
-            "busena": forms.Select(attrs={"style": "width:110px"}),
-            "prioritetas": forms.NumberInput(attrs={"style": "width:70px"}),
-            "pastaba": forms.TextInput(attrs={"style": "width:100%;"}),
+            "galioja_nuo": forms.DateInput(attrs={"type": "date"}),
+            "galioja_iki": forms.DateInput(attrs={"type": "date"}),
+            "pastaba": forms.Textarea(attrs={"rows": 2}),
         }
 
-    def clean(self):
-        """
-        Sujungta tavo sena logika:
-        - kaina privaloma ir turi būti teigiama;
-        - tvarkingas fiksuota / intervalinė atskyrimas;
-        - 'empty' formos formsete praleidžiamos.
-        """
-        cleaned = super().clean()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        # jei forma formsete visiškai tuščia ir leidžiama praleisti – tikrai netikrinam
-        if self.empty_permitted and not self.has_changed():
-            return cleaned
+        # bendros klasės
+        for name, f in self.fields.items():
+            css = f.widget.attrs.get("class", "")
+            f.widget.attrs["class"] = (css + " poz-field").strip()
+
+        # skaitiniai – be rodyklių, bet su decimal klaviatūra
+        if "kaina" in self.fields:
+            w = self.fields["kaina"].widget
+            w.input_type = "text"
+            w.attrs.setdefault("inputmode", "decimal")
+            w.attrs.setdefault("placeholder", "0")
+
+        for n in ("kiekis_nuo", "kiekis_iki", "fiksuotas_kiekis"):
+            if n in self.fields:
+                w = self.fields[n].widget
+                w.input_type = "text"
+                w.attrs.setdefault("inputmode", "numeric")
+                w.attrs.setdefault("placeholder", "")
+
+        # Inicializuojam busena_ui iš DB busena
+        db_busena = getattr(self.instance, "busena", None) or "aktuali"
+        self.fields["busena_ui"].initial = "aktuali" if db_busena == "aktuali" else "neaktuali"
+
+    def clean(self):
+        cleaned = super().clean()
 
         yra_fiksuota = cleaned.get("yra_fiksuota")
         fiksuotas_kiekis = cleaned.get("fiksuotas_kiekis")
         kiekis_nuo = cleaned.get("kiekis_nuo")
         kiekis_iki = cleaned.get("kiekis_iki")
-        kaina = cleaned.get("kaina")
-        matas = cleaned.get("matas")
 
-        # --- Kaina: privaloma ir teigiama ---
-        try:
-            if kaina is None or Decimal(kaina) < 0:
-                raise ValidationError("Kaina turi būti teigiama.")
-        except Exception:
-            raise ValidationError("Neteisinga kainos reikšmė.")
+        # UI -> DB busena
+        bus_ui = cleaned.get("busena_ui") or "aktuali"
+        cleaned["busena"] = "aktuali" if bus_ui == "aktuali" else "sena"
 
-        # --- Matas: privalomas ---
-        if not matas:
-            raise ValidationError("Pasirinkite matą.")
-
-        # --- Fiksuota / intervalinė logika (tavo sena schema) ---
+        # Validacija pagal tavo modelio KainosEilute.clean logiką
         if yra_fiksuota:
-            # Fiksuota: privalomas fiksuotas_kiekis, kiekis_nuo/iki turi būti tušti
-            if fiksuotas_kiekis is None:
-                raise ValidationError("Fiksuotai kainai reikia nurodyti „Fiksuotas kiekis“.")
-            if kiekis_nuo is not None or kiekis_iki is not None:
-                raise ValidationError("Fiksuotai kainai „Kiekis nuo/iki“ turi būti tušti.")
+            if fiksuotas_kiekis in (None, ""):
+                self.add_error("fiksuotas_kiekis", "Fiksuotai kainai privalomas „Fiksuotas kiekis“.")
+            if kiekis_nuo not in (None, "") or kiekis_iki not in (None, ""):
+                self.add_error("kiekis_nuo", "Fiksuotai kainai „Kiekis nuo/iki“ turi būti tušti.")
+                self.add_error("kiekis_iki", "Fiksuotai kainai „Kiekis nuo/iki“ turi būti tušti.")
         else:
-            # Intervalinė: bent vienas iš nuo/iki turi būti užpildytas
-            if kiekis_nuo is None and kiekis_iki is None:
-                raise ValidationError(
-                    "Intervalinei kainai užpildykite bent „Kiekis nuo“ arba „Kiekis iki“."
-                )
-            if (
-                kiekis_nuo is not None
-                and kiekis_iki is not None
-                and kiekis_iki < kiekis_nuo
-            ):
-                raise ValidationError("„Kiekis iki“ negali būti mažesnis už „Kiekis nuo“.")
+            if (kiekis_nuo in (None, "") and kiekis_iki in (None, "")):
+                self.add_error("kiekis_nuo", "Intervalinei kainai užpildykite bent „Kiekis nuo“ arba „Kiekis iki“.")
 
         return cleaned
+
+    def save(self, commit=True):
+        inst: KainosEilute = super().save(commit=False)
+
+        # busena_ui -> inst.busena
+        bus_ui = self.cleaned_data.get("busena_ui") or "aktuali"
+        inst.busena = "aktuali" if bus_ui == "aktuali" else "sena"
+
+        if commit:
+            inst.save()
+        return inst
 
 
 KainaFormSet = inlineformset_factory(
     Pozicija,
     KainosEilute,
-    form=KainaForm,
-    extra=1,        # visada bent viena tuščia eilutė
+    form=KainosEiluteForm,
+    extra=0,
     can_delete=True,
 )

@@ -457,11 +457,7 @@
               {% if fak %}
                 {{ fak }}
               {% else %}
-                {% if det %}
-                  —
-                {% else %}
-                  —
-                {% endif %}
+                —
               {% endif %}
             </span>
           {% endwith %}
@@ -582,21 +578,9 @@
       </div>
     </section>
 
-    {# 10. Kaina – visi duomenys vienoje kortelėje #}
+    {# 10. Kaina – tik rėžinės eilutės (be "bendra kaina") #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Kaina</h2>
-      <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Bendra kaina</span>
-          <span class="poz-field-value">
-            {% if pozicija.kaina_eur %}
-              {{ pozicija.kaina_eur }}&nbsp;€
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-      </div>
 
       {% if kainos_akt %}
         <div class="poz-price-table-wrapper">

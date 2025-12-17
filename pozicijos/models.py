@@ -170,7 +170,7 @@ class PozicijosKaina(models.Model):
         ("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2"),
     ]
     BUSENA_CHOICES = [
-        ("aktuali", "Aktuali"), ("sena", "Sena"), ("pasiulymas", "Pasiūlymas"),
+        ("aktuali", "Aktuali"), ("neaktuali", "Neaktuali"),
     ]
 
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos", verbose_name="Pozicija")

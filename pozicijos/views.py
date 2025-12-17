@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -9,8 +10,9 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .services.import_csv import import_pozicijos_from_csv
-from .models import Pozicija, PozicijosBrezinys
+from .models import Pozicija, PozicijosBrezinys, KainosEilute
 from .forms import PozicijaForm, PozicijosBrezinysForm
+from .forms_kainos import KainaFormSet
 from .schemas.columns import COLUMNS
 from .services.previews import generate_preview_for_instance
 from .services.listing import (
@@ -20,7 +22,6 @@ from .services.listing import (
 )
 
 
-# Laukai, kuriems formoje rodysim pasiūlymus iš DB (datalist)
 FORM_SUGGEST_FIELDS = [
     "klientas",
     "projektas",
@@ -38,43 +39,22 @@ FORM_SUGGEST_FIELDS = [
 ]
 
 
-# =============================================================================
-#  Pagalbinė funkcija formos pasiūlymams (datalist)
-# =============================================================================
-
 def _get_form_suggestions() -> dict[str, list[str]]:
-    """
-    Iš DB ištraukiam unikalias reikšmes tekstiniams laukams, kad formoje būtų
-    datalist pasiūlymai. Nefiltruojam pagal jokį klientą/projektą – tiesiog
-    visos kada nors naudotos reikšmės.
-    """
     suggestions: dict[str, list[str]] = {}
-
     qs = Pozicija.objects.all()
     for field in FORM_SUGGEST_FIELDS:
-        values = (
-            qs.order_by(field)
-            .values_list(field, flat=True)
-            .distinct()
-        )
-        # pašalinam tuščias reikšmes
+        values = qs.order_by(field).values_list(field, flat=True).distinct()
         suggestions[field] = [v for v in values if v]
-
     return suggestions
 
-
-# =============================================================================
-#  Pozicijų sąrašas + AJAX tbody + statistika (donut)
-# =============================================================================
 
 def pozicijos_list(request):
     visible_cols = visible_cols_from_request(request)
     q = request.GET.get("q", "").strip()
     page_size = int(request.GET.get("page_size", 25))
 
-    # perskaitom sort + dir, kad perduotume į šabloną
-    current_sort = request.GET.get("sort", "")   # pvz. "klientas"
-    current_dir = request.GET.get("dir", "asc")  # "asc" arba "desc"
+    current_sort = request.GET.get("sort", "")
+    current_dir = request.GET.get("dir", "asc")
 
     qs = Pozicija.objects.all()
     qs = apply_filters(qs, request)
@@ -86,7 +66,7 @@ def pozicijos_list(request):
         "items": qs,
         "q": q,
         "page_size": page_size,
-        "f": request.GET,  # šablonas naudoja dict_get
+        "f": request.GET,
         "current_sort": current_sort,
         "current_dir": current_dir,
     }
@@ -121,11 +101,7 @@ def pozicijos_stats(request):
     qs = Pozicija.objects.all()
     qs = apply_filters(qs, request)
 
-    data = (
-        qs.values("klientas")
-        .annotate(cnt=Count("id"))
-        .order_by("-cnt")
-    )
+    data = qs.values("klientas").annotate(cnt=Count("id")).order_by("-cnt")
 
     labels: list[str] = []
     values: list[int] = []
@@ -136,77 +112,121 @@ def pozicijos_stats(request):
         values.append(row["cnt"])
         total += row["cnt"]
 
-    return JsonResponse(
-        {
-            "labels": labels,
-            "values": values,
-            "total": total,
-        }
-    )
+    return JsonResponse({"labels": labels, "values": values, "total": total})
 
-
-# =============================================================================
-#  Pozicijos kortelė + create/edit formos
-# =============================================================================
 
 def pozicija_detail(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
-
-    # VISI brėžiniai (įskaitant .stp / .step) šiai pozicijai
     breziniai = PozicijosBrezinys.objects.filter(pozicija=poz).order_by("id")
-
-    # AKTUALIOS kainos (rodom kortelėje)
     kainos_akt = poz.aktualios_kainos()
 
     context = {
         "pozicija": poz,
-        "columns_schema": COLUMNS,   # jei ateity norėsim eiti per schemą
-        "breziniai": breziniai,      # <- svarbu: čia keliauja į detail.html
-        "kainos_akt": kainos_akt,    # lentelė „Kainos (aktualios)“
+        "columns_schema": COLUMNS,
+        "breziniai": breziniai,
+        "kainos_akt": kainos_akt,
     }
     return render(request, "pozicijos/detail.html", context)
 
 
+def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
+    """
+    Sąrašo stulpeliui: atnaujinam pozicija.kaina_eur iš aktualios kainos eilutės.
+    (Kadangi pas tave kaina susideda iš eilučių, čia laikom "headline" = pirmą aktualią.)
+    """
+    akt = poz.aktualios_kainos().first()
+    poz.kaina_eur = akt.kaina if akt else None
+    poz.save(update_fields=["kaina_eur", "updated"])
 
 
 def pozicija_create(request):
+    pozicija = None
+
     if request.method == "POST":
         form = PozicijaForm(request.POST, request.FILES)
-        if form.is_valid():
-            obj = form.save()
-            return redirect("pozicijos:detail", pk=obj.pk)
+
+        # NOTE: formset prefix svarbus, kad niekas nesusipainiotų su kitom formom
+        formset = KainaFormSet(request.POST, prefix="kainos", queryset=KainosEilute.objects.none())
+
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                pozicija = form.save()  # sukuria poziciją (atsiranda pk)
+
+                # dabar perrišam formset ant instance
+                formset.instance = pozicija
+                instances = formset.save(commit=False)
+                for inst in instances:
+                    inst.pozicija = pozicija
+                    inst.save()
+                for f in formset.deleted_forms:
+                    if f.instance.pk:
+                        f.instance.delete()
+
+                _sync_kaina_eur_from_lines(pozicija)
+
+            messages.success(request, "Pozicija sukurta.")
+            return redirect("pozicijos:detail", pk=pozicija.pk)
+        else:
+            messages.error(request, "Patikrinkite formos klaidas.")
     else:
         form = PozicijaForm()
+        formset = KainaFormSet(prefix="kainos", queryset=KainosEilute.objects.none())
 
     context = {
         "form": form,
-        "pozicija": None,
+        "pozicija": pozicija,
         "suggestions": _get_form_suggestions(),
+        "kainos_formset": formset,
     }
     return render(request, "pozicijos/form.html", context)
 
 
 def pozicija_edit(request, pk):
-    poz = get_object_or_404(Pozicija, pk=pk)
+    pozicija = get_object_or_404(Pozicija, pk=pk)
+
+    qs = KainosEilute.objects.filter(pozicija=pozicija).order_by(
+        "matas",
+        "yra_fiksuota",
+        "kiekis_nuo",
+        "fiksuotas_kiekis",
+        "prioritetas",
+        "-created",
+    )
+
     if request.method == "POST":
-        form = PozicijaForm(request.POST, request.FILES, instance=poz)
-        if form.is_valid():
-            form.save()
-            return redirect("pozicijos:detail", pk=poz.pk)
+        form = PozicijaForm(request.POST, request.FILES, instance=pozicija)
+        formset = KainaFormSet(request.POST, prefix="kainos", instance=pozicija, queryset=qs)
+
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                form.save()
+
+                instances = formset.save(commit=False)
+                for inst in instances:
+                    inst.pozicija = pozicija
+                    inst.save()
+                for f in formset.deleted_forms:
+                    if f.instance.pk:
+                        f.instance.delete()
+
+                _sync_kaina_eur_from_lines(pozicija)
+
+            messages.success(request, "Pozicija atnaujinta.")
+            return redirect("pozicijos:detail", pk=pozicija.pk)
+        else:
+            messages.error(request, "Patikrinkite formos klaidas.")
     else:
-        form = PozicijaForm(instance=poz)
+        form = PozicijaForm(instance=pozicija)
+        formset = KainaFormSet(prefix="kainos", instance=pozicija, queryset=qs)
 
     context = {
         "form": form,
-        "pozicija": poz,
+        "pozicija": pozicija,
         "suggestions": _get_form_suggestions(),
+        "kainos_formset": formset,
     }
     return render(request, "pozicijos/form.html", context)
 
-
-# =============================================================================
-#  Brėžiniai: upload + delete + 3D
-# =============================================================================
 
 @require_POST
 def brezinys_upload(request, pk):
@@ -214,18 +234,10 @@ def brezinys_upload(request, pk):
     if request.method == "POST" and request.FILES.get("failas"):
         f = request.FILES["failas"]
         title = request.POST.get("pavadinimas", "").strip()
-        br = PozicijosBrezinys.objects.create(
-            pozicija=poz,
-            failas=f,
-            pavadinimas=title,
-        )
-        # Po įkėlimo – bandome sugeneruoti preview
+        br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
         res = generate_preview_for_instance(br)
         if not res.ok:
-            messages.info(
-                request,
-                f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}",
-            )
+            messages.info(request, f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}")
         else:
             messages.success(request, "Įkelta ir sugeneruota peržiūra.")
     return redirect("pozicijos:detail", pk=poz.pk)
@@ -240,31 +252,12 @@ def brezinys_delete(request, pk, bid):
 
 @xframe_options_sameorigin
 def brezinys_3d(request, pk, bid):
-    """
-    Pilnas 3D peržiūros puslapis su Online3DViewer website versija.
-    Naudoja .stp failą tiesiai iš media (brezinys.failas.url).
-    """
     poz = get_object_or_404(Pozicija, pk=pk)
     br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
-    return render(
-        request,
-        "pozicijos/brezinys_3d.html",
-        {
-            "pozicija": poz,
-            "brezinys": br,
-        },
-    )
+    return render(request, "pozicijos/brezinys_3d.html", {"pozicija": poz, "brezinys": br})
 
-
-# =============================================================================
-#  CSV importas (slaptas)
-# =============================================================================
 
 def pozicijos_import_csv(request):
-    """
-    Slaptas CSV importo puslapis.
-    Jokių nuorodų UI – pasiekiamas tik per URL /pozicijos/_import_csv/.
-    """
     result = None
     dry_run = False
 
@@ -276,11 +269,4 @@ def pozicijos_import_csv(request):
         else:
             result = import_pozicijos_from_csv(uploaded, dry_run=dry_run)
 
-    return render(
-        request,
-        "pozicijos/import_csv.html",
-        {
-            "result": result,
-            "dry_run": dry_run,
-        },
-    )
+    return render(request, "pozicijos/import_csv.html", {"result": result, "dry_run": dry_run})
