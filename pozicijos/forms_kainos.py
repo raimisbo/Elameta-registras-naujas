@@ -44,8 +44,8 @@ class KainosEiluteForm(forms.ModelForm):
             # busena DB lauko tiesiogiai nerodom – naudojam busena_ui
         ]
         widgets = {
-            "galioja_nuo": forms.DateInput(attrs={"type": "date"}),
-            "galioja_iki": forms.DateInput(attrs={"type": "date"}),
+            "galioja_nuo": forms.DateInput(format="%Y-%m-%d", attrs={"placeholder": "YYYY-MM-DD"}),
+            "galioja_iki": forms.DateInput(format="%Y-%m-%d", attrs={"placeholder": "YYYY-MM-DD"}),
             "pastaba": forms.Textarea(attrs={"rows": 2}),
         }
 

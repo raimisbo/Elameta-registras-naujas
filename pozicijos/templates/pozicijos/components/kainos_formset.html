@@ -12,9 +12,7 @@
 
 <div class="kainos-head">
   <div class="kainos-head__text">Kainų eilutės sudaro galutinę kainą.</div>
-  <button type="button" class="btn btn-secondary" id="kainos-add-row">
-    + Pridėti eilutę
-  </button>
+  <button type="button" class="btn btn-secondary" id="kainos-add-row">+ Pridėti eilutę</button>
 </div>
 
 <div class="kainos-table-wrap">
@@ -38,36 +36,44 @@
       {% for form in formset %}
         {% with st=form.instance.busena %}
         <tr class="kaina-row {% if st == 'aktuali' %}kaina-row--aktuali{% else %}kaina-row--neaktuali{% endif %}">
-          <td class="cell-kaina">{{ form.id }}{{ form.kaina }}</td>
-          <td>{{ form.matas }}</td>
+          <td class="cell-kaina">
+            {{ form.id }}
+            {{ form.kaina }}
+            {% if form.kaina.errors %}<div class="errorlist">{{ form.kaina.errors }}</div>{% endif %}
+          </td>
 
-          <td style="text-align:center;">
+          <td class="cell-matas">
+            {{ form.matas }}
+            {% if form.matas.errors %}<div class="errorlist">{{ form.matas.errors }}</div>{% endif %}
+          </td>
+
+          <td class="cell-fiks" style="text-align:center;">
             {{ form.yra_fiksuota }}
           </td>
 
-          <td>{{ form.kiekis_nuo }}</td>
-          <td>{{ form.kiekis_iki }}</td>
-          <td>{{ form.fiksuotas_kiekis }}</td>
+          <td class="cell-qty">{{ form.kiekis_nuo }}</td>
+          <td class="cell-qty">{{ form.kiekis_iki }}</td>
+          <td class="cell-fxq">{{ form.fiksuotas_kiekis }}</td>
 
-          <td>
+          <td class="cell-gal">
             <div class="date-stack">
               {{ form.galioja_nuo }}
               {{ form.galioja_iki }}
             </div>
           </td>
 
-          <td>
-            <select name="{{ form.busena.html_name }}">
-              <option value="aktuali" {% if st == "aktuali" %}selected{% endif %}>Aktuali</option>
-              <option value="sena" {% if st != "aktuali" %}selected{% endif %}>Neaktuali</option>
-            </select>
+          <td class="cell-bus">
+            {# !!! SVARBIAUSIA: UI laukas yra busena_ui #}
+            {{ form.busena_ui }}
           </td>
 
-          <td>
+          <td class="cell-past">
             {{ form.pastaba }}
           </td>
 
-          <td style="text-align:center;">{{ form.DELETE }}</td>
+          <td class="cell-del" style="text-align:center;">
+            {{ form.DELETE }}
+          </td>
         </tr>
         {% endwith %}
       {% empty %}
@@ -85,23 +91,18 @@
 </p>
 
 <template id="kainos-empty-template">
-  {% with form=formset.empty_form %}
+  {% with f=formset.empty_form %}
   <tr class="kaina-row kaina-row--neaktuali">
-    <td class="cell-kaina">{{ form.id }}{{ form.kaina }}</td>
-    <td>{{ form.matas }}</td>
-    <td style="text-align:center;">{{ form.yra_fiksuota }}</td>
-    <td>{{ form.kiekis_nuo }}</td>
-    <td>{{ form.kiekis_iki }}</td>
-    <td>{{ form.fiksuotas_kiekis }}</td>
-    <td><div class="date-stack">{{ form.galioja_nuo }}{{ form.galioja_iki }}</div></td>
-    <td>
-      <select name="{{ form.busena.html_name }}">
-        <option value="aktuali">Aktuali</option>
-        <option value="sena" selected>Neaktuali</option>
-      </select>
-    </td>
-    <td>{{ form.pastaba }}</td>
-    <td style="text-align:center;">{{ form.DELETE }}</td>
+    <td class="cell-kaina">{{ f.id }}{{ f.kaina }}</td>
+    <td class="cell-matas">{{ f.matas }}</td>
+    <td class="cell-fiks" style="text-align:center;">{{ f.yra_fiksuota }}</td>
+    <td class="cell-qty">{{ f.kiekis_nuo }}</td>
+    <td class="cell-qty">{{ f.kiekis_iki }}</td>
+    <td class="cell-fxq">{{ f.fiksuotas_kiekis }}</td>
+    <td class="cell-gal"><div class="date-stack">{{ f.galioja_nuo }}{{ f.galioja_iki }}</div></td>
+    <td class="cell-bus">{{ f.busena_ui }}</td>
+    <td class="cell-past">{{ f.pastaba }}</td>
+    <td class="cell-del" style="text-align:center;">{{ f.DELETE }}</td>
   </tr>
   {% endwith %}
 </template>
@@ -117,42 +118,66 @@
   }
   .kainos-head__text{ font-size:14px; color:#4b5563; }
 
-  .kainos-table-wrap{ overflow:auto; }
+  .kainos-table-wrap{
+    overflow:auto;
+    maz-width:100%;
+  }
 
   .kainos-table{
     width:100%;
     min-width:980px;
     table-layout:fixed;
   }
-  .kainos-table th, .kainos-table td{
+  .kainos-table th:last-child,
+  .kainos-table td:last-child{
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: inerhit;
+    border-left: 1px solid #e5e7eb;
     vertical-align:top;
     white-space:normal;
     word-break:break-word;
   }
 
-  /* Suspaudžiam “skaičius” stulpelius */
-  .col-kaina{ width:90px; }
+  /* header'iui reikia viršaus */
+  .kainos-table thead th:last-child{
+    z-index: 3;
+  }
+
+  /* kad "Šal." būtų siauras ir tvarkingas */
+  .col-del{ width:45px; }
+
+  /* Skaičius suspaudžiam */
+  .col-kaina{ width:80px; }
   .col-matas{ width:70px; }
   .col-fiks{ width:55px; }
-  .col-qty{ width:70px; }
-  .col-fxq{ width:70px; }
+  .col-qty{ width:60px; }
+  .col-fxq{ width:60px; }
   .col-gal{ width:120px; }
-  .col-bus{ width:110px; }
+  .col-bus{ width:120px; }
   .col-del{ width:55px; }
 
-  /* Pastabos – maksimaliai platus (pasiima likutį) */
-  .col-past{ width:auto; }
+  /* Pastabos – platus stulpelis */
+  .col-past{ width:440px; }
 
   .date-stack{ display:flex; flex-direction:column; gap:4px; }
 
-  /* Pastabų laukui priverčiam normalų plotį ir aukštį */
-  .kainos-table td textarea,
-  .kainos-table td textarea[name$="-pastaba"]{
+  .kainos-table input,
+  .kainos-table select,
+  .kainos-table textarea{
     width:100%;
-    min-height:70px;
-    resize:vertical;
     box-sizing:border-box;
   }
+
+  .kainos-table td textarea{
+    min-height:70px;
+    resize:vertical;
+  }
+
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  input[type=number] { -moz-appearance:textfield; }
 
   .kaina-row--aktuali td{ background:#ecfdf5; }
   .kaina-row--neaktuali td{ background:#f9fafb; color:#6b7280; }
@@ -184,7 +209,6 @@
       if (fixed) { nuo.value = ""; iki.value = ""; }
       else { fx.value = ""; }
     }
-
     chk.addEventListener('change', sync);
     sync();
   }
