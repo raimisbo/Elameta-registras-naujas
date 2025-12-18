@@ -1,5 +1,3 @@
-# pozicijos/schemas/columns.py
-
 """
 Visų pozicijų sąrašo stulpelių schema.
 
@@ -182,13 +180,15 @@ COLUMNS: list[dict] = [
         "default": False,
     },
     {
+        # buvo date -> dabar darbo dienų skaičius
         "key": "atlikimo_terminas",
-        "label": "Atlikimo terminas",
-        "type": "date",
-        "filter": "date",
+        "label": "Atlikimo terminas (d.d.)",
+        "type": "number",
+        "filter": "range",
         "searchable": False,
-        "width": 120,
+        "width": 140,
         "default": False,
+        "align": "right",
     },
 
     # ---------------- Pakavimas ----------------

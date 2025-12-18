@@ -1,4 +1,3 @@
-# pozicijos/models.py
 import os
 import hashlib
 
@@ -18,20 +17,16 @@ PAKAVIMO_TIPAS_CHOICES = [
     ("individualus", "Individualus"),
 ]
 
-MASKAVIMO_TIPAS_CHOICES = [
-    ("iprastas", "Įprastas"),
-    ("specialus", "Specialus"),
-]
-
 
 # ======================= Pagrindas: Pozicija =======================
 
 class Pozicija(models.Model):
-    # pasirinkimai (choices)
+    # KANONINĖS reikšmės (visur): "nera" / "yra"
     MASKAVIMO_TIPAS_CHOICES = [
-        ("iprastas", "Įprastas"),
-        ("specialus", "Specialus"),
+        ("nera", "Nėra"),
+        ("yra", "Yra"),
     ]
+
     PAKAVIMO_TIPAS_CHOICES = [
         ("palaidas", "Palaidas"),
         ("standartinis", "Standartinis"),
@@ -73,17 +68,27 @@ class Pozicija(models.Model):
     miltu_blizgumas = models.CharField("Blizgumas", max_length=50, null=True, blank=True)
     miltu_kaina = models.DecimalField("Miltelių kaina", max_digits=10, decimal_places=2, null=True, blank=True)
 
-    # Maskavimas + kiti
+    # Maskavimas
     maskavimo_tipas = models.CharField(
         "Maskavimas",
-        max_length=20,
+        max_length=10,
         choices=MASKAVIMO_TIPAS_CHOICES,
+        default="nera",
+        blank=False,
+    )
+    maskavimas = models.TextField("Maskavimo aprašymas", max_length=200, blank=True, default="")
+
+    # --- Terminai ---
+    # NAUJAS: darbo dienų skaičius (pagrindinis laukas, naudojamas UI)
+    atlikimo_terminas = models.PositiveIntegerField(
+        "Atlikimo terminas",
         null=True,
         blank=True,
+        help_text="Darbo dienos",
     )
-    maskavimas = models.CharField("Maskavimo aprašymas", max_length=200, null=True, blank=True)
 
-    atlikimo_terminas = models.DateField("Atlikimo terminas", null=True, blank=True)
+    # LEGACY: sena data (išsaugom istorijai / atsekamumui; UI nenaudojam)
+    atlikimo_terminas_data = models.DateField("Atlikimo terminas (sena data)", null=True, blank=True)
 
     testai_kokybe = models.CharField("Testai / kokybė", max_length=255, null=True, blank=True)
 
@@ -126,6 +131,28 @@ class Pozicija(models.Model):
     @property
     def dok_count(self):
         return ""
+
+    # --- Svarbu: normalizuojam senas reikšmes, kad NIEKADA neužlūžtų ---
+    def save(self, *args, **kwargs):
+        val = (self.maskavimo_tipas or "").strip().lower()
+
+        # iš senų / klaidingų reikšmių į kanoninę
+        if val in ("ners", "nera", "", "none", "null", "0", "ne", "no"):
+            self.maskavimo_tipas = "nera"
+        elif val in ("yra", "1", "taip", "yes", "true"):
+            self.maskavimo_tipas = "yra"
+        elif val in ("iprastas", "specialus"):
+            # tavo seni variantai – irgi laikom kaip "yra" (jei nori kitaip – pakeisim)
+            self.maskavimo_tipas = "yra"
+        else:
+            # bet koks kitas šiukšlinis val -> "nera"
+            self.maskavimo_tipas = "nera"
+
+        if self.maskavimo_tipas == "nera":
+            # kai nėra – aprašymas turi būti švarus, kad niekas neblokuotų
+            self.maskavimas = ""
+
+        super().save(*args, **kwargs)
 
     # ===== Helperiai kainoms
 
@@ -215,7 +242,6 @@ class PozicijosBrezinys(models.Model):
     def __str__(self):
         return self.pavadinimas or getattr(self.failas, "name", "")
 
-    # ---- Helperiai UI ir preview keliui ----
     @property
     def filename(self) -> str:
         name = getattr(self.failas, "name", "") or ""
@@ -228,34 +254,24 @@ class PozicijosBrezinys(models.Model):
         return (ext or "").lstrip(".")
 
     def _preview_relpath(self) -> str:
-        """Naujas kelias su hash (stabilus pavadinimas)."""
         name = getattr(self.failas, "name", "") or ""
         base, _ = os.path.splitext(os.path.basename(name))
         digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
         return f"pozicijos/breziniai/previews/{base}-{digest}.png"
 
     def _legacy_preview_relpath(self) -> str:
-        """Senas kelias be hash — suderinamumui su anksčiau sugeneruotais PNG."""
         name = getattr(self.failas, "name", "") or ""
         base, _ = os.path.splitext(os.path.basename(name))
         return f"pozicijos/breziniai/previews/{base}.png"
 
     @property
     def thumb_url(self) -> str | None:
-        """
-        - jei yra ImageField preview → jo URL
-        - jei yra senas PNG disk'e → jo URL
-        - jei STP/STEP → statinė 3D ikona iš static
-        - kitaip None
-        """
-        # 1) ImageField preview
         if self.preview:
             try:
                 return self.preview.url
             except Exception:
                 pass
 
-        # 2) suderinamumas – senieji PNG failai saugykloje
         storage = self.failas.storage
         rel_new = self._preview_relpath()
         rel_old = self._legacy_preview_relpath()
@@ -267,7 +283,6 @@ class PozicijosBrezinys(models.Model):
         except Exception:
             pass
 
-        # 3) fallback – statinė ikona STP/STEP failams
         from django.templatetags.static import static
         ext = (self.ext or "").lower()
         if ext in {"stp", "step"}:
@@ -276,20 +291,12 @@ class PozicijosBrezinys(models.Model):
         return None
 
     def preview_abspath(self) -> str | None:
-        """
-        Absoliutus kelias iki sugeneruoto PNG preview:
-        - pirma bandom ImageField preview.path
-        - tada naują hash pavadinimą
-        - tada legacy pavadinimą
-        """
-        # 1) ImageField
         if self.preview:
             try:
                 return self.preview.path
             except Exception:
                 pass
 
-        # 2) senasis mechanizmas
         storage = self.failas.storage
         rel_new = self._preview_relpath()
         rel_old = self._legacy_preview_relpath()
@@ -305,12 +312,6 @@ class PozicijosBrezinys(models.Model):
         return None
 
     def best_image_path_for_pdf(self) -> str | None:
-        """
-        Parenka geriausią kelią PDF'ui:
-        - jei yra PNG preview – grąžina jį
-        - kitaip, jei originalas yra PNG/JPG/JPEG – grąžina originalo path
-        - kitaip None (PDF/TIFF/CAD nerodom)
-        """
         preview = self.preview_abspath()
         if preview:
             return preview
@@ -328,14 +329,7 @@ class PozicijosBrezinys(models.Model):
             return orig_path
         return None
 
-    # ---- Valymas trynimo metu ----
     def delete(self, using=None, keep_parents=False):
-        """
-        Trinant įrašą:
-         - pašalina originalų failą
-         - pašalina ImageField preview (jei yra)
-         - pašalina naują ir seną preview failą (jei buvo sugeneruoti be ImageField)
-        """
         storage = self.failas.storage
         orig = getattr(self.failas, "name", None)
         rel_new = self._preview_relpath()
@@ -362,13 +356,11 @@ class KainosEilute(models.Model):
     kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=2)
     matas = models.CharField("Matas", max_length=10, choices=MATAS_CHOICES, default="vnt.", db_index=True)
 
-    # kiekio dimensija
     yra_fiksuota = models.BooleanField("Fiksuotas kiekis", default=False, db_index=True)
     fiksuotas_kiekis = models.IntegerField("Fiksuotas kiekis", null=True, blank=True)
     kiekis_nuo = models.IntegerField("Kiekis nuo", null=True, blank=True)
     kiekis_iki = models.IntegerField("Kiekis iki", null=True, blank=True)
 
-    # laikas
     galioja_nuo = models.DateField("Galioja nuo", null=True, blank=True, db_index=True)
     galioja_iki = models.DateField("Galioja iki", null=True, blank=True, db_index=True)
 

@@ -1,4 +1,3 @@
-# pozicijos/services/listing.py
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
@@ -20,21 +19,24 @@ SORTABLE_FIELDS: Dict[str, str] = {
 
 def build_numeric_range_q(field_name: str, expr: str) -> Q:
     """
-    Vieno lauko (plotas/svoris) filtro interpretacija, kai ateina per f[field]:
+    Decimal tipo (plotas/svoris) filtro interpretacija.
 
-      "10..20"  -> >=10 ir <=20
-      ">5"      -> >=5
-      "<12.5"   -> <=12.5
-      "15"      -> ==15
+    Palaikoma:
+      "10..20"   -> >=10 ir <=20
+      ">5"       -> >=5
+      ">=5"      -> >=5
+      "<12.5"    -> <=12.5
+      "<=12.5"   -> <=12.5
+      "15"       -> ==15
+      "=15"      -> ==15
 
     Kablelį leidžiam kaip dešimtainį skirtuką: "12,5" -> 12.5.
-    Jei išraiška nekorektiška – grąžinam tuščią Q() (t.y. nefiltuojam).
+    Jei išraiška nekorektiška – grąžinam tuščią Q().
     """
     raw = (expr or "").strip()
     if not raw:
         return Q()
 
-    # leisti kablelį kaip dešimtainį skirtuką
     raw = raw.replace(",", ".")
 
     min_val = None
@@ -45,11 +47,23 @@ def build_numeric_range_q(field_name: str, expr: str) -> Q:
             left, right = raw.split("..", 1)
             left = left.strip()
             right = right.strip()
-
             if left:
                 min_val = Decimal(left)
             if right:
                 max_val = Decimal(right)
+
+        elif raw.startswith(">="):
+            value = Decimal(raw[2:].strip())
+            min_val = value
+
+        elif raw.startswith("<="):
+            value = Decimal(raw[2:].strip())
+            max_val = value
+
+        elif raw.startswith("="):
+            value = Decimal(raw[1:].strip())
+            min_val = value
+            max_val = value
 
         elif raw[0] in (">", "<"):
             op = raw[0]
@@ -63,13 +77,73 @@ def build_numeric_range_q(field_name: str, expr: str) -> Q:
                 max_val = value
 
         else:
-            # paprastas skaičius – reiškia lygų
             value = Decimal(raw)
             min_val = value
             max_val = value
 
     except (InvalidOperation, ValueError):
-        # blogai įvestas skaičius – nedarom filtro, bet ir nekertam klaidos
+        return Q()
+
+    q = Q()
+    if min_val is not None:
+        q &= Q(**{f"{field_name}__gte": min_val})
+    if max_val is not None:
+        q &= Q(**{f"{field_name}__lte": max_val})
+    return q
+
+
+def build_int_range_q(field_name: str, expr: str) -> Q:
+    """
+    Integer tipo (pvz. atlikimo_terminas darbo dienomis) filtro interpretacija.
+
+    Palaikoma:
+      "10..20", ">5", ">=5", "<12", "<=12", "15", "=15"
+    """
+    raw = (expr or "").strip()
+    if not raw:
+        return Q()
+
+    min_val = None
+    max_val = None
+
+    try:
+        if ".." in raw:
+            left, right = raw.split("..", 1)
+            left = left.strip()
+            right = right.strip()
+            if left:
+                min_val = int(left)
+            if right:
+                max_val = int(right)
+
+        elif raw.startswith(">="):
+            min_val = int(raw[2:].strip())
+
+        elif raw.startswith("<="):
+            max_val = int(raw[2:].strip())
+
+        elif raw.startswith("="):
+            v = int(raw[1:].strip())
+            min_val = v
+            max_val = v
+
+        elif raw[0] in (">", "<"):
+            op = raw[0]
+            val_str = raw[1:].strip()
+            if not val_str:
+                return Q()
+            v = int(val_str)
+            if op == ">":
+                min_val = v
+            else:
+                max_val = v
+
+        else:
+            v = int(raw)
+            min_val = v
+            max_val = v
+
+    except ValueError:
         return Q()
 
     q = Q()
@@ -88,8 +162,6 @@ def visible_cols_from_request(request) -> List[str]:
     """
     Atkuria, kurie stulpeliai turi būti rodomi, pagal ?cols=...
     Jei nieko nėra – imami visi COLUMNS, kuriuose default=True.
-
-    Elgesys toks pats, kaip senajame _visible_cols_from_request.
     """
     cols_param = request.GET.get("cols")
     if cols_param:
@@ -109,12 +181,7 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
       ?q=...  -> klientas/projektas/poz_kodas/poz_pavad (icontains)
 
     Per-stulpeliniai:
-      ?f[klientas]=...   -> icontains
-      ?f[plotas]=10..20  -> numeric range per build_numeric_range_q
-      ir t.t.
-
-    Logika paimta iš seno pozicijos/views.py (_apply_filters),
-    kad niekas „nepasikeistų po refaktoringo“.
+      ?f[field]=...
     """
     q_global = request.GET.get("q", "").strip()
     if q_global:
@@ -134,7 +201,7 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
         if not value:
             continue
 
-        # tekstiniai filtrai – icontains (kaip seniau)
+        # tekstiniai filtrai – icontains
         if field in [
             "klientas", "projektas", "poz_kodas", "poz_pavad",
             "metalas", "padengimas", "spalva",
@@ -142,11 +209,15 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
         ]:
             qs = qs.filter(**{f"{field}__icontains": value})
 
-        # skaitmeniniai filtrai su min..max, >, <, == sintakse
+        # Decimal range
         elif field in ["plotas", "svoris"]:
             qs = qs.filter(build_numeric_range_q(field, value))
 
-        # visi kiti – tikslus atitikimas (lygiai taip, kaip buvo)
+        # Integer range (darbo dienos)
+        elif field in ["atlikimo_terminas"]:
+            qs = qs.filter(build_int_range_q(field, value))
+
+        # visi kiti – tikslus atitikimas
         else:
             qs = qs.filter(**{field: value})
 
@@ -160,27 +231,18 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
 def apply_sorting(qs: QuerySet, request) -> QuerySet:
     """
     Rikiavimas pagal ?sort=key&dir=asc/desc
-
-      - sort: vienas iš COLUMNS key (pvz. 'klientas', 'poz_kodas', 'kaina_eur', ...)
-      - virtualūs key (pvz. 'brez_count', 'dok_count') ignoruojami.
-      - jei sort nėra arba neatpažįstamas -> pagal naujausią (created desc, id desc)
-
-    Tai yra tiesiog perkelta senojo _apply_sorting logika.
     """
     sort = request.GET.get("sort")
     direction = request.GET.get("dir", "asc")
 
-    # Jei niekas nenurodyta – laikomės seno default'o
     if not sort:
         return qs.order_by("-created", "-id")
 
     field = SORTABLE_FIELDS.get(sort)
     if not field:
-        # jei prašo rikiuoti pagal virtualų ar neegzistuojantį – grįžtam prie default
         return qs.order_by("-created", "-id")
 
     if direction == "desc":
         field = "-" + field
 
-    # Antrinis rikiavimas pagal id, kad būtų stabilu
     return qs.order_by(field, "-id")

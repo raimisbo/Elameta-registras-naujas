@@ -10,6 +10,12 @@
           {{ it.get_maskavimo_tipas_display|default:"—" }}
         {% elif c.key == "pakavimo_tipas" %}
           {{ it.get_pakavimo_tipas_display|default:"—" }}
+        {% elif c.key == "atlikimo_terminas" %}
+          {% if it.atlikimo_terminas is not None %}
+            {{ it.atlikimo_terminas }} d.d.
+          {% else %}
+            —
+          {% endif %}
         {% else %}
           {{ it|attr:c.key }}
         {% endif %}
