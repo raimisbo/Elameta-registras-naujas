@@ -26,7 +26,7 @@ INSTALLED_APPS = [
     'django_extensions',
 
     # local
-    'detaliu_registras',
+    # 'detaliu_registras',  # ARCHYVAS: laikom repozitorijoje, bet runtime nenaudojam
     'pozicijos.apps.PozicijosConfig',
 ]
 

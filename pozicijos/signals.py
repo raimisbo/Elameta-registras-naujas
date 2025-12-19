@@ -7,7 +7,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from .models import PozicijosBrezinys
-from .thumbnails import generate_brezinys_thumbnail
+from .services.previews import regenerate_missing_preview
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +16,19 @@ logger = logging.getLogger(__name__)
 def auto_preview_on_create(sender, instance: PozicijosBrezinys, created: bool, **kwargs):
     """
     Kiekvieno naujo brėžinio įkėlimo metu bandome sugeneruoti PNG miniatiūrą.
-    JPG/PNG/TIFF → sumažintas vaizdas, PDF → 1 puslapio PNG (jei yra pdf2image),
-    STEP/STP → placeholder "3D". Jei nepavyksta – request'o negadinam, tik log.
+    JPG/PNG/TIFF → sumažintas vaizdas, PDF → 1 puslapio PNG (per PyMuPDF),
+    STEP/STP → miniatiūros nenaudojam (šablone rodoma statinė "3D" ikona).
+    Jei nepavyksta – request'o negadinam, tik log.
     """
     if not created or not instance.failas:
         return
 
     try:
-        created_thumb = generate_brezinys_thumbnail(instance)
-        if created_thumb:
-            logger.debug("Preview generated for brezinys id=%s", instance.pk)
+        res = regenerate_missing_preview(instance)
+        if res.ok:
+            logger.debug("Preview ok for brezinys id=%s (%s)", instance.pk, res.message or "ok")
         else:
-            logger.info("Preview not generated for brezinys id=%s (maybe no handler).", instance.pk)
+            logger.info("Preview not generated for brezinys id=%s: %s", instance.pk, res.message)
     except Exception as e:
         # niekada nemetam iš signalo – tik log'as
         logger.exception("Preview generation failed for brezinys id=%s: %s", instance.pk, e)

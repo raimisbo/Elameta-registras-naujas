@@ -7,7 +7,7 @@ from typing import Optional
 
 from django.core.files.base import ContentFile
 
-from PIL import Image, ImageOps
+from PIL import Image
 try:
     import fitz  # PyMuPDF
 except Exception:
@@ -42,11 +42,11 @@ def _pil_to_png_bytes(img: Image.Image) -> bytes:
 def _save_preview(b: PozicijosBrezinys, png_bytes: bytes) -> PreviewResult:
     rel = b._preview_relpath()  # pvz. pozicijos/breziniai/previews/<vardas>.png
     storage = b.failas.storage
-    # užtikrinam katalogą
-    folder = os.path.dirname(rel)
+    # užtikrinam katalogą (jei FileSystemStorage)
     if hasattr(storage, "path"):
-        abs_folder = os.path.join(os.path.dirname(storage.path(rel)), "")
         try:
+            abs_path = storage.path(rel)
+            abs_folder = os.path.dirname(abs_path)
             os.makedirs(abs_folder, exist_ok=True)
         except Exception:
             pass
@@ -55,8 +55,19 @@ def _save_preview(b: PozicijosBrezinys, png_bytes: bytes) -> PreviewResult:
     # jei buvo – perrašom
     if storage.exists(rel):
         storage.delete(rel)
-    storage.save(rel, content)
-    return PreviewResult(ok=True, saved_path=rel)
+    saved_name = storage.save(rel, content)
+
+    # sinchronizuojam su ImageField (kad būtų aiškus "source of truth")
+    try:
+        if getattr(b, "preview", None) is not None:
+            b.preview.name = saved_name
+            # išsaugom tik preview – kad neperrašytumėm kitų laukų
+            b.save(update_fields=["preview"])
+    except Exception:
+        # preview failas vis tiek yra storage'e – neblokuojam
+        pass
+
+    return PreviewResult(ok=True, saved_path=saved_name)
 
 
 def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
@@ -129,6 +140,11 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
 
 def regenerate_missing_preview(b: PozicijosBrezinys) -> PreviewResult:
     """Sugeneruoja, jei nėra. Jei yra – grįžta ok=True be veiksmų."""
+    try:
+        if getattr(b, "preview", None) and getattr(b.preview, "name", ""):
+            return PreviewResult(ok=True, message="Jau yra", saved_path=b.preview.name)
+    except Exception:
+        pass
     storage = b.failas.storage
     rel = b._preview_relpath()
     if rel and storage.exists(rel):

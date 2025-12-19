@@ -55,6 +55,14 @@ LANG_LABELS = {
 
         "type_fixed": "Fiksuota",
         "type_interval": "Intervalinė",
+
+        # HTML peržiūrai
+        "preview_hint": "HTML peržiūra – galutinis PDF gali šiek tiek skirtis.",
+        "summary_detail": "Detalė",
+        "summary_customer": "Klientas",
+        "summary_project": "Projektas",
+        "section_prices_short": "Kainos",
+        "no_preview": "Nėra peržiūros",
     },
     "en": {
         "offer_title": "OFFER",
@@ -80,6 +88,14 @@ LANG_LABELS = {
 
         "type_fixed": "Fixed",
         "type_interval": "Interval",
+
+        # for HTML preview
+        "preview_hint": "HTML preview – final PDF may differ slightly.",
+        "summary_detail": "Part",
+        "summary_customer": "Customer",
+        "summary_project": "Project",
+        "section_prices_short": "Prices",
+        "no_preview": "No preview",
     },
 }
 
@@ -490,17 +506,190 @@ def proposal_pdf(request, pk: int):
         c.drawString(margin_left, y, labels["no_data"])
         y -= 12
 
-    # ... (likusi PDF generavimo dalis pas tave lieka nepakitusi) ...
+    def draw_section_title(title: str) -> None:
+        nonlocal y
+        if y < bottom_margin + 20 * mm:
+            y = new_page_y()
 
+        c.setFont(font_bold, 12)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(margin_left, y, title)
+        y -= 5
+        c.setStrokeColor(colors.HexColor("#e5e7eb"))
+        c.setLineWidth(0.6)
+        c.line(margin_left, y, width - margin_right, y)
+        y -= 8
+
+    # ===== Kainos =====
+    if show_prices:
+        draw_section_title(labels["section_prices"])
+
+        if kainos:
+            table_width = width - margin_left - margin_right
+
+            header = [
+                labels["col_price"],
+                labels["col_unit"],
+                labels["col_type"],
+                labels["col_qty_from"],
+                labels["col_qty_to"],
+                labels["col_fixed_qty"],
+                labels["col_valid_from"],
+                labels["col_valid_to"],
+            ]
+            rows = [header]
+            for k in kainos:
+                row = [
+                    str(k.kaina),
+                    str(k.matas or ""),
+                    labels["type_fixed"] if k.yra_fiksuota else labels["type_interval"],
+                    "—" if k.kiekis_nuo is None else str(k.kiekis_nuo),
+                    "—" if k.kiekis_iki is None else str(k.kiekis_iki),
+                    "—" if k.fiksuotas_kiekis is None else str(k.fiksuotas_kiekis),
+                    "—" if not k.galioja_nuo else k.galioja_nuo.strftime("%Y-%m-%d"),
+                    "—" if not k.galioja_iki else k.galioja_iki.strftime("%Y-%m-%d"),
+                ]
+                rows.append(row)
+
+            # stulpelių plotis: pritaikom paprastai, kad tilptų
+            col_widths = [
+                22 * mm,
+                14 * mm,
+                20 * mm,
+                16 * mm,
+                16 * mm,
+                18 * mm,
+                22 * mm,
+                22 * mm,
+            ]
+
+            tbl = Table(rows, colWidths=col_widths)
+            tbl.setStyle(
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, 0), font_bold),
+                        ("FONTNAME", (0, 1), (-1, -1), font_regular),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f9fafb")),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e5e7eb")),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                        ("TOPPADDING", (0, 0), (-1, -1), 2),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ]
+                )
+            )
+
+            tw, th = tbl.wrap(table_width, 0)
+            if y - th < bottom_margin:
+                y = new_page_y()
+            tbl.drawOn(c, margin_left, y - th)
+            y = y - th - 14
+        else:
+            c.setFont(font_regular, 9)
+            c.setFillColor(colors.HexColor("#6b7280"))
+            c.drawString(margin_left, y, labels["no_prices"])
+            y -= 12
+
+    # ===== Brėžinių miniatiūros (iki 3) =====
+    if show_drawings:
+        draw_section_title(labels["section_drawings"])
+
+        drawings = brez[:3]
+        if not drawings:
+            c.setFont(font_regular, 9)
+            c.setFillColor(colors.HexColor("#6b7280"))
+            c.drawString(margin_left, y, labels["no_drawings"])
+            y -= 12
+        else:
+            available = width - margin_left - margin_right
+            gap = 6 * mm
+            thumb_w = (available - gap * 2) / 3
+            thumb_h = thumb_w * 0.75  # ~4:3
+            label_h = 5 * mm
+
+            needed_h = thumb_h + label_h + 6
+            if y - needed_h < bottom_margin:
+                y = new_page_y()
+
+            top_y = y
+            for i, b in enumerate(drawings):
+                x = margin_left + i * (thumb_w + gap)
+                # rėmelis
+                c.setStrokeColor(colors.HexColor("#e5e7eb"))
+                c.setLineWidth(0.6)
+                c.rect(x, top_y - thumb_h, thumb_w, thumb_h, stroke=1, fill=0)
+
+                img_path = None
+                try:
+                    img_path = b.best_image_path_for_pdf()
+                except Exception:
+                    img_path = None
+
+                if img_path and os.path.exists(img_path):
+                    try:
+                        c.drawImage(
+                            ImageReader(img_path),
+                            x + 1,
+                            top_y - thumb_h + 1,
+                            width=thumb_w - 2,
+                            height=thumb_h - 2,
+                            preserveAspectRatio=True,
+                            anchor='c',
+                            mask='auto',
+                        )
+                    except Exception:
+                        # fallback tekstas
+                        c.setFont(font_bold, 10)
+                        c.setFillColor(colors.HexColor("#6b7280"))
+                        c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, "N/A")
+                else:
+                    # placeholder (STP/STEP arba nėra preview)
+                    label = "3D" if (getattr(b, "ext", "") or "").lower() in {"stp", "step"} else "N/A"
+                    c.setFont(font_bold, 12)
+                    c.setFillColor(colors.HexColor("#6b7280"))
+                    c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, label)
+
+                # pavadinimas / failas
+                c.setFont(font_regular, 7.5)
+                c.setFillColor(colors.HexColor("#111827"))
+                name = (getattr(b, "pavadinimas", "") or "").strip() or getattr(b, "filename", "")
+                if len(name) > 36:
+                    name = name[:33] + "..."
+                c.drawCentredString(x + thumb_w / 2, top_y - thumb_h - 4, name)
+
+            y = top_y - needed_h - 6
+
+    # ===== Pastabos / sąlygos =====
+    combined_notes = []
+    if poz_pastabos:
+        combined_notes.append(poz_pastabos)
+    if notes:
+        combined_notes.append(notes)
+    if combined_notes:
+        draw_section_title(labels["section_notes"])
+        c.setFillColor(colors.HexColor("#111827"))
+        y = _draw_wrapped_text(
+            c=c,
+            text="\n\n".join(combined_notes),
+            x=margin_left,
+            y=y,
+            max_width=width - margin_left - margin_right,
+            font_name=font_regular,
+            font_size=9,
+            page_width=width,
+            page_height=height,
+            bottom_margin=bottom_margin,
+        )
+        y -= 6
+
+    # ===== Footer =====
     c.setFont(font_regular, 8)
     c.setFillColor(colors.HexColor("#6b7280"))
-    c.drawRightString(
-        width - margin_right,
-        15 * mm,
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
-    )
+    c.drawRightString(width - margin_right, 15 * mm, datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-    c.showPage()
     c.save()
 
     pdf = buffer.getvalue()

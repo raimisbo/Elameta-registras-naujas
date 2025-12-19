@@ -14,7 +14,7 @@ from .models import Pozicija, PozicijosBrezinys, KainosEilute
 from .forms import PozicijaForm, PozicijosBrezinysForm
 from .forms_kainos import KainaFormSet
 from .schemas.columns import COLUMNS
-from .services.previews import generate_preview_for_instance
+from .services.previews import regenerate_missing_preview
 from .services.listing import (
     visible_cols_from_request,
     apply_filters,
@@ -235,11 +235,11 @@ def brezinys_upload(request, pk):
         f = request.FILES["failas"]
         title = request.POST.get("pavadinimas", "").strip()
         br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
-        res = generate_preview_for_instance(br)
-        if not res.ok:
-            messages.info(request, f"Įkelta. Peržiūros sugeneruoti nepavyko: {res.message}")
+        res = regenerate_missing_preview(br)
+        if res.ok:
+            messages.success(request, "Įkelta. Miniatiūra paruošta.")
         else:
-            messages.success(request, "Įkelta ir sugeneruota peržiūra.")
+            messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {res.message}")
     return redirect("pozicijos:detail", pk=poz.pk)
 
 

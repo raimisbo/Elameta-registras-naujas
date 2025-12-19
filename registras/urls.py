@@ -17,17 +17,7 @@ urlpatterns = [
         name="home_redirect",
     ),
 
-    # Pagrindinis app su namespace 'detaliu_registras'
-    path(
-        "detaliu_registras/",
-        include(("detaliu_registras.urls", "detaliu_registras"), namespace="detaliu_registras"),
-    ),
-
-    # Istorijos maršrutai (jei naudoji istorijos partialus šablonuose)
-    path(
-        "detaliu_registras/",
-        include(("detaliu_registras.urls_history", "detaliu_registras_history"), namespace="detaliu_registras_history"),
-    ),
+    # detaliu_registras yra archyvas – laikom projekte, bet runtime nenaudojam.
     path("pozicijos/", include(("pozicijos.urls", "pozicijos"), namespace="pozicijos")),
 ]
 
