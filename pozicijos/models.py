@@ -1,32 +1,16 @@
+from __future__ import annotations
+
 import os
-import hashlib
 
 from django.db import models
-from django.db.models import Q, Index, UniqueConstraint
-from django.core.exceptions import ValidationError
-from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 
-# ======================= Choices =======================
-
-PAKAVIMO_TIPAS_CHOICES = [
-    ("palaidas", "Palaidas"),
-    ("standartinis", "Standartinis"),
-    ("geras", "Geras"),
-    ("individualus", "Individualus"),
-]
-
-
-# ======================= Pagrindas: Pozicija =======================
-
 class Pozicija(models.Model):
-    # KANONINĖS reikšmės (visur): "nera" / "yra"
     MASKAVIMO_TIPAS_CHOICES = [
         ("nera", "Nėra"),
         ("yra", "Yra"),
     ]
-
     PAKAVIMO_TIPAS_CHOICES = [
         ("palaidas", "Palaidas"),
         ("standartinis", "Standartinis"),
@@ -34,39 +18,47 @@ class Pozicija(models.Model):
         ("individualus", "Individualus"),
     ]
 
-    # pagrindiniai
-    klientas = models.CharField("Klientas", max_length=255, null=True, blank=True)
-    projektas = models.CharField("Projektas", max_length=255, null=True, blank=True)
-    poz_kodas = models.CharField("Kodas", max_length=100)
-    poz_pavad = models.CharField("Pavadinimas", max_length=255)
+    PAPILDOMOS_PASLAUGOS_CHOICES = [
+        ("ne", "Ne"),
+        ("taip", "Taip"),
+    ]
 
-    # specifikacija
-    metalas = models.CharField("Metalas", max_length=120, null=True, blank=True)
-    plotas = models.DecimalField("Plotas", max_digits=10, decimal_places=2, null=True, blank=True)
-    svoris = models.DecimalField("Svoris", max_digits=10, decimal_places=3, null=True, blank=True)
+    # Pagrindiniai
+    klientas = models.CharField("Klientas", max_length=255, blank=True, default="")
+    projektas = models.CharField("Projektas", max_length=255, blank=True, default="")
 
-    # kabinimas
-    kabinimo_budas = models.CharField("Kabinimo būdas", max_length=120, null=True, blank=True)
-    kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, null=True, blank=True)
-    detaliu_kiekis_reme = models.IntegerField("Detalių kiekis rėme", null=True, blank=True)
-    faktinis_kiekis_reme = models.IntegerField("Faktinis kiekis rėme", null=True, blank=True)
+    poz_kodas = models.CharField("Pozicijos kodas", max_length=100, blank=True, default="")
+    poz_pavad = models.CharField("Pozicijos pavadinimas", max_length=255, blank=True, default="")
 
-    # paviršius / dažymas – bendra dalis
-    paruosimas = models.CharField("Paruošimas", max_length=200, null=True, blank=True)
-    padengimas = models.CharField("Padengimas", max_length=200, null=True, blank=True)
-    padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, null=True, blank=True)
-    spalva = models.CharField("Spalva", max_length=120, null=True, blank=True)
+    # Medžiaga
+    metalas = models.CharField("Metalas", max_length=120, blank=True, default="")
+    plotas = models.CharField("Plotas", max_length=120, blank=True, default="")
+    svoris = models.CharField("Svoris", max_length=120, blank=True, default="")
+
+    # Kabinimas
+    kabinimo_budas = models.CharField("Kabinimo būdas", max_length=120, blank=True, default="")
+    kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, blank=True, default="")
+    detaliu_kiekis_reme = models.CharField("Detalių kiekis rėme", max_length=120, blank=True, default="")
+    faktinis_kiekis_reme = models.CharField("Faktinis kiekis rėme", max_length=120, blank=True, default="")
+
+    # Paruošimas / padengimas
+    paruosimas = models.CharField("Paruošimas", max_length=200, blank=True, default="")
+    padengimas = models.CharField("Padengimas", max_length=200, blank=True, default="")
+    padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, blank=True, default="")
+    spalva = models.CharField("Spalva", max_length=120, blank=True, default="")
 
     # Paslaugos logika: KTL / Miltai / Paruošimas
     paslauga_ktl = models.BooleanField("KTL", default=False)
     paslauga_miltai = models.BooleanField("Miltai", default=False)
     paslauga_paruosimas = models.BooleanField("Paruošimas", default=False)
 
-    miltu_kodas = models.CharField("Miltelių kodas", max_length=100, null=True, blank=True)
-    miltu_spalva = models.CharField("Miltelių spalva", max_length=120, null=True, blank=True)
-    miltu_tiekejas = models.CharField("Miltelių tiekėjas", max_length=120, null=True, blank=True)
-    miltu_blizgumas = models.CharField("Blizgumas", max_length=50, null=True, blank=True)
+    miltu_kodas = models.CharField("Miltelių kodas", max_length=100, blank=True, default="")
+    miltu_spalva = models.CharField("Miltelių spalva", max_length=120, blank=True, default="")
+    miltu_tiekejas = models.CharField("Miltelių tiekėjas", max_length=120, blank=True, default="")
+    miltu_blizgumas = models.CharField("Blizgumas", max_length=50, blank=True, default="")
     miltu_kaina = models.DecimalField("Miltelių kaina", max_digits=10, decimal_places=2, null=True, blank=True)
+
+    paslaugu_pastabos = models.TextField("Paslaugų pastabos", blank=True, default="")
 
     # Maskavimas
     maskavimo_tipas = models.CharField(
@@ -79,147 +71,100 @@ class Pozicija(models.Model):
     maskavimas = models.TextField("Maskavimo aprašymas", max_length=200, blank=True, default="")
 
     # --- Terminai ---
-    # NAUJAS: darbo dienų skaičius (pagrindinis laukas, naudojamas UI)
-    atlikimo_terminas = models.PositiveIntegerField(
-        "Atlikimo terminas",
-        null=True,
-        blank=True,
-        help_text="Darbo dienos",
-    )
+    atlikimo_terminas = models.IntegerField("Atlikimo terminas (d.d.)", null=True, blank=True)
+    atlikimo_terminas_data = models.DateField("Atlikimo terminas (data)", null=True, blank=True)
 
-    # LEGACY: sena data (išsaugom istorijai / atsekamumui; UI nenaudojam)
-    atlikimo_terminas_data = models.DateField("Atlikimo terminas (sena data)", null=True, blank=True)
-
-    testai_kokybe = models.CharField("Testai / kokybė", max_length=255, null=True, blank=True)
+    # Kokybė / testai
+    testai_kokybe = models.CharField("Testai / kokybė", max_length=255, blank=True, default="")
 
     # Pakavimas
     pakavimo_tipas = models.CharField(
-        "Pakavimas",
+        "Pakavimo tipas",
         max_length=20,
         choices=PAKAVIMO_TIPAS_CHOICES,
-        null=True,
         blank=True,
+        default="",
     )
-    pakavimas = models.CharField("Pakavimo aprašymas", max_length=255, null=True, blank=True)
-    instrukcija = models.TextField("Pakavimo pastabos", null=True, blank=True)
+    pakavimas = models.CharField("Pakavimas", max_length=255, blank=True, default="")
+    instrukcija = models.TextField("Instrukcija", blank=True, default="")
 
-    # seni laukai, UI jau nenaudojam, bet paliekam DB suderinamumui
-    pakavimo_dienos_norma = models.CharField("Pakavimo dienos norma", max_length=120, null=True, blank=True)
-    pak_po_ktl = models.CharField("Pakavimas po KTL", max_length=255, null=True, blank=True)
-    pak_po_milt = models.CharField("Pakavimas po miltelinio", max_length=255, null=True, blank=True)
+    # --- Papildomos paslaugos (NAUJA) ---
+    papildomos_paslaugos = models.CharField(
+        "Papildomos paslaugos",
+        max_length=4,
+        choices=PAPILDOMOS_PASLAUGOS_CHOICES,
+        default="ne",
+        blank=False,
+    )
+    papildomos_paslaugos_aprasymas = models.TextField(
+        "Papildomų paslaugų aprašymas",
+        blank=True,
+        default="",
+    )
 
-    # kaina (trumpasis „headline“ laukas)
-    kaina_eur = models.DecimalField("Dabartinė kaina (EUR)", max_digits=12, decimal_places=2, null=True, blank=True)
+    # Kaina (sinchronizuojama iš kainų eilučių)
+    kaina_eur = models.DecimalField("Kaina (EUR)", max_digits=12, decimal_places=2, null=True, blank=True)
 
-    pastabos = models.TextField("Pastabos", null=True, blank=True)
+    pastabos = models.TextField("Pastabos", blank=True, default="")
 
-    created = models.DateTimeField("Sukurta", auto_now_add=True, null=True, blank=True)
-    updated = models.DateTimeField("Atnaujinta", auto_now=True, null=True, blank=True)
+    created = models.DateTimeField("Sukurta", auto_now_add=True)
+    updated = models.DateTimeField("Atnaujinta", auto_now=True)
 
-    class Meta:
-        ordering = ["-created", "-id"]
-        verbose_name = "Pozicija"
-        verbose_name_plural = "Pozicijos"
-
-    def __str__(self):
-        return f"{self.poz_kodas} – {self.poz_pavad or ''}"
-
-    @property
-    def brez_count(self):
-        return self.breziniai.count()
-
-    @property
-    def dok_count(self):
-        return ""
-
-    # --- Svarbu: normalizuojam senas reikšmes, kad NIEKADA neužlūžtų ---
-    def save(self, *args, **kwargs):
-        val = (self.maskavimo_tipas or "").strip().lower()
-
-        # iš senų / klaidingų reikšmių į kanoninę
-        if val in ("ners", "nera", "", "none", "null", "0", "ne", "no"):
-            self.maskavimo_tipas = "nera"
-        elif val in ("yra", "1", "taip", "yes", "true"):
-            self.maskavimo_tipas = "yra"
-        elif val in ("iprastas", "specialus"):
-            # tavo seni variantai – irgi laikom kaip "yra" (jei nori kitaip – pakeisim)
-            self.maskavimo_tipas = "yra"
-        else:
-            # bet koks kitas šiukšlinis val -> "nera"
-            self.maskavimo_tipas = "nera"
-
-        if self.maskavimo_tipas == "nera":
-            # kai nėra – aprašymas turi būti švarus, kad niekas neblokuotų
-            self.maskavimas = ""
-
-        super().save(*args, **kwargs)
-
-    # ===== Helperiai kainoms
-
-    def aktualios_kainos(self, matas: str | None = None, as_of=None):
-        as_of = (as_of or timezone.now().date())
-        qs = self.kainu_eilutes.filter(
-            busena="aktuali"
-        ).filter(
-            Q(galioja_nuo__isnull=True) | Q(galioja_nuo__lte=as_of)
-        ).filter(
-            Q(galioja_iki__isnull=True) | Q(galioja_iki__gte=as_of)
-        )
-        if matas:
-            qs = qs.filter(matas=matas)
-        return qs.order_by("yra_fiksuota", "kiekis_nuo", "fiksuotas_kiekis", "prioritetas", "-created")
-
-    def get_kaina_for_qty(self, qty: int, matas: str = "vnt.", as_of=None):
-        as_of = (as_of or timezone.now().date())
-        qs = self.kainu_eilutes.filter(
-            matas=matas, busena="aktuali"
-        ).filter(
-            Q(galioja_nuo__isnull=True) | Q(galioja_nuo__lte=as_of)
-        ).filter(
-            Q(galioja_iki__isnull=True) | Q(galioja_iki__gte=as_of)
-        )
-
-        fx = qs.filter(yra_fiksuota=True, fiksuotas_kiekis=qty).order_by("prioritetas", "-created").first()
-        if fx:
-            return fx
-
-        iv = qs.filter(yra_fiksuota=False) \
-               .filter(Q(kiekis_nuo__isnull=True) | Q(kiekis_nuo__lte=qty)) \
-               .filter(Q(kiekis_iki__isnull=True) | Q(kiekis_iki__gte=qty)) \
-               .order_by("prioritetas", "-created").first()
-        return iv
-
-
-# ======================= Sena suderinamumui =======================
-
-class PozicijosKaina(models.Model):
-    MATAS_CHOICES = [
-        ("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2"),
-    ]
-    BUSENA_CHOICES = [
-        ("aktuali", "Aktuali"), ("neaktuali", "Neaktuali"),
-    ]
-
-    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos", verbose_name="Pozicija")
-    suma = models.DecimalField("Suma", max_digits=12, decimal_places=2)
-    busena = models.CharField("Būsena", max_length=20, choices=BUSENA_CHOICES, default="aktuali")
-    yra_fiksuota = models.BooleanField("Yra fiksuota", default=False)
-    kiekis_nuo = models.IntegerField("Kiekis nuo", null=True, blank=True)
-    kiekis_iki = models.IntegerField("Kiekis iki", null=True, blank=True)
-    fiksuotas_kiekis = models.IntegerField("Fiksuotas kiekis", null=True, blank=True, default=None)
-    kainos_matas = models.CharField("Matas", max_length=10, choices=MATAS_CHOICES, default="vnt.")
-    created = models.DateTimeField("Įrašyta", auto_now_add=True, null=True, blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created"]
-        verbose_name = "Pozicijos kaina"
-        verbose_name_plural = "Pozicijų kainos"
 
     def __str__(self):
-        return f"{self.pozicija} – {self.suma} {self.kainos_matas}"
+        return f"{self.poz_kodas or self.id} — {self.poz_pavad}".strip()
 
+    # ---- Kainos API (naudojama views) ----
+    def aktualios_kainos(self):
+        qs = self.kainos_eilutes.all()
+        field_names = {f.name for f in qs.model._meta.get_fields()}
+        order_fields = []
+        if "prioritetas" in field_names:
+            order_fields.append("prioritetas")
+        if "created" in field_names:
+            order_fields.append("-created")
+        if order_fields:
+            qs = qs.order_by(*order_fields)
+        return qs
 
-# ======================= Brėžiniai (su preview helperiais) =======================
+    def get_kaina_for_qty(self, qty):
+        try:
+            q = int(qty) if qty is not None else None
+        except (TypeError, ValueError):
+            q = None
+
+        lines = list(self.aktualios_kainos())
+
+        if q is not None:
+            for l in lines:
+                if getattr(l, "yra_fiksuota", False) and getattr(l, "fiksuotas_kiekis", None) == q:
+                    return getattr(l, "kaina", None)
+
+        if q is not None:
+            for l in lines:
+                kn = getattr(l, "kiekis_nuo", None)
+                kk = getattr(l, "kiekis_iki", None)
+                if kn is None and kk is None:
+                    continue
+                if kn is None:
+                    ok = q <= kk
+                elif kk is None:
+                    ok = q >= kn
+                else:
+                    ok = (kn <= q <= kk)
+                if ok:
+                    return getattr(l, "kaina", None)
+
+        for l in lines:
+            k = getattr(l, "kaina", None)
+            if k is not None:
+                return k
+        return None
+
 
 class PozicijosBrezinys(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="breziniai")
@@ -227,7 +172,6 @@ class PozicijosBrezinys(models.Model):
     failas = models.FileField("Brėžinys", upload_to="pozicijos/breziniai/%Y/%m/")
     uploaded = models.DateTimeField(auto_now_add=True)
 
-    # sugeneruota PNG miniatiūra
     preview = models.ImageField(
         "Miniatiūra",
         upload_to="pozicijos/breziniai/previews/",
@@ -249,165 +193,49 @@ class PozicijosBrezinys(models.Model):
 
     @property
     def ext(self) -> str:
-        name = (getattr(self.failas, "name", "") or "").lower()
-        _, ext = os.path.splitext(name)
-        return (ext or "").lstrip(".")
-
-    def _preview_relpath(self) -> str:
         name = getattr(self.failas, "name", "") or ""
-        base, _ = os.path.splitext(os.path.basename(name))
-        digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
-        return f"pozicijos/breziniai/previews/{base}-{digest}.png"
-
-    def _legacy_preview_relpath(self) -> str:
-        name = getattr(self.failas, "name", "") or ""
-        base, _ = os.path.splitext(os.path.basename(name))
-        return f"pozicijos/breziniai/previews/{base}.png"
+        return os.path.splitext(name)[1].lower().lstrip(".")
 
     @property
-    def thumb_url(self) -> str | None:
+    def is_step(self) -> bool:
+        return self.ext in ("stp", "step")
+
+    @property
+    def thumb_url(self) -> str:
         if self.preview:
             try:
                 return self.preview.url
             except Exception:
-                pass
+                return ""
+        return ""
 
-        storage = self.failas.storage
-        rel_new = self._preview_relpath()
-        rel_old = self._legacy_preview_relpath()
-        try:
-            if storage.exists(rel_new):
-                return storage.url(rel_new)
-            if storage.exists(rel_old):
-                return storage.url(rel_old)
-        except Exception:
-            pass
-
-        from django.templatetags.static import static
-        ext = (self.ext or "").lower()
-        if ext in {"stp", "step"}:
-            return static("pozicijos/img/icon-3d.png")
-
-        return None
-
-    def preview_abspath(self) -> str | None:
-        if self.preview:
-            try:
-                return self.preview.path
-            except Exception:
-                pass
-
-        storage = self.failas.storage
-        rel_new = self._preview_relpath()
-        rel_old = self._legacy_preview_relpath()
-        for rel in (rel_new, rel_old):
-            try:
-                if storage.exists(rel):
-                    try:
-                        return storage.path(rel)
-                    except Exception:
-                        return None
-            except Exception:
-                continue
-        return None
-
-    def best_image_path_for_pdf(self) -> str | None:
-        preview = self.preview_abspath()
-        if preview:
-            return preview
-
-        try:
-            orig_path = self.failas.path
-        except Exception:
-            orig_path = None
-
-        if not orig_path:
-            return None
-
-        ext = (self.ext or "").lower()
-        if ext in {"png", "jpg", "jpeg"}:
-            return orig_path
-        return None
-
-    def delete(self, using=None, keep_parents=False):
-        storage = self.failas.storage
-        orig = getattr(self.failas, "name", None)
-        rel_new = self._preview_relpath()
-        rel_old = self._legacy_preview_relpath()
-        preview_name = self.preview.name if self.preview else None
-
-        super().delete(using=using, keep_parents=keep_parents)
-
-        for path in (orig, rel_new, rel_old, preview_name):
-            try:
-                if path and storage.exists(path):
-                    storage.delete(path)
-            except Exception:
-                pass
-
-
-# ======================= Naujas modelis: KainosEilute =======================
 
 class KainosEilute(models.Model):
-    MATAS_CHOICES = [("vnt.", "vnt."), ("kg", "kg"), ("m2", "m2")]
-    BUSENA_CHOICES = [("aktuali", "Aktuali"), ("sena", "Sena"), ("pasiulymas", "Pasiūlymas")]
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos_eilutes")
 
-    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainu_eilutes")
-    kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=2)
-    matas = models.CharField("Matas", max_length=10, choices=MATAS_CHOICES, default="vnt.", db_index=True)
+    kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=2, null=True, blank=True)
+    matas = models.CharField("Matas", max_length=50, blank=True, default="")
 
-    yra_fiksuota = models.BooleanField("Fiksuotas kiekis", default=False, db_index=True)
+    yra_fiksuota = models.BooleanField("Fiksuota", default=False)
     fiksuotas_kiekis = models.IntegerField("Fiksuotas kiekis", null=True, blank=True)
+
     kiekis_nuo = models.IntegerField("Kiekis nuo", null=True, blank=True)
     kiekis_iki = models.IntegerField("Kiekis iki", null=True, blank=True)
 
-    galioja_nuo = models.DateField("Galioja nuo", null=True, blank=True, db_index=True)
-    galioja_iki = models.DateField("Galioja iki", null=True, blank=True, db_index=True)
+    galioja_nuo = models.DateField("Galioja nuo", null=True, blank=True)
+    galioja_iki = models.DateField("Galioja iki", null=True, blank=True)
 
-    busena = models.CharField("Būsena", max_length=20, choices=BUSENA_CHOICES, default="aktuali", db_index=True)
-    prioritetas = models.IntegerField("Prioritetas", default=100, help_text="Mažesnis laimi, kai yra keli galimi")
+    busena = models.CharField("Būsena", max_length=50, blank=True, default="")
+    prioritetas = models.IntegerField("Prioritetas", default=0)
+    pastaba = models.CharField("Pastaba", max_length=255, blank=True, default="")
 
-    pastaba = models.TextField("Pastaba", null=True, blank=True)
-
-    created = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated = models.DateTimeField(auto_now=True)
+    created = models.DateTimeField("Sukurta", auto_now_add=True)
+    updated = models.DateTimeField("Atnaujinta", auto_now=True)
 
     history = HistoricalRecords()
 
     class Meta:
-        indexes = [
-            Index(fields=["pozicija", "matas", "busena"]),
-            Index(fields=["pozicija", "created"]),
-            Index(fields=["pozicija", "galioja_nuo", "galioja_iki"]),
-        ]
-        constraints = [
-            UniqueConstraint(
-                condition=Q(busena="aktuali", yra_fiksuota=True),
-                fields=["pozicija", "matas", "fiksuotas_kiekis"],
-                name="uniq_aktuali_fiksuota",
-            ),
-        ]
         ordering = ["-created"]
-        verbose_name = "Kainos eilutė"
-        verbose_name_plural = "Kainų eilutės"
 
     def __str__(self):
-        if self.yra_fiksuota:
-            scope = f"fx {self.fiksuotas_kiekis} {self.matas}"
-        else:
-            iki = self.kiekis_iki if self.kiekis_iki is not None else "∞"
-            scope = f"[{self.kiekis_nuo}-{iki}] {self.matas}"
-        return f"{self.pozicija} – {self.kaina} ({scope})"
-
-    def clean(self):
-        if self.yra_fiksuota:
-            if self.fiksuotas_kiekis is None:
-                raise ValidationError("Fiksuotai kainai privalomas „fiksuotas_kiekis“.")
-            if self.kiekis_nuo is not None or self.kiekis_iki is not None:
-                raise ValidationError("Fiksuotai kainai „kiekis_nuo/iki“ turi būti tušti.")
-        else:
-            if self.kiekis_nuo is None and self.kiekis_iki is None:
-                raise ValidationError("Intervalinei kainai užpildykite bent „kiekis_nuo“ arba „kiekis_iki“.")
-            if self.kiekis_nuo is not None and self.kiekis_iki is not None:
-                if self.kiekis_iki < self.kiekis_nuo:
-                    raise ValidationError("„kiekis_iki“ negali būti mažesnis už „kiekis_nuo“.")
+        return f"{self.pozicija_id} | {self.kaina} {self.matas}".strip()

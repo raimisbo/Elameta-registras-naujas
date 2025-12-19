@@ -550,7 +550,32 @@
       </div>
     </section>
 
-    {# 8. Terminai #}
+    {# 8. Papildomos paslaugos (NAUJA) #}
+    <section class="poz-card">
+      <h2 class="poz-card-title">Papildomos paslaugos</h2>
+      <div class="poz-fields">
+        <div class="poz-field-row">
+          <span class="poz-field-label">Papildomos paslaugos</span>
+          <span class="poz-field-value">
+            {{ pozicija.get_papildomos_paslaugos_display|default:"—" }}
+          </span>
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Aprašymas</span>
+          <span class="poz-field-value">
+            {% if pozicija.papildomos_paslaugos == "taip" and pozicija.papildomos_paslaugos_aprasymas %}
+              <div class="poz-notes-text">
+                {{ pozicija.papildomos_paslaugos_aprasymas|linebreaksbr }}
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </section>
+
+    {# 9. Terminai #}
     <section class="poz-card">
       <h2 class="poz-card-title">Terminai</h2>
       <div class="poz-fields">
@@ -567,7 +592,7 @@
       </div>
     </section>
 
-    {# 9. Testai / kokybė #}
+    {# 10. Testai / kokybė #}
     <section class="poz-card">
       <h2 class="poz-card-title">Testai / kokybė</h2>
       <div class="poz-fields">
@@ -578,7 +603,7 @@
       </div>
     </section>
 
-    {# 10. Kaina – tik rėžinės eilutės (be "bendra kaina") #}
+    {# 11. Kaina – tik rėžinės eilutės (be "bendra kaina") #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Kaina</h2>
 
@@ -646,7 +671,7 @@
       </div>
     </section>
 
-    {# 11. Sistemos informacija #}
+    {# 12. Sistemos informacija #}
     <section class="poz-card">
       <h2 class="poz-card-title">Sistemos informacija</h2>
       <div class="poz-meta">
@@ -693,7 +718,7 @@
       </div>
     </section>
 
-    {# 12. Pastabos – pilno pločio kortelė #}
+    {# 13. Pastabos – pilno pločio kortelė #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Pastabos</h2>
       {% if pozicija.pastabos %}

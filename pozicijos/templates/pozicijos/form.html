@@ -10,39 +10,47 @@
   .poz-form-page { background:#f3f3f3; }
   .poz-form-container { max-width:1200px; margin:0 auto; padding:16px 20px 32px; }
 
-  .poz-form-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; }
-  .poz-form-header h1{ margin:0 0 4px; font-size:1.3rem; font-weight:600; }
-  .poz-form-header-sub{ margin:0; font-size:0.9rem; color:#666; }
+  .poz-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:12px; }
+  .poz-title { margin:0; font-size:1.35rem; font-weight:700; }
+  .poz-subtitle{ margin-top:4px; color:#6b7280; font-size:0.9rem; }
 
-  .poz-form-actions-top{ display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+  .poz-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn{ border:1px solid #d1d5db; background:#fff; padding:7px 12px; border-radius:8px; cursor:pointer; text-decoration:none; color:#111827; font-size:0.9rem; }
+  .btn-primary{ background:#111827; color:#fff; border-color:#111827; }
+  .btn-secondary{ background:#fff; }
+  .btn:hover{ filter:brightness(0.98); }
 
-  .poz-form-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:flex-start; }
+  .poz-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width: 980px){
+    .poz-grid{ grid-template-columns:1fr; }
+  }
 
-  .poz-form-page .poz-card{
-    background:#f9fafb;
+  .poz-card{
+    background:#fff;
     border:1px solid #e5e7eb;
-    border-radius:6px;
-    padding:12px 14px 10px;
-    box-shadow:0 1px 3px rgba(15,23,42,0.06);
+    border-radius:10px;
+    padding:12px 12px 10px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.03);
   }
   .poz-card--full{ grid-column:1 / -1; }
-
-  .poz-card-title{ margin:0 0 8px; font-size:0.95rem; font-weight:600; color:#333; }
-
-  .field-row{
-    display:grid;
-    grid-template-columns:minmax(0,36%) minmax(0,64%);
-    column-gap:8px;
-    align-items:flex-start;
-    font-size:0.9rem;
-    margin-bottom:6px;
+  .poz-card-title{
+    margin:0 0 10px;
+    font-size:1rem;
+    font-weight:700;
+    border-bottom:1px solid #f3f4f6;
+    padding-bottom:6px;
   }
-  .field-label{ color:#777; padding-top:4px; }
 
-  .field-control input,
+  .field-row{ display:grid; grid-template-columns: 220px 1fr; gap:10px; align-items:flex-start; margin:8px 0; }
+  .field-label{ color:#374151; font-size:0.88rem; padding-top:6px; }
+  .field-control input[type="text"],
+  .field-control input[type="number"],
+  .field-control input[type="date"],
   .field-control select,
   .field-control textarea{
     width:100%;
+    border:1px solid #d1d5db;
+    border-radius:8px;
     box-sizing:border-box;
     padding:4px 6px;
     font-size:0.9rem;
@@ -58,63 +66,40 @@
   .subblock{ margin-top:8px; padding:8px 10px; border:1px dashed #d1d5db; border-radius:6px; background:#fff; }
 
   /* Maskavimo aprašymas: tik vertikaliai auga */
-  #id_maskavimas{
-    resize:none;
-    overflow:hidden;
-    min-height:48px;
-  }
-
-  /* Atlikimo terminas: skaičius + sufiksas */
-  .with-suffix{
-    display:flex;
-    align-items:center;
-    gap:8px;
-  }
-  .with-suffix input{
-    max-width:160px;
-  }
-  .unit-suffix{
-    font-size:0.88rem;
-    color:#6b7280;
-    white-space:nowrap;
-  }
-
-  @media (max-width: 900px) {
-    .poz-form-grid { grid-template-columns:1fr; }
-    .poz-card, .poz-card--full { grid-column:1 / -1; }
-  }
+  textarea { resize: vertical; }
 </style>
 {% endblock %}
 
-{% block body_class %}poz-form-page{% endblock %}
-
 {% block content %}
-<div class="poz-form-container">
-  <div class="poz-form-header">
-    <div>
-      <h1>{% if pozicija %}Redaguoti poziciją{% else %}Nauja pozicija{% endif %}</h1>
-      {% if pozicija %}
-        <p class="poz-form-header-sub">
-          {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad|default:"Be pavadinimo" }}
-        </p>
+<div class="poz-form-page">
+  <div class="poz-form-container">
+
+    <div class="poz-header">
+      <div>
+        <h1 class="poz-title">
+          {% if pozicija %}Pozicija {{ pozicija.poz_kodas|default:pozicija.id }}{% else %}Nauja pozicija{% endif %}
+        </h1>
+        <div class="poz-subtitle">Redagavimo forma.</div>
+      </div>
+
+      <div class="poz-actions">
+        <a class="btn btn-secondary" href="{% url 'pozicijos:list' %}">Grįžti</a>
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="poz-card" style="border-color:#fecaca;background:#fff1f2;">
+          {{ form.non_field_errors }}
+        </div>
       {% endif %}
-    </div>
-    <div class="poz-form-actions-top">
-      <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal į sąrašą</a>
-    </div>
-  </div>
 
-  {% if form.non_field_errors %}
-    <div class="flash flash-error">{{ form.non_field_errors }}</div>
-  {% endif %}
+      <div class="poz-grid">
 
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-
-    <div class="poz-form-grid">
-
-      <section class="poz-card poz-card--full">
-        <h2 class="poz-card-title">Pagrindinė informacija</h2>
+      <section class="poz-card">
+        <h2 class="poz-card-title">Pagrindiniai</h2>
 
         <div class="field-row">
           <div class="field-label">{{ form.klientas.label }}</div>
@@ -150,7 +135,7 @@
       </section>
 
       <section class="poz-card">
-        <h2 class="poz-card-title">Specifikacija</h2>
+        <h2 class="poz-card-title">Medžiaga</h2>
 
         <div class="field-row">
           <div class="field-label">{{ form.metalas.label }}</div>
@@ -213,7 +198,6 @@
         </div>
       </section>
 
-      {# PASLAUGA: checkbox’ai + Miltų detalizacija #}
       <section class="poz-card">
         <h2 class="poz-card-title">Paslauga</h2>
 
@@ -247,7 +231,7 @@
           </div>
         </div>
 
-        <div class="field-row">
+        <div class="field-row" id="row-spalva-top">
           <div class="field-label">{{ form.spalva.label }}</div>
           <div class="field-control">
             {{ form.spalva }}
@@ -296,9 +280,16 @@
             </div>
           </div>
         </div>
+
+        <div class="field-row">
+          <div class="field-label">{{ form.paslaugu_pastabos.label }}</div>
+          <div class="field-control">
+            {{ form.paslaugu_pastabos }}
+            {% if form.paslaugu_pastabos.errors %}<div class="field-errors">{{ form.paslaugu_pastabos.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
       </section>
 
-      {# MASKAVIMAS #}
       <section class="poz-card">
         <h2 class="poz-card-title">Maskavimas</h2>
 
@@ -307,7 +298,6 @@
           <div class="field-control">
             {{ form.maskavimo_tipas }}
             {% if form.maskavimo_tipas.errors %}<div class="field-errors">{{ form.maskavimo_tipas.errors|striptags }}</div>{% endif %}
-            <div class="field-help">Pasirinkite „Yra“, jei reikalingas maskavimas.</div>
           </div>
         </div>
 
@@ -316,6 +306,28 @@
           <div class="field-control">
             {{ form.maskavimas }}
             {% if form.maskavimas.errors %}<div class="field-errors">{{ form.maskavimas.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="poz-card">
+        <h2 class="poz-card-title">Terminai</h2>
+        <div class="field-row">
+          <div class="field-label">{{ form.atlikimo_terminas.label }}</div>
+          <div class="field-control">
+            {{ form.atlikimo_terminas }}
+            {% if form.atlikimo_terminas.errors %}<div class="field-errors">{{ form.atlikimo_terminas.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="poz-card">
+        <h2 class="poz-card-title">Testai / kokybė</h2>
+        <div class="field-row">
+          <div class="field-label">{{ form.testai_kokybe.label }}</div>
+          <div class="field-control">
+            {{ form.testai_kokybe }}
+            {% if form.testai_kokybe.errors %}<div class="field-errors">{{ form.testai_kokybe.errors|striptags }}</div>{% endif %}
           </div>
         </div>
       </section>
@@ -349,44 +361,30 @@
       </section>
 
       <section class="poz-card">
-        <h2 class="poz-card-title">Terminai</h2>
+        <h2 class="poz-card-title">Papildomos paslaugos</h2>
+
         <div class="field-row">
-          <div class="field-label">{{ form.atlikimo_terminas.label }}</div>
+          <div class="field-label">{{ form.papildomos_paslaugos.label }}</div>
           <div class="field-control">
-            <div class="with-suffix">
-              {{ form.atlikimo_terminas }}
-              <span class="unit-suffix">Darbo dienos</span>
-            </div>
-            {% if form.atlikimo_terminas.errors %}<div class="field-errors">{{ form.atlikimo_terminas.errors|striptags }}</div>{% endif %}
+            {{ form.papildomos_paslaugos }}
+            {% if form.papildomos_paslaugos.errors %}<div class="field-errors">{{ form.papildomos_paslaugos.errors|striptags }}</div>{% endif %}
+            <div class="field-help">Pasirinkus „Taip“ – atsiras aprašymo laukas.</div>
+          </div>
+        </div>
+
+        <div class="field-row" id="papildomos-paslaugos-aprasymas-row" style="display:none;">
+          <div class="field-label">{{ form.papildomos_paslaugos_aprasymas.label }}</div>
+          <div class="field-control">
+            {{ form.papildomos_paslaugos_aprasymas }}
+            {% if form.papildomos_paslaugos_aprasymas.errors %}<div class="field-errors">{{ form.papildomos_paslaugos_aprasymas.errors|striptags }}</div>{% endif %}
           </div>
         </div>
       </section>
 
-      <section class="poz-card">
-        <h2 class="poz-card-title">Testai / kokybė</h2>
-        <div class="field-row">
-          <div class="field-label">{{ form.testai_kokybe.label }}</div>
-          <div class="field-control">
-            {{ form.testai_kokybe }}
-            {% if form.testai_kokybe.errors %}<div class="field-errors">{{ form.testai_kokybe.errors|striptags }}</div>{% endif %}
-          </div>
-        </div>
-      </section>
 
-      {# KAINOS BLOKAS: turi būti ir kuriant, ir redaguojant #}
       <section class="poz-card poz-card--full">
-        <h2 class="poz-card-title">Kaina</h2>
-
-        {% if kainos_formset %}
-          {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset show_help=True %}
-          {% if kainos_formset.non_form_errors %}
-            <div class="field-errors" style="margin-top:8px;">
-              {{ kainos_formset.non_form_errors|striptags }}
-            </div>
-          {% endif %}
-        {% else %}
-          <p style="color:#6b7280;margin:0;">Kainų formset nepaduotas iš view (kainos_formset).</p>
-        {% endif %}
+        <h2 class="poz-card-title">Kainos</h2>
+        {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset %}
       </section>
 
       <section class="poz-card poz-card--full">
@@ -402,44 +400,34 @@
 
     </div>
 
-    <div class="poz-form-footer" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-      {% if pozicija %}
-        <a href="{% url 'pozicijos:detail' pozicija.id %}" class="btn btn-secondary">Atgal į pozicijos kortelę</a>
-      {% else %}
-        <a href="{% url 'pozicijos:list' %}" class="btn btn-secondary">Atgal į sąrašą</a>
-      {% endif %}
-      <button type="submit" class="btn btn-primary">
-        {% if pozicija %}Išsaugoti{% else %}Sukurti{% endif %}
-      </button>
+    <div class="poz-actions" style="margin-top:12px;">
+      <button type="submit" class="btn btn-primary">Išsaugoti</button>
     </div>
 
-    {% if suggestions %}
-      {% for field_name, values in suggestions.items %}
-        <datalist id="dl-{{ field_name }}">
-          {% for v in values %}
-            <option value="{{ v }}"></option>
-          {% endfor %}
-        </datalist>
-      {% endfor %}
-    {% endif %}
   </form>
-</div>
-{% endblock %}
 
-{% block page_js %}
+</div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
-  // --- Maskavimas: Yra / Nėra + auto-grow textarea ---
-  var masTipas = document.getElementById('id_maskavimo_tipas');
-  var masRow   = document.getElementById('maskavimas-row');
-  var masTxt   = document.getElementById('id_maskavimas');
-
+  // --- Auto-grow textarea (pagal data-autoresize="1") ---
   function autoGrow(el) {
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = (el.scrollHeight) + 'px';
   }
+
+  document.querySelectorAll('textarea[data-autoresize="1"]').forEach(function(el){
+    autoGrow(el);
+    el.addEventListener('input', function(){ autoGrow(el); });
+  });
+
+  // --- Maskavimas: Yra / Nėra ---
+  var masTipas = document.getElementById('id_maskavimo_tipas');
+  var masRow   = document.getElementById('maskavimas-row');
+  var masTxt   = document.getElementById('id_maskavimas');
 
   function syncMaskavimasUI() {
     if (!masTipas || !masRow) return;
@@ -454,22 +442,101 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   if (masTipas) masTipas.addEventListener('change', syncMaskavimasUI);
-  if (masTxt) masTxt.addEventListener('input', function(){ autoGrow(masTxt); });
 
-  // --- Paslauga: Miltų detalizacija rodoma tik jei paslauga_miltai pažymėta ---
+  // --- Paslauga: KTL / Miltai / Paruošimas ---
+  var chkKTL = document.getElementById('id_paslauga_ktl');
   var chkMiltai = document.getElementById('id_paslauga_miltai');
-  var miltaiBox = document.getElementById('miltai-subblock');
+  var chkPar = document.getElementById('id_paslauga_paruosimas');
 
-  function syncMiltaiUI() {
-    if (!chkMiltai || !miltaiBox) return;
-    miltaiBox.style.display = chkMiltai.checked ? '' : 'none';
+  var inpPar = document.getElementById('id_paruosimas');
+  var inpPad = document.getElementById('id_padengimas');
+  var inpStd = document.getElementById('id_padengimo_standartas');
+  var inpSpalva = document.getElementById('id_spalva');
+
+  var miltaiBox = document.getElementById('miltai-subblock');
+  var rowSpalvaTop = document.getElementById('row-spalva-top');
+
+  function setVal(el, val) {
+    if (!el) return;
+    el.value = val;
   }
-  if (chkMiltai) chkMiltai.addEventListener('change', syncMiltaiUI);
+
+  function syncPaslaugosUI(changedEl) {
+    if (!chkKTL || !chkMiltai || !chkPar) return;
+
+    var ktl = !!chkKTL.checked;
+    var miltai = !!chkMiltai.checked;
+
+    // KTL ir Miltai kartu – UI lygmenyje paliekam paskutinį pasirinkimą
+    if (ktl && miltai) {
+      if (changedEl === chkKTL) {
+        chkMiltai.checked = false;
+        miltai = false;
+      } else {
+        chkKTL.checked = false;
+        ktl = false;
+      }
+    }
+
+    // Jei KTL arba Miltai – Paruošimas prisideda automatiškai
+    if (ktl || miltai) {
+      chkPar.checked = true;
+    }
+
+    // Tik Paruošimas -> default Gardobond 24T (tik jei tuščia)
+    var parOnly = !!chkPar.checked && !ktl && !miltai;
+    if (parOnly && inpPar && !((inpPar.value || '').trim())) {
+      setVal(inpPar, 'Gardobond 24T');
+    }
+
+    // KTL -> automatinės reikšmės
+    if (ktl) {
+      if (inpPad) setVal(inpPad, 'KTL BASF CG 570');
+      if (inpStd) setVal(inpStd, '');
+      if (inpSpalva) setVal(inpSpalva, 'Juoda RAL 9005');
+    }
+
+    // Miltai UI: rodom subbloką, slepiam spalvą viršuje
+    if (miltaiBox) miltaiBox.style.display = miltai ? '' : 'none';
+    if (rowSpalvaTop) rowSpalvaTop.style.display = miltai ? 'none' : '';
+
+    // Miltai atveju – išvalom viršutinę spalvą, kad neliktų "paslėpta"
+    if (miltai && inpSpalva) setVal(inpSpalva, '');
+  }
+
+  function bind(el) {
+    if (!el) return;
+    el.addEventListener('change', function(){ syncPaslaugosUI(el); });
+  }
+  bind(chkKTL);
+  bind(chkMiltai);
+  bind(chkPar);
+
+    // --- Papildomos paslaugos: Taip/Ne ---
+  var ppSel = document.getElementById('id_papildomos_paslaugos');
+  var ppRow = document.getElementById('papildomos-paslaugos-aprasymas-row');
+  var ppTxt = document.getElementById('id_papildomos_paslaugos_aprasymas');
+
+  function syncPapildomosPaslaugosUI() {
+    if (!ppSel || !ppRow) return;
+    var val = (ppSel.value || '').toLowerCase();
+    var show = (val === 'taip');
+    ppRow.style.display = show ? '' : 'none';
+    if (!show && ppTxt) {
+      ppTxt.value = '';
+      autoGrow(ppTxt);
+    }
+    if (show && ppTxt) autoGrow(ppTxt);
+  }
+
+  if (ppSel) ppSel.addEventListener('change', syncPapildomosPaslaugosUI);
+
 
   // init
   syncMaskavimasUI();
-  if (masTxt) autoGrow(masTxt);
-  syncMiltaiUI();
+  syncPaslaugosUI(null);
+  syncPapildomosPaslaugosUI();
 });
 </script>
+
 {% endblock %}

@@ -32,6 +32,7 @@ class PozicijaForm(forms.ModelForm):
             "miltu_tiekejas",
             "miltu_blizgumas",
             "miltu_kaina",
+            "paslaugu_pastabos",
             "maskavimo_tipas",
             "maskavimas",
             "atlikimo_terminas",
@@ -39,35 +40,38 @@ class PozicijaForm(forms.ModelForm):
             "pakavimo_tipas",
             "pakavimas",
             "instrukcija",
+            "papildomos_paslaugos",
+            "papildomos_paslaugos_aprasymas",
             "pastabos",
         ]
         widgets = {
-            # atlikimo_terminas: darbo dienų skaičius
             "atlikimo_terminas": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
-
             "maskavimas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "instrukcija": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
+            "paslaugu_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
+            "papildomos_paslaugos_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "pastabos": forms.Textarea(attrs={"rows": 3, "data-autoresize": "1"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # default naujam įrašui
         if not getattr(self.instance, "pk", None):
             if "maskavimo_tipas" in self.fields:
                 self.fields["maskavimo_tipas"].initial = "nera"
+            if "papildomos_paslaugos" in self.fields:
+                self.fields["papildomos_paslaugos"].initial = "ne"
 
     def clean(self):
         cleaned = super().clean()
 
+        # --- Maskavimas ---
         raw_tipas = (cleaned.get("maskavimo_tipas") or "").strip().lower()
         apr = (cleaned.get("maskavimas") or "").strip()
 
-        # Normalizuojam viską į "nera" / "yra"
-        if raw_tipas in ("ners", "nera", "", "none", "null"):
+        if raw_tipas in ("nera", "", "none", "null"):
             tipas = "nera"
-        elif raw_tipas in ("yra", "iprastas", "specialus"):
+        elif raw_tipas in ("yra",):
             tipas = "yra"
         else:
             tipas = "nera"
@@ -75,12 +79,49 @@ class PozicijaForm(forms.ModelForm):
         cleaned["maskavimo_tipas"] = tipas
 
         if tipas == "nera":
-            # Nėra -> aprašymas visada tuščias, ir NIEKADA neblokuojam
             cleaned["maskavimas"] = ""
         else:
-            # Yra -> aprašymas privalomas
             if not apr:
                 self.add_error("maskavimas", "Kai „Maskavimas = Yra“, aprašymas yra privalomas.")
+
+        # --- Paslaugos logika: KTL / Miltai / Paruošimas ---
+        ktl = bool(cleaned.get("paslauga_ktl"))
+        miltai = bool(cleaned.get("paslauga_miltai"))
+        par = bool(cleaned.get("paslauga_paruosimas"))
+
+        if ktl and miltai:
+            self.add_error("paslauga_ktl", "Negalima pasirinkti kartu su „Miltai“.")
+            self.add_error("paslauga_miltai", "Negalima pasirinkti kartu su „KTL“.")
+
+        if ktl or miltai:
+            cleaned["paslauga_paruosimas"] = True
+            par = True
+
+        if par and (not ktl) and (not miltai):
+            if not (cleaned.get("paruosimas") or "").strip():
+                cleaned["paruosimas"] = "Gardobond 24T"
+
+        if ktl and not miltai:
+            cleaned["padengimas"] = "KTL BASF CG 570"
+            cleaned["padengimo_standartas"] = ""
+            cleaned["spalva"] = "Juoda RAL 9005"
+
+        if miltai and not ktl:
+            cleaned["spalva"] = ""
+
+        # --- Papildomos paslaugos (NAUJA) ---
+        pp = (cleaned.get("papildomos_paslaugos") or "ne").strip().lower()
+        pp_txt = (cleaned.get("papildomos_paslaugos_aprasymas") or "").strip()
+
+        if pp not in ("ne", "taip"):
+            pp = "ne"
+        cleaned["papildomos_paslaugos"] = pp
+
+        if pp == "ne":
+            cleaned["papildomos_paslaugos_aprasymas"] = ""
+        else:
+            if not pp_txt:
+                self.add_error("papildomos_paslaugos_aprasymas", "Kai pasirinkta „Taip“, aprašymas yra privalomas.")
 
         return cleaned
 
