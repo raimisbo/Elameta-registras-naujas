@@ -7,11 +7,15 @@ from django.forms import inlineformset_factory
 from .models import Pozicija, KainosEilute
 
 
-# UI rodome tik 2 būsenas, bet DB turi: "aktuali", "sena", "pasiulymas"
-# Mes pasirenkam: Neaktuali -> "sena"
 BUSENA_UI_CHOICES = [
     ("aktuali", "Aktuali"),
     ("neaktuali", "Neaktuali"),
+]
+
+MATAS_CHOICES = [
+    ("vnt", "Vnt."),
+    ("kg", "kg."),
+    ("komplektas", "komplektas"),
 ]
 
 
@@ -19,8 +23,10 @@ class KainosEiluteForm(forms.ModelForm):
     """
     Vienos kainos eilutės forma pozicijos formsete.
 
-    - UI: busena tik "Aktuali" / "Neaktuali"
-    - DB: "Neaktuali" map'inama į "sena"
+    Pokyčiai:
+    - Nebenaudojam UI lygmenyje "Fiksuota" / "Fx" (paliekam DB suderinamumui, bet nevaldoma per formą).
+    - Matas = ChoiceField: Vnt. / kg. / komplektas (su fallback, jei DB turi kitą reikšmę).
+    - Pastaba = textarea su auto-resize atributu (JS šablone).
     """
 
     busena_ui = forms.ChoiceField(
@@ -29,24 +35,30 @@ class KainosEiluteForm(forms.ModelForm):
         required=True,
     )
 
+    # perrašom matas į ChoiceField (DB vis tiek CharField)
+    matas = forms.ChoiceField(
+        label="Matas",
+        choices=MATAS_CHOICES,
+        required=False,
+    )
+
     class Meta:
         model = KainosEilute
         fields = [
             "kaina",
             "matas",
-            "yra_fiksuota",
             "kiekis_nuo",
             "kiekis_iki",
-            "fiksuotas_kiekis",
             "galioja_nuo",
             "galioja_iki",
             "pastaba",
-            # busena DB lauko tiesiogiai nerodom – naudojam busena_ui
+            # DB "busena" tiesiogiai nerodom – naudojam busena_ui
+            # DB "yra_fiksuota" ir "fiksuotas_kiekis" sąmoningai NENAUDOJAMI UI.
         ]
         widgets = {
             "galioja_nuo": forms.DateInput(attrs={"type": "date"}),
             "galioja_iki": forms.DateInput(attrs={"type": "date"}),
-            "pastaba": forms.Textarea(attrs={"rows": 2}),
+            "pastaba": forms.Textarea(attrs={"rows": 1, "data-autoresize": "1"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -57,47 +69,41 @@ class KainosEiluteForm(forms.ModelForm):
             css = f.widget.attrs.get("class", "")
             f.widget.attrs["class"] = (css + " poz-field").strip()
 
-        # skaitiniai – be rodyklių, bet su decimal klaviatūra
+        # kaina – decimal klaviatūra
         if "kaina" in self.fields:
             w = self.fields["kaina"].widget
             w.input_type = "text"
             w.attrs.setdefault("inputmode", "decimal")
             w.attrs.setdefault("placeholder", "0")
 
-        for n in ("kiekis_nuo", "kiekis_iki", "fiksuotas_kiekis"):
+        # kiekiai – numeric klaviatūra
+        for n in ("kiekis_nuo", "kiekis_iki"):
             if n in self.fields:
                 w = self.fields[n].widget
                 w.input_type = "text"
                 w.attrs.setdefault("inputmode", "numeric")
                 w.attrs.setdefault("placeholder", "")
 
-        # Inicializuojam busena_ui iš DB busena
+        # Būsena UI init iš DB
         db_busena = getattr(self.instance, "busena", None) or "aktuali"
         self.fields["busena_ui"].initial = "aktuali" if db_busena == "aktuali" else "neaktuali"
 
+        # MATAS fallback: jei DB turi kitą reikšmę, įtraukiam ją į choices, kad nelūžtų redagavimas
+        current_matas = (getattr(self.instance, "matas", None) or "").strip()
+        if current_matas:
+            allowed_values = {v for v, _ in MATAS_CHOICES}
+            if current_matas not in allowed_values:
+                self.fields["matas"].choices = MATAS_CHOICES + [(current_matas, current_matas)]
+
     def clean(self):
         cleaned = super().clean()
-
-        yra_fiksuota = cleaned.get("yra_fiksuota")
-        fiksuotas_kiekis = cleaned.get("fiksuotas_kiekis")
-        kiekis_nuo = cleaned.get("kiekis_nuo")
-        kiekis_iki = cleaned.get("kiekis_iki")
 
         # UI -> DB busena
         bus_ui = cleaned.get("busena_ui") or "aktuali"
         cleaned["busena"] = "aktuali" if bus_ui == "aktuali" else "sena"
 
-        # Validacija pagal tavo modelio KainosEilute.clean logiką
-        if yra_fiksuota:
-            if fiksuotas_kiekis in (None, ""):
-                self.add_error("fiksuotas_kiekis", "Fiksuotai kainai privalomas „Fiksuotas kiekis“.")
-            if kiekis_nuo not in (None, "") or kiekis_iki not in (None, ""):
-                self.add_error("kiekis_nuo", "Fiksuotai kainai „Kiekis nuo/iki“ turi būti tušti.")
-                self.add_error("kiekis_iki", "Fiksuotai kainai „Kiekis nuo/iki“ turi būti tušti.")
-        else:
-            if (kiekis_nuo in (None, "") and kiekis_iki in (None, "")):
-                self.add_error("kiekis_nuo", "Intervalinei kainai užpildykite bent „Kiekis nuo“ arba „Kiekis iki“.")
-
+        # Leisti "bazinę" kainą be Nuo/Iki (jei reikia) – todėl Nuo/Iki nėra privalomi.
+        # Jei norėsi griežčiau (reikalauti bent vieno), pasakyk – padarysim.
         return cleaned
 
     def save(self, commit=True):

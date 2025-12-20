@@ -23,10 +23,8 @@
         <tr>
           <th class="col-kaina">Kaina €</th>
           <th class="col-matas">Matas</th>
-          <th class="col-fiks">Fiks.</th>
           <th class="col-qty">Nuo</th>
           <th class="col-qty">Iki</th>
-          <th class="col-fxq">Fx</th>
           <th class="col-gal">Galiojimas</th>
           <th class="col-bus">Būsena</th>
           <th class="col-past">Pastabos</th>
@@ -49,13 +47,8 @@
               {% if form.matas.errors %}<div class="errorlist">{{ form.matas.errors }}</div>{% endif %}
             </td>
 
-            <td class="cell-fiks" style="text-align:center;">
-              {{ form.yra_fiksuota }}
-            </td>
-
             <td class="cell-qty">{{ form.kiekis_nuo }}</td>
             <td class="cell-qty">{{ form.kiekis_iki }}</td>
-            <td class="cell-fxq">{{ form.fiksuotas_kiekis }}</td>
 
             <td class="cell-gal">
               <div class="date-stack">
@@ -79,7 +72,7 @@
           {% endwith %}
         {% empty %}
           <tr data-empty-row="1">
-            <td colspan="10" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
+            <td colspan="8" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -88,7 +81,7 @@
 
   <p class="kainos-help">
     <strong>Pastaba:</strong>
-    Intervalinei kainai naudokite „Nuo / Iki“. Fiksuotai – pažymėkite „Fiks.“ ir pildykite „Fx“.
+    „Nuo / Iki“ galite palikti tuščius – tuomet eilutė laikoma bazine (galioja visiems kiekiams).
   </p>
 
   <template id="kainos-empty-template-{{ formset.prefix }}">
@@ -96,10 +89,8 @@
     <tr class="kaina-row kaina-row--neaktuali">
       <td class="cell-kaina">{{ f.id }}{{ f.kaina }}</td>
       <td class="cell-matas">{{ f.matas }}</td>
-      <td class="cell-fiks" style="text-align:center;">{{ f.yra_fiksuota }}</td>
       <td class="cell-qty">{{ f.kiekis_nuo }}</td>
       <td class="cell-qty">{{ f.kiekis_iki }}</td>
-      <td class="cell-fxq">{{ f.fiksuotas_kiekis }}</td>
       <td class="cell-gal"><div class="date-stack">{{ f.galioja_nuo }}{{ f.galioja_iki }}</div></td>
       <td class="cell-bus">{{ f.busena_ui }}</td>
       <td class="cell-past">{{ f.pastaba }}</td>
@@ -126,12 +117,14 @@
     max-width:100%;
   }
 
+  /* Svarbu: auto layout, kad Pastabos paimtų likusį plotį */
   .kainos-table{
     width:100%;
-    min-width:980px;
-    table-layout:fixed;
+    min-width:860px;
+    table-layout:auto;
   }
 
+  /* Sticky paskutinis stulpelis (Šal.) */
   .kainos-table th:last-child,
   .kainos-table td:last-child{
     position: sticky;
@@ -143,19 +136,16 @@
     white-space:normal;
     word-break:break-word;
   }
-
   .kainos-table thead th:last-child{ z-index: 3; }
 
-  .col-kaina{ width:80px; }
-  .col-matas{ width:70px; }
-  .col-fiks{ width:55px; }
-  .col-qty{ width:60px; }
-  .col-fxq{ width:60px; }
-  .col-gal{ width:120px; }
-  .col-bus{ width:120px; }
-  .col-past{ width:440px; }
+  .col-kaina{ width:90px; }
+  .col-matas{ width:120px; }
+  .col-qty{ width:70px; }
+  .col-gal{ width:140px; }
+  .col-bus{ width:95px; }
   .col-del{ width:55px; }
 
+  /* Pastaboms nenurodom width – ji pasiima likusį plotį */
   .date-stack{ display:flex; flex-direction:column; gap:4px; }
 
   .kainos-table input,
@@ -165,9 +155,16 @@
     box-sizing:border-box;
   }
 
+  /* Būsena – siauresnė (kad tilptų tekstas, bet neužimtų Pastabų vietos) */
+  .cell-bus select{
+    width:100%;
+  }
+
+  /* Pastabos – auto-augimas (JS), papildomai leidžiam vertikaliai */
   .kainos-table td textarea{
-    min-height:70px;
+    min-height:34px;
     resize:vertical;
+    overflow:hidden; /* kad augant nebūtų scroll bar */
   }
 
   .kaina-row--aktuali td{ background:#ecfdf5; }
@@ -178,6 +175,20 @@
 
 <script>
 (function () {
+  function autoGrow(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight) + 'px';
+  }
+
+  function initAutoGrowIn(node) {
+    const root = node || document;
+    root.querySelectorAll('textarea[data-autoresize="1"]').forEach(function (el) {
+      autoGrow(el);
+      el.addEventListener('input', function () { autoGrow(el); });
+    });
+  }
+
   function bootOne(root) {
     const prefix = root.dataset.prefix;
     const body = document.getElementById('kainu-formset-body-' + prefix);
@@ -190,31 +201,13 @@
 
     if (!body || !addBtn || !totalInput || !tmpl) return;
 
-    function initRow(row) {
-      const chk = row.querySelector('input[name$="-yra_fiksuota"]');
-      const nuo = row.querySelector('input[name$="-kiekis_nuo"]');
-      const iki = row.querySelector('input[name$="-kiekis_iki"]');
-      const fx  = row.querySelector('input[name$="-fiksuotas_kiekis"]');
-      if (!chk || !nuo || !iki || !fx) return;
-
-      function sync() {
-        const fixed = chk.checked;
-        nuo.disabled = fixed;
-        iki.disabled = fixed;
-        fx.disabled = !fixed;
-        if (fixed) { nuo.value = ""; iki.value = ""; }
-        else { fx.value = ""; }
-      }
-      chk.addEventListener('change', sync);
-      sync();
-    }
-
     function removeEmptyRowIfPresent() {
       const empty = body.querySelector('tr[data-empty-row="1"]');
       if (empty) empty.remove();
     }
 
-    body.querySelectorAll('tr.kaina-row').forEach(initRow);
+    // init esamiems
+    initAutoGrowIn(root);
 
     addBtn.addEventListener('click', function () {
       removeEmptyRowIfPresent();
@@ -230,7 +223,9 @@
 
       body.appendChild(row);
       totalInput.value = String(i + 1);
-      initRow(row);
+
+      // autoresize naujai pridėtai pastabai
+      initAutoGrowIn(row);
     });
   }
 
