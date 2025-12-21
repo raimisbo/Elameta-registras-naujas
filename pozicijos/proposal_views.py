@@ -1,3 +1,4 @@
+# pozicijos/proposal_views.py
 from __future__ import annotations
 
 import io
@@ -34,68 +35,41 @@ LANG_LABELS = {
     "lt": {
         "offer_title": "PASIŪLYMAS",
         "date_label": "Data",
-
         "section_main": "Pagrindinė informacija",
         "section_prices": "Kainos (aktualios eilutės)",
         "section_drawings": "Brėžinių miniatiūros",
         "section_notes": "Pastabos / sąlygos",
-
         "no_data": "Nėra duomenų.",
         "no_prices": "Aktyvių kainų eilučių šiai pozicijai nėra.",
         "no_drawings": "Brėžinių nėra.",
-
+        # KAINŲ LENTELĖ (be fiksuotos logikos)
         "col_price": "Kaina €",
         "col_unit": "Matas",
-        "col_type": "Tipas",
         "col_qty_from": "Kiekis nuo",
         "col_qty_to": "Kiekis iki",
-        "col_fixed_qty": "Fiks. kiekis",
         "col_valid_from": "Galioja nuo",
         "col_valid_to": "Galioja iki",
-
-        "type_fixed": "Fiksuota",
-        "type_interval": "Intervalinė",
-
         # HTML peržiūrai
         "preview_hint": "HTML peržiūra – galutinis PDF gali šiek tiek skirtis.",
-        "summary_detail": "Detalė",
-        "summary_customer": "Klientas",
-        "summary_project": "Projektas",
-        "section_prices_short": "Kainos",
-        "no_preview": "Nėra peržiūros",
     },
     "en": {
         "offer_title": "OFFER",
         "date_label": "Date",
-
         "section_main": "Main information",
         "section_prices": "Prices (current lines)",
         "section_drawings": "Drawing thumbnails",
         "section_notes": "Notes / terms",
-
         "no_data": "No data.",
         "no_prices": "There are no active price lines for this position.",
         "no_drawings": "No drawings.",
-
+        # PRICE TABLE (no fixed logic)
         "col_price": "Price €",
         "col_unit": "Unit",
-        "col_type": "Type",
         "col_qty_from": "Qty from",
         "col_qty_to": "Qty to",
-        "col_fixed_qty": "Fixed qty",
         "col_valid_from": "Valid from",
         "col_valid_to": "Valid until",
-
-        "type_fixed": "Fixed",
-        "type_interval": "Interval",
-
-        # for HTML preview
         "preview_hint": "HTML preview – final PDF may differ slightly.",
-        "summary_detail": "Part",
-        "summary_customer": "Customer",
-        "summary_project": "Project",
-        "section_prices_short": "Prices",
-        "no_preview": "No preview",
     },
 }
 
@@ -117,14 +91,24 @@ FIELD_LABELS = {
         "padengimas": "Padengimas",
         "padengimo_standartas": "Padengimo standartas",
         "spalva": "Spalva",
-        "maskavimas": "Maskavimas",
+        "paslauga_ktl": "KTL",
+        "paslauga_miltai": "Miltai",
+        "paslauga_paruosimas": "Paruošimas (paslauga)",
+        "miltu_kodas": "Miltelių kodas",
+        "miltu_spalva": "Miltelių spalva",
+        "miltu_tiekejas": "Miltelių tiekėjas",
+        "miltu_blizgumas": "Blizgumas",
+        "miltu_kaina": "Miltelių kaina",
+        "paslaugu_pastabos": "Paslaugų pastabos",
+        "maskavimo_tipas": "Maskavimas",
+        "maskavimas": "Maskavimo aprašymas",
         "atlikimo_terminas": "Atlikimo terminas (darbo dienos)",
         "testai_kokybe": "Testai / kokybė",
+        "pakavimo_tipas": "Pakavimo tipas",
         "pakavimas": "Pakavimas",
         "instrukcija": "Instrukcija",
-        "pakavimo_dienos_norma": "Pakavimo dienos norma",
-        "pak_po_ktl": "Pakavimas po KTL",
-        "pak_po_milt": "Pakavimas po miltelinio",
+        "papildomos_paslaugos": "Papildomos paslaugos",
+        "papildomos_paslaugos_aprasymas": "Papildomų paslaugų aprašymas",
         "kaina_eur": "Kaina €",
         "pastabos": "Pastabos",
     },
@@ -144,14 +128,24 @@ FIELD_LABELS = {
         "padengimas": "Coating",
         "padengimo_standartas": "Coating standard",
         "spalva": "Colour",
-        "maskavimas": "Masking",
+        "paslauga_ktl": "KTL",
+        "paslauga_miltai": "Powder",
+        "paslauga_paruosimas": "Pre-treatment (service)",
+        "miltu_kodas": "Powder code",
+        "miltu_spalva": "Powder colour",
+        "miltu_tiekejas": "Powder supplier",
+        "miltu_blizgumas": "Gloss",
+        "miltu_kaina": "Powder price",
+        "paslaugu_pastabos": "Service notes",
+        "maskavimo_tipas": "Masking",
+        "maskavimas": "Masking description",
         "atlikimo_terminas": "Lead time (working days)",
         "testai_kokybe": "Tests / quality",
+        "pakavimo_tipas": "Packaging type",
         "pakavimas": "Packaging",
         "instrukcija": "Instruction",
-        "pakavimo_dienos_norma": "Daily packing capacity",
-        "pak_po_ktl": "Packing after KTL",
-        "pak_po_milt": "Packing after powder",
+        "papildomos_paslaugos": "Additional services",
+        "papildomos_paslaugos_aprasymas": "Additional services description",
         "kaina_eur": "Price €",
         "pastabos": "Notes",
     },
@@ -159,7 +153,7 @@ FIELD_LABELS = {
 
 
 def _register_fonts() -> tuple[str, str]:
-    """Pabandome paimti LT šriftus iš MEDIA_ROOT/fonts, kitaip – Helvetica."""
+    """Pabandome paimti šriftus iš MEDIA_ROOT/fonts, kitaip – Helvetica."""
     regular = "Helvetica"
     bold = "Helvetica-Bold"
 
@@ -167,10 +161,7 @@ def _register_fonts() -> tuple[str, str]:
     if not os.path.isdir(fonts_dir):
         return regular, bold
 
-    font_files = [
-        f for f in os.listdir(fonts_dir)
-        if f.lower().endswith((".ttf", ".otf"))
-    ]
+    font_files = [f for f in os.listdir(fonts_dir) if f.lower().endswith((".ttf", ".otf"))]
     if not font_files:
         return regular, bold
 
@@ -191,10 +182,10 @@ def _register_fonts() -> tuple[str, str]:
 
 
 def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
-    """(label, value) sąrašas iš neužpildytų Pozicija laukų."""
+    """(label, value) sąrašas iš užpildytų Pozicija laukų."""
     rows: list[tuple[str, str]] = []
 
-    # svarbu: praleidžiam legacy datą, kad nesimaišytų su nauju darbo dienų lauku
+    # praleidžiam legacy datą, kad nesimaišytų su darbo dienų lauku
     skip = {"id", "created", "updated", "atlikimo_terminas_data"}
 
     labels_map = FIELD_LABELS.get(lang, FIELD_LABELS["lt"])
@@ -207,23 +198,30 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
         if value in (None, ""):
             continue
 
+        # label
         label = labels_map.get(field.name)
         if not label:
             vn = field.verbose_name or field.name
             label = str(vn).capitalize()
 
-        # special-case: darbo dienų sufiksas
-        if field.name == "atlikimo_terminas":
+        # value (choices -> get_display)
+        value_str: str
+        get_disp = getattr(pozicija, f"get_{field.name}_display", None)
+        if callable(get_disp) and getattr(field, "choices", None):
             try:
-                n = int(value)
-                if lang == "en":
-                    value_str = f"{n} working days"
-                else:
-                    value_str = f"{n} darbo dienos"
+                value_str = str(get_disp())
             except Exception:
                 value_str = str(value)
         else:
-            value_str = str(value)
+            # special-case: darbo dienos
+            if field.name == "atlikimo_terminas":
+                try:
+                    n = int(value)
+                    value_str = f"{n} working days" if lang == "en" else f"{n} darbo dienos"
+                except Exception:
+                    value_str = str(value)
+            else:
+                value_str = str(value)
 
         rows.append((label, value_str))
 
@@ -232,12 +230,13 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
 
 def _get_kainos_for_pdf(pozicija: Pozicija):
     """Naudojam tik 'aktuali' KainosEilute eilutes."""
-    return pozicija.kainu_eilutes.filter(busena="aktuali").order_by(
+    return pozicija.kainos_eilutes.filter(busena="aktuali").order_by(
         "matas",
-        "yra_fiksuota",
         "kiekis_nuo",
-        "fiksuotas_kiekis",
+        "kiekis_iki",
         "galioja_nuo",
+        "galioja_iki",
+        "-created",
     )
 
 
@@ -253,7 +252,6 @@ def _draw_wrapped_text(
     max_width: float,
     font_name: str,
     font_size: float,
-    page_width: float,
     page_height: float,
     bottom_margin: float,
     leading: float | None = None,
@@ -391,10 +389,12 @@ def proposal_pdf(request, pk: int):
         c.showPage()
         return height - 30 * mm
 
+    # ===== Top bar =====
     top_bar_h = 18 * mm
     c.setFillColor(colors.HexColor("#f3f4f6"))
     c.rect(0, height - top_bar_h, width, top_bar_h, stroke=0, fill=1)
 
+    # Logo (optional)
     logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
     if os.path.exists(logo_path):
         try:
@@ -414,13 +414,10 @@ def proposal_pdf(request, pk: int):
         except Exception:
             pass
 
+    # Company block (right)
     company_name = getattr(settings, "OFFER_COMPANY_NAME", "") or "UAB Elameta"
     line1 = getattr(settings, "OFFER_COMPANY_LINE1", "Adresas, LT-00000, Miestas")
-    line2 = getattr(
-        settings,
-        "OFFER_COMPANY_LINE2",
-        "Tel. +370 000 00000, el. paštas info@elameta.lt",
-    )
+    line2 = getattr(settings, "OFFER_COMPANY_LINE2", "Tel. +370 000 00000, el. paštas info@elameta.lt")
     right_x = width - margin_right
 
     c.setFont(font_bold, 10)
@@ -435,6 +432,7 @@ def proposal_pdf(request, pk: int):
     if line2:
         c.drawRightString(right_x, y_company, line2)
 
+    # Title
     top_bottom_y = height - top_bar_h
     d = 11 * mm
     title_y = top_bottom_y - d
@@ -457,14 +455,22 @@ def proposal_pdf(request, pk: int):
     c.line(margin_left, y, width - margin_right, y)
     y -= 18
 
-    c.setFont(font_bold, 12)
-    c.setFillColor(colors.HexColor("#111827"))
-    c.drawString(margin_left, y, labels["section_main"])
-    y -= 5
-    c.setStrokeColor(colors.HexColor("#e5e7eb"))
-    c.setLineWidth(0.6)
-    c.line(margin_left, y, width - margin_right, y)
-    y -= 8
+    def draw_section_title(title: str) -> None:
+        nonlocal y
+        if y < bottom_margin + 20 * mm:
+            y = new_page_y()
+
+        c.setFont(font_bold, 12)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(margin_left, y, title)
+        y -= 5
+        c.setStrokeColor(colors.HexColor("#e5e7eb"))
+        c.setLineWidth(0.6)
+        c.line(margin_left, y, width - margin_right, y)
+        y -= 8
+
+    # ===== Main info =====
+    draw_section_title(labels["section_main"])
 
     if field_rows:
         table_width = width - margin_left - margin_right
@@ -506,21 +512,7 @@ def proposal_pdf(request, pk: int):
         c.drawString(margin_left, y, labels["no_data"])
         y -= 12
 
-    def draw_section_title(title: str) -> None:
-        nonlocal y
-        if y < bottom_margin + 20 * mm:
-            y = new_page_y()
-
-        c.setFont(font_bold, 12)
-        c.setFillColor(colors.HexColor("#111827"))
-        c.drawString(margin_left, y, title)
-        y -= 5
-        c.setStrokeColor(colors.HexColor("#e5e7eb"))
-        c.setLineWidth(0.6)
-        c.line(margin_left, y, width - margin_right, y)
-        y -= 8
-
-    # ===== Kainos =====
+    # ===== Prices (no fixed logic) =====
     if show_prices:
         draw_section_title(labels["section_prices"])
 
@@ -530,37 +522,31 @@ def proposal_pdf(request, pk: int):
             header = [
                 labels["col_price"],
                 labels["col_unit"],
-                labels["col_type"],
                 labels["col_qty_from"],
                 labels["col_qty_to"],
-                labels["col_fixed_qty"],
                 labels["col_valid_from"],
                 labels["col_valid_to"],
             ]
             rows = [header]
+
             for k in kainos:
                 row = [
-                    str(k.kaina),
+                    "" if k.kaina is None else str(k.kaina),
                     str(k.matas or ""),
-                    labels["type_fixed"] if k.yra_fiksuota else labels["type_interval"],
                     "—" if k.kiekis_nuo is None else str(k.kiekis_nuo),
                     "—" if k.kiekis_iki is None else str(k.kiekis_iki),
-                    "—" if k.fiksuotas_kiekis is None else str(k.fiksuotas_kiekis),
                     "—" if not k.galioja_nuo else k.galioja_nuo.strftime("%Y-%m-%d"),
                     "—" if not k.galioja_iki else k.galioja_iki.strftime("%Y-%m-%d"),
                 ]
                 rows.append(row)
 
-            # stulpelių plotis: pritaikom paprastai, kad tilptų
             col_widths = [
-                22 * mm,
-                14 * mm,
-                20 * mm,
-                16 * mm,
-                16 * mm,
-                18 * mm,
-                22 * mm,
-                22 * mm,
+                26 * mm,  # kaina
+                18 * mm,  # matas
+                18 * mm,  # nuo
+                18 * mm,  # iki
+                28 * mm,  # galioja nuo
+                28 * mm,  # galioja iki
             ]
 
             tbl = Table(rows, colWidths=col_widths)
@@ -593,7 +579,7 @@ def proposal_pdf(request, pk: int):
             c.drawString(margin_left, y, labels["no_prices"])
             y -= 12
 
-    # ===== Brėžinių miniatiūros (iki 3) =====
+    # ===== Drawing thumbnails (up to 3) =====
     if show_drawings:
         draw_section_title(labels["section_drawings"])
 
@@ -617,18 +603,22 @@ def proposal_pdf(request, pk: int):
             top_y = y
             for i, b in enumerate(drawings):
                 x = margin_left + i * (thumb_w + gap)
-                # rėmelis
+
+                # frame
                 c.setStrokeColor(colors.HexColor("#e5e7eb"))
                 c.setLineWidth(0.6)
                 c.rect(x, top_y - thumb_h, thumb_w, thumb_h, stroke=1, fill=0)
 
                 img_path = None
                 try:
-                    img_path = b.best_image_path_for_pdf()
+                    if getattr(b, "preview", None) and getattr(b.preview, "path", None):
+                        p = b.preview.path
+                        if p and os.path.exists(p):
+                            img_path = p
                 except Exception:
                     img_path = None
 
-                if img_path and os.path.exists(img_path):
+                if img_path:
                     try:
                         c.drawImage(
                             ImageReader(img_path),
@@ -637,22 +627,21 @@ def proposal_pdf(request, pk: int):
                             width=thumb_w - 2,
                             height=thumb_h - 2,
                             preserveAspectRatio=True,
-                            anchor='c',
-                            mask='auto',
+                            anchor="c",
+                            mask="auto",
                         )
                     except Exception:
-                        # fallback tekstas
                         c.setFont(font_bold, 10)
                         c.setFillColor(colors.HexColor("#6b7280"))
                         c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, "N/A")
                 else:
-                    # placeholder (STP/STEP arba nėra preview)
-                    label = "3D" if (getattr(b, "ext", "") or "").lower() in {"stp", "step"} else "N/A"
+                    ext = (getattr(b, "ext", "") or "").lower()
+                    label = "3D" if ext in {"stp", "step"} else "N/A"
                     c.setFont(font_bold, 12)
                     c.setFillColor(colors.HexColor("#6b7280"))
                     c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, label)
 
-                # pavadinimas / failas
+                # caption
                 c.setFont(font_regular, 7.5)
                 c.setFillColor(colors.HexColor("#111827"))
                 name = (getattr(b, "pavadinimas", "") or "").strip() or getattr(b, "filename", "")
@@ -662,12 +651,13 @@ def proposal_pdf(request, pk: int):
 
             y = top_y - needed_h - 6
 
-    # ===== Pastabos / sąlygos =====
-    combined_notes = []
+    # ===== Notes =====
+    combined_notes: list[str] = []
     if poz_pastabos:
         combined_notes.append(poz_pastabos)
     if notes:
         combined_notes.append(notes)
+
     if combined_notes:
         draw_section_title(labels["section_notes"])
         c.setFillColor(colors.HexColor("#111827"))
@@ -679,7 +669,6 @@ def proposal_pdf(request, pk: int):
             max_width=width - margin_left - margin_right,
             font_name=font_regular,
             font_size=9,
-            page_width=width,
             page_height=height,
             bottom_margin=bottom_margin,
         )

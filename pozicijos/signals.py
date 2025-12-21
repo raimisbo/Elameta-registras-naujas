@@ -12,6 +12,8 @@ from .services.previews import regenerate_missing_preview
 logger = logging.getLogger(__name__)
 
 
+
+
 @receiver(post_save, sender=PozicijosBrezinys)
 def auto_preview_on_create(sender, instance: PozicijosBrezinys, created: bool, **kwargs):
     """

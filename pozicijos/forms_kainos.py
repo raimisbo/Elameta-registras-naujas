@@ -13,33 +13,25 @@ BUSENA_UI_CHOICES = [
 ]
 
 MATAS_CHOICES = [
-    ("vnt", "Vnt."),
-    ("kg", "kg."),
+    ("Vnt.", "Vnt."),
+    ("kg", "kg"),
     ("komplektas", "komplektas"),
 ]
 
 
 class KainosEiluteForm(forms.ModelForm):
     """
-    Vienos kainos eilutės forma pozicijos formsete.
+    Intervalinė kainodara (be fiksuotos kainos UI):
 
-    Pokyčiai:
-    - Nebenaudojam UI lygmenyje "Fiksuota" / "Fx" (paliekam DB suderinamumui, bet nevaldoma per formą).
-    - Matas = ChoiceField: Vnt. / kg. / komplektas (su fallback, jei DB turi kitą reikšmę).
-    - Pastaba = textarea su auto-resize atributu (JS šablone).
+    - UI: Būsena = Aktuali / Neaktuali (Neaktuali -> DB "sena")
+    - Privaloma: Kiekis nuo IR Kiekis iki
+    - Matas: Vnt. / kg / komplektas
     """
 
     busena_ui = forms.ChoiceField(
         label="Būsena",
         choices=BUSENA_UI_CHOICES,
         required=True,
-    )
-
-    # perrašom matas į ChoiceField (DB vis tiek CharField)
-    matas = forms.ChoiceField(
-        label="Matas",
-        choices=MATAS_CHOICES,
-        required=False,
     )
 
     class Meta:
@@ -52,8 +44,6 @@ class KainosEiluteForm(forms.ModelForm):
             "galioja_nuo",
             "galioja_iki",
             "pastaba",
-            # DB "busena" tiesiogiai nerodom – naudojam busena_ui
-            # DB "yra_fiksuota" ir "fiksuotas_kiekis" sąmoningai NENAUDOJAMI UI.
         ]
         widgets = {
             "galioja_nuo": forms.DateInput(attrs={"type": "date"}),
@@ -65,18 +55,22 @@ class KainosEiluteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # bendros klasės
-        for name, f in self.fields.items():
+        for _, f in self.fields.items():
             css = f.widget.attrs.get("class", "")
             f.widget.attrs["class"] = (css + " poz-field").strip()
 
-        # kaina – decimal klaviatūra
+        # matas = select su ribotais pasirinkimais
+        if "matas" in self.fields:
+            self.fields["matas"].required = True
+            self.fields["matas"].widget = forms.Select(choices=MATAS_CHOICES)
+
+        # skaitiniai – patogesni input'ai
         if "kaina" in self.fields:
             w = self.fields["kaina"].widget
             w.input_type = "text"
             w.attrs.setdefault("inputmode", "decimal")
             w.attrs.setdefault("placeholder", "0")
 
-        # kiekiai – numeric klaviatūra
         for n in ("kiekis_nuo", "kiekis_iki"):
             if n in self.fields:
                 w = self.fields[n].widget
@@ -84,16 +78,9 @@ class KainosEiluteForm(forms.ModelForm):
                 w.attrs.setdefault("inputmode", "numeric")
                 w.attrs.setdefault("placeholder", "")
 
-        # Būsena UI init iš DB
+        # inicializuojam busena_ui iš DB
         db_busena = getattr(self.instance, "busena", None) or "aktuali"
         self.fields["busena_ui"].initial = "aktuali" if db_busena == "aktuali" else "neaktuali"
-
-        # MATAS fallback: jei DB turi kitą reikšmę, įtraukiam ją į choices, kad nelūžtų redagavimas
-        current_matas = (getattr(self.instance, "matas", None) or "").strip()
-        if current_matas:
-            allowed_values = {v for v, _ in MATAS_CHOICES}
-            if current_matas not in allowed_values:
-                self.fields["matas"].choices = MATAS_CHOICES + [(current_matas, current_matas)]
 
     def clean(self):
         cleaned = super().clean()
@@ -102,8 +89,24 @@ class KainosEiluteForm(forms.ModelForm):
         bus_ui = cleaned.get("busena_ui") or "aktuali"
         cleaned["busena"] = "aktuali" if bus_ui == "aktuali" else "sena"
 
-        # Leisti "bazinę" kainą be Nuo/Iki (jei reikia) – todėl Nuo/Iki nėra privalomi.
-        # Jei norėsi griežčiau (reikalauti bent vieno), pasakyk – padarysim.
+        kn = cleaned.get("kiekis_nuo")
+        kk = cleaned.get("kiekis_iki")
+
+        # PRIVALOMA: abu
+        if kn in (None, ""):
+            self.add_error("kiekis_nuo", "Privaloma užpildyti „Kiekis nuo“.")
+        if kk in (None, ""):
+            self.add_error("kiekis_iki", "Privaloma užpildyti „Kiekis iki“.")
+
+        # jei abu yra – logika
+        try:
+            if kn is not None and kk is not None and int(kn) > int(kk):
+                self.add_error("kiekis_iki", "„Kiekis iki“ turi būti didesnis arba lygus „Kiekis nuo“.")
+        except Exception:
+            # jei vartotojas įvedė ne skaičių – Django pats paprastai duoda klaidą,
+            # čia papildomai nesukomplikuojam
+            pass
+
         return cleaned
 
     def save(self, commit=True):
@@ -112,6 +115,12 @@ class KainosEiluteForm(forms.ModelForm):
         # busena_ui -> inst.busena
         bus_ui = self.cleaned_data.get("busena_ui") or "aktuali"
         inst.busena = "aktuali" if bus_ui == "aktuali" else "sena"
+
+        # kad neliktų fiksuotos logikos DB lygyje (UI jos nebėra)
+        if hasattr(inst, "yra_fiksuota"):
+            inst.yra_fiksuota = False
+        if hasattr(inst, "fiksuotas_kiekis"):
+            inst.fiksuotas_kiekis = None
 
         if commit:
             inst.save()

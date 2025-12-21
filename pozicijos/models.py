@@ -19,8 +19,8 @@ class Pozicija(models.Model):
     ]
 
     PAPILDOMOS_PASLAUGOS_CHOICES = [
-        ("ne", "Ne"),
-        ("taip", "Taip"),
+        ("ne", "Nėra"),
+        ("taip", "Yra"),
     ]
 
     # Pagrindiniai
