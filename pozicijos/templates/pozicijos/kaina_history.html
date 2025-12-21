@@ -1,111 +1,137 @@
 {# pozicijos/templates/pozicijos/kaina_history.html #}
 {% extends "base.html" %}
 
-{% block title %}Kainos istorija – {{ pozicija.poz_kodas }}{% endblock %}
+{% block title %}Kainos istorija – {{ kaina.id }}{% endblock %}
+{% block body_class %}kainos-history-page{% endblock %}
+
+{% block page_css %}
+<style>
+  .kainos-history-page { background:#f3f3f3; }
+  .history-container { max-width:1200px; margin:0 auto; padding:16px 20px 32px; }
+
+  .history-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+  .history-title { margin:0; font-size:1.35rem; font-weight:700; }
+  .history-sub { margin:4px 0 0; color:#6b7280; font-size:0.92rem; }
+
+  .btn{
+    border:1px solid #d1d5db;
+    background:#fff;
+    padding:7px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+    color:#111827;
+    font-size:0.9rem;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .btn:hover{ filter:brightness(0.98); }
+
+  .card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    padding:12px 14px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.03);
+  }
+
+  table { width:100%; border-collapse:collapse; }
+  th, td { border:1px solid #e5e7eb; padding:6px 8px; font-size:0.92rem; vertical-align:top; }
+  th { background:#f9fafb; text-align:left; font-weight:700; }
+
+  .type { font-weight:700; }
+  .type-plus { color:#15803d; }
+  .type-tilde { color:#b45309; }
+  .type-minus { color:#b91c1c; }
+
+  .muted { color:#6b7280; }
+</style>
+{% endblock %}
 
 {% block content %}
-<h1 class="page-title">
-  Kainos istorija – {{ pozicija.poz_kodas }}
-  {% if pozicija.poz_pavad %}
-    <small style="color:#64748b">/ {{ pozicija.poz_pavad }}</small>
-  {% endif %}
-</h1>
+<div class="history-container">
 
-<div class="actions" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
-  <a class="btn btn-secondary" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">
-    ← Atgal į kainas
-  </a>
-</div>
+  <div class="history-header">
+    <div>
+      <h1 class="history-title">Kainos istorija – #{{ kaina.id }}</h1>
+      <div class="history-sub">
+        Pozicija: {{ pozicija.poz_kodas|default:pozicija.id }}{% if pozicija.poz_pavad %} — {{ pozicija.poz_pavad }}{% endif %}
+      </div>
+    </div>
 
-<div class="box" style="margin-bottom:12px;">
-  <h3 style="margin:0 0 6px;">Eilutė</h3>
-  <p style="margin:0;font-size:14px;">
-    <strong>€ {{ kaina.kaina }}</strong> /
-    {{ kaina.matas }},
-    {% if kaina.yra_fiksuota %}
-      fiksuotas kiekis: {{ kaina.fiksuotas_kiekis }}
-    {% else %}
-      kiekis: {{ kaina.kiekis_nuo|default:"–" }} – {{ kaina.kiekis_iki|default:"∞" }}
-    {% endif %}
-    <br>
-    <strong>Būsena:</strong> {{ kaina.busena }} |
-    <strong>Galioja:</strong> {{ kaina.galioja_nuo|default:"–" }} – {{ kaina.galioja_iki|default:"∞" }} |
-    <strong>Prioritetas:</strong> {{ kaina.prioritetas }}
-    {% if kaina.pastaba %}
-      <br><strong>Pastaba:</strong> {{ kaina.pastaba }}
-    {% endif %}
-  </p>
-</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">← Atgal į kainas</a>
+      <a class="btn" href="{% url 'pozicijos:detail' pozicija.pk %}">← Atgal į poziciją</a>
+    </div>
+  </div>
 
-<div class="box">
-  <h3 style="margin:0 0 6px;">Pakeitimų žurnalas</h3>
-  {% if history %}
-    <div style="overflow:auto;">
-      <table class="table zebra" style="min-width:900px;">
+  <div class="card">
+    {% if history %}
+      <table>
         <thead>
           <tr>
-            <th>Data</th>
-            <th>Veiksmas</th>
-            <th>€ Kaina</th>
+            <th style="width:180px;">Data</th>
+            <th style="width:90px;">Tipas</th>
+            <th style="width:160px;">Vartotojas</th>
+            <th>Kaina</th>
             <th>Matas</th>
-            <th>Tipas</th>
-            <th>Kiekis</th>
-            <th>Galioja</th>
+            <th>Kiekis nuo</th>
+            <th>Kiekis iki</th>
             <th>Būsena</th>
-            <th>Prior.</th>
+            <th>Galioja nuo</th>
+            <th>Galioja iki</th>
             <th>Pastaba</th>
-            <th>Vartotojas</th>
           </tr>
         </thead>
         <tbody>
-        {% for h in history %}
-          <tr>
-            <td>{{ h.history_date|date:"Y-m-d H:i" }}</td>
-            <td>
-              {% if h.history_type == '+' %}
-                Sukurta
-              {% elif h.history_type == '~' %}
-                Pakeista
-              {% elif h.history_type == '-' %}
-                Ištrinta
-              {% else %}
-                –
-              {% endif %}
-            </td>
-            <td>€ {{ h.kaina }}</td>
-            <td>{{ h.matas }}</td>
-            <td>
-              {% if h.yra_fiksuota %}
-                Fiksuota
-              {% else %}
-                Intervalinė
-              {% endif %}
-            </td>
-            <td>
-              {% if h.yra_fiksuota %}
-                {{ h.fiksuotas_kiekis }}
-              {% else %}
-                {{ h.kiekis_nuo|default:"–" }} – {{ h.kiekis_iki|default:"∞" }}
-              {% endif %}
-            </td>
-            <td>{{ h.galioja_nuo|default:"–" }} – {{ h.galioja_iki|default:"∞" }}</td>
-            <td>{{ h.busena }}</td>
-            <td>{{ h.prioritetas }}</td>
-            <td>{{ h.pastaba|default:"" }}</td>
-            <td>
-              {% if h.history_user %}
-                {{ h.history_user }}
-              {% else %}
-                –
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
+          {% for h in history %}
+            <tr>
+              <td>
+                {% if h.history_date %}{{ h.history_date|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+              </td>
+              <td class="type">
+                {% if h.history_type == "+" %}
+                  <span class="type-plus">+</span>
+                {% elif h.history_type == "~" %}
+                  <span class="type-tilde">~</span>
+                {% elif h.history_type == "-" %}
+                  <span class="type-minus">-</span>
+                {% else %}
+                  {{ h.history_type|default:"—" }}
+                {% endif %}
+              </td>
+              <td class="muted">
+                {% if h.history_user %}
+                  {{ h.history_user }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+
+              <td>{% if h.kaina is None %}—{% else %}{{ h.kaina }}{% endif %}</td>
+              <td>{{ h.matas|default:"" }}</td>
+              <td>{% if h.kiekis_nuo is None %}—{% else %}{{ h.kiekis_nuo }}{% endif %}</td>
+              <td>{% if h.kiekis_iki is None %}—{% else %}{{ h.kiekis_iki }}{% endif %}</td>
+              <td>{{ h.busena|default:"—" }}</td>
+              <td>{% if h.galioja_nuo %}{{ h.galioja_nuo|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+              <td>{% if h.galioja_iki %}{{ h.galioja_iki|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+              <td>{{ h.pastaba|default:"" }}</td>
+            </tr>
+          {% endfor %}
         </tbody>
       </table>
-    </div>
-  {% else %}
-    <p class="muted" style="margin:0;">Istorijos įrašų nėra.</p>
-  {% endif %}
+    {% else %}
+      <div class="muted">Istorijos įrašų nėra.</div>
+    {% endif %}
+  </div>
+
 </div>
 {% endblock %}

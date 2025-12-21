@@ -384,7 +384,11 @@
 
       <section class="poz-card poz-card--full">
         <h2 class="poz-card-title">Kainos</h2>
-        {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset %}
+        {% if pozicija and pozicija.pk %}
+          {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset show_history_links=1 %}
+        {% else %}
+          {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset %}
+        {% endif %}
       </section>
 
       <section class="poz-card poz-card--full">

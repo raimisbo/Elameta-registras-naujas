@@ -1,102 +1,142 @@
 {# pozicijos/templates/pozicijos/kainos_list.html #}
 {% extends "base.html" %}
 
-{% block title %}Kainos – {{ pozicija.poz_kodas }}{% endblock %}
-{% block body_class %}poz-form-page{% endblock %}
+{% block title %}Kainos – {{ pozicija.poz_kodas|default:pozicija.id }}{% endblock %}
+{% block body_class %}kainos-list-page{% endblock %}
 
 {% block page_css %}
 <style>
-  .poz-form-page { background:#f3f3f3; }
-  .kainos-page-wrap{
-    max-width:1200px;
-    margin:0 auto;
-    padding:16px 20px 32px;
-  }
-  .kainos-header{
+  .kainos-list-page { background:#f3f3f3; }
+  .kainos-container { max-width:1200px; margin:0 auto; padding:16px 20px 32px; }
+
+  .kainos-header {
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
     gap:12px;
-    margin-bottom:16px;
-  }
-  .kainos-header h1{
-    margin:0 0 4px;
-    font-size:1.3rem;
-    font-weight:600;
-  }
-  .kainos-sub{
-    margin:0;
-    font-size:0.9rem;
-    color:#666;
-  }
-  .kainos-actions{
-    display:flex;
+    margin-bottom:12px;
     flex-wrap:wrap;
-    gap:8px;
-    justify-content:flex-end;
   }
 
-  /* kortelė kaip formoje */
-  .poz-card{
-    background:#f9fafb;
-    border:1px solid #e5e7eb;
-    border-radius:6px;
-    padding:12px 14px 10px;
-    box-shadow:0 1px 3px rgba(15,23,42,0.06);
-  }
-  .poz-card-title{
-    margin:0 0 8px;
-    font-size:0.95rem;
-    font-weight:600;
-    color:#333;
-  }
+  .kainos-title { margin:0; font-size:1.35rem; font-weight:700; }
+  .kainos-sub { margin:4px 0 0; color:#6b7280; font-size:0.92rem; }
 
-  .kainos-footer{
-    margin-top:12px;
-    display:flex;
-    justify-content:space-between;
+  .kainos-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  .btn{
+    border:1px solid #d1d5db;
+    background:#fff;
+    padding:7px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+    color:#111827;
+    font-size:0.9rem;
+    display:inline-flex;
     align-items:center;
-    gap:8px;
+    gap:6px;
+  }
+  .btn-primary{ background:#111827; color:#fff; border-color:#111827; }
+  .btn:hover{ filter:brightness(0.98); }
+
+  .card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    padding:12px 14px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.03);
+  }
+
+  .filters {
+    display:flex;
+    gap:12px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .filters label { display:flex; flex-direction:column; gap:4px; font-size:0.9rem; color:#374151; }
+  .filters select {
+    border:1px solid #d1d5db;
+    border-radius:8px;
+    padding:6px 8px;
+    font-size:0.9rem;
+    min-width:160px;
+    background:#fff;
+  }
+
+  .note {
+    margin-top:8px;
+    color:#6b7280;
+    font-size:0.88rem;
+    line-height:1.35;
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="kainos-page-wrap">
+<div class="kainos-container">
 
   <div class="kainos-header">
     <div>
-      <h1>Kainos</h1>
-      <p class="kainos-sub">
-        {{ pozicija.poz_kodas }}{% if pozicija.poz_pavad %} – {{ pozicija.poz_pavad }}{% endif %}
-      </p>
+      <h1 class="kainos-title">Kainos – {{ pozicija.poz_kodas|default:pozicija.id }}</h1>
+      <div class="kainos-sub">
+        {% if pozicija.poz_pavad %}{{ pozicija.poz_pavad }}{% endif %}
+        {% if pozicija.klientas %}{% if pozicija.poz_pavad %} • {% endif %}{{ pozicija.klientas }}{% endif %}
+        {% if pozicija.projektas %} • {{ pozicija.projektas }}{% endif %}
+      </div>
     </div>
 
-    {# NOTE: "Išsaugoti" turi būti formos viduje, todėl čia tik navigacija #}
     <div class="kainos-actions">
-      <a class="btn btn-secondary" href="{% url 'pozicijos:detail' pozicija.pk %}">
-        ← Atgal į poziciją
-      </a>
+      <a class="btn" href="{% url 'pozicijos:detail' pozicija.pk %}">← Atgal į poziciją</a>
+      <button class="btn btn-primary" form="kainos-form" type="submit">Išsaugoti</button>
     </div>
   </div>
 
-  <form method="post">
-    {% csrf_token %}
+  <div class="card" style="margin-bottom:12px;">
+    <form method="get" action="" class="filters" id="kainos-filters">
+      <label>
+        Būsena
+        <select name="busena" onchange="this.form.submit()">
+          <option value="" {% if not busena %}selected{% endif %}>Visos</option>
+          <option value="aktuali" {% if busena == "aktuali" %}selected{% endif %}>Aktuali</option>
+          <option value="sena" {% if busena == "sena" %}selected{% endif %}>Neaktuali</option>
+        </select>
+      </label>
 
-    <section class="poz-card">
-      <h2 class="poz-card-title">Kaina</h2>
+      <label>
+        Matas
+        <select name="matas" onchange="this.form.submit()">
+          <option value="" {% if not matas %}selected{% endif %}>Visi</option>
+          <option value="Vnt." {% if matas == "Vnt." %}selected{% endif %}>Vnt.</option>
+          <option value="kg" {% if matas == "kg" %}selected{% endif %}>kg</option>
+          <option value="komplektas" {% if matas == "komplektas" %}selected{% endif %}>komplektas</option>
+        </select>
+      </label>
 
-      {# tas pats blokas kaip redagavime #}
-      {% include "pozicijos/components/kainos_formset.html" with formset=formset show_help=True %}
-    </section>
+      <noscript>
+        <button class="btn" type="submit">Filtruoti</button>
+      </noscript>
+    </form>
 
-    <div class="kainos-footer">
-      <a class="btn btn-secondary" href="{% url 'pozicijos:detail' pozicija.pk %}">
-        ← Atgal į poziciją
-      </a>
-      <button type="submit" class="btn btn-primary">Išsaugoti</button>
+    <div class="note">
+      Pastaba: šiame lange redaguojamos kainų eilutės (intervalai). Jei keliose eilutėse pažymėsi „Aktuali“,
+      sistema po išsaugojimo sutvarkys konfliktus per <code>set_aktuali()</code> logiką.
     </div>
+  </div>
 
-  </form>
+  <div class="card">
+    <form method="post"
+          id="kainos-form"
+          action="{% if busena or matas %}?{% if busena %}busena={{ busena|urlencode }}{% endif %}{% if busena and matas %}&{% endif %}{% if matas %}matas={{ matas|urlencode }}{% endif %}{% endif %}">
+      {% csrf_token %}
+
+      {# Svarbu: kad po POST view žinotų, kokie filtrai buvo aktyvūs #}
+      <input type="hidden" name="_busena" value="{{ busena }}">
+      <input type="hidden" name="_matas" value="{{ matas }}">
+
+      {% include "pozicijos/components/kainos_formset.html" with formset=formset %}
+    </form>
+  </div>
+
 </div>
 {% endblock %}

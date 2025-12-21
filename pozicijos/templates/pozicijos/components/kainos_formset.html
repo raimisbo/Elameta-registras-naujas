@@ -28,6 +28,7 @@
           <th class="col-gal">Galiojimas</th>
           <th class="col-bus">Būsena</th>
           <th class="col-past">Pastabos</th>
+          <th class="col-hist">Ist.</th>
           <th class="col-del">Šal.</th>
         </tr>
       </thead>
@@ -73,6 +74,14 @@
               {% if form.pastaba.errors %}<div class="errorlist">{{ form.pastaba.errors }}</div>{% endif %}
             </td>
 
+            <td class="cell-hist" style="text-align:center;">
+              {% if form.instance.pk %}
+                <a class="hist-link" href="{% url 'pozicijos:kaina_history' form.instance.pk %}">Ist.</a>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+
             <td class="cell-del" style="text-align:center;">
               {{ form.DELETE }}
             </td>
@@ -80,7 +89,7 @@
           {% endwith %}
         {% empty %}
           <tr data-empty-row="1">
-            <td colspan="8" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
+            <td colspan="9" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -107,7 +116,7 @@
 
   .kainos-table{
     width:100%;
-    min-width:980px;
+    min-width:1040px; /* + vienas stulpelis */
     table-layout:fixed;
   }
 
@@ -130,7 +139,8 @@
   .col-matas{ width:120px; }
   .col-qty{ width:80px; }
   .col-gal{ width:140px; }
-  .col-bus{ width:110px; }  /* siauresnis, kad tilptu "Aktuali/Neaktuali" */
+  .col-bus{ width:110px; }
+  .col-hist{ width:60px; }
   .col-del{ width:55px; }
 
   .date-stack{ display:flex; flex-direction:column; gap:4px; }
@@ -148,6 +158,20 @@
     resize:none;
     overflow:hidden;
   }
+
+  .hist-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:2px 6px;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    text-decoration:none;
+    color:#111827;
+    font-size:0.85rem;
+    background:#fff;
+  }
+  .hist-link:hover{ filter:brightness(0.98); }
 
   .kaina-row--aktuali td{ background:#ecfdf5; }
   .kaina-row--neaktuali td{ background:#f9fafb; color:#6b7280; }
@@ -174,7 +198,6 @@
     if (!body || !addBtn || !totalInput || !tmpl) return;
 
     function initRow(row) {
-      // autoresize pastaba
       const ta = row.querySelector('textarea[data-autoresize="1"]');
       if (ta) {
         autoGrow(ta);
@@ -230,6 +253,7 @@
     <td class="cell-gal"><div class="date-stack">{{ f.galioja_nuo }}{{ f.galioja_iki }}</div></td>
     <td class="cell-bus">{{ f.busena_ui }}</td>
     <td class="cell-past">{{ f.pastaba }}</td>
+    <td class="cell-hist" style="text-align:center;">—</td>
     <td class="cell-del" style="text-align:center;">{{ f.DELETE }}</td>
   </tr>
   {% endwith %}

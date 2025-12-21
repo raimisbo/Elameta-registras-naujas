@@ -11,9 +11,8 @@
 </p>
 
 <form id="proposal-form" method="get" action="">
-  <div class="box" style="max-width:520px;display:flex;flex-direction:column;gap:12px">
+  <div class="box" style="max-width:760px;display:flex;flex-direction:column;gap:12px">
 
-    {# Kalbos pasirinkimas #}
     <label style="display:flex;align-items:center;gap:6px;">
       <span>Kalba / Language:</span>
       <select name="lang" id="proposal-lang">
@@ -28,6 +27,62 @@
       Rodyti kainas
     </label>
 
+    {% if show_prices %}
+      <div style="border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <strong>Pasirink, kurias kainų eilutes dėti į pasiūlymą</strong>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary" id="btn-kainos-all">Pažymėti visas</button>
+            <button type="button" class="btn btn-secondary" id="btn-kainos-none">Nuimti visas</button>
+          </div>
+        </div>
+
+        <div style="margin-top:8px; overflow:auto;">
+          <table style="width:100%; border-collapse:collapse; min-width:640px;">
+            <thead>
+              <tr>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb; width:48px;">✓</th>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb;">Matas</th>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb;">Nuo</th>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb;">Iki</th>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb;">Kaina €</th>
+                <th style="border:1px solid #e5e7eb; padding:6px 8px; background:#f9fafb;">Galioja</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for k in available_kainos %}
+                <tr>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px; text-align:center;">
+                    <input type="checkbox" name="kaina_id" value="{{ k.id }}"
+                      {% if k.id in selected_kaina_ids %}checked{% endif %}>
+                  </td>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px;">{{ k.matas|default:"" }}</td>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px;">{% if k.kiekis_nuo is None %}—{% else %}{{ k.kiekis_nuo }}{% endif %}</td>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px;">{% if k.kiekis_iki is None %}—{% else %}{{ k.kiekis_iki }}{% endif %}</td>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px;">{{ k.kaina|default:"" }}</td>
+                  <td style="border:1px solid #e5e7eb; padding:6px 8px;">
+                    {% if k.galioja_nuo %}{{ k.galioja_nuo|date:"Y-m-d" }}{% else %}—{% endif %}
+                    –
+                    {% if k.galioja_iki %}{{ k.galioja_iki|date:"Y-m-d" }}{% else %}—{% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="6" style="border:1px solid #e5e7eb; padding:8px; color:#6b7280; text-align:center;">
+                    Nėra aktualių kainų eilučių.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:8px; color:#6b7280; font-size:0.9rem;">
+          Jei nepažymėsi nieko – į PDF bus įdėtos visos aktualios eilutės (default).
+        </div>
+      </div>
+    {% endif %}
+
     <label style="display:flex;align-items:center;gap:6px;">
       <input type="checkbox" name="show_drawings" value="1"
              {% if show_drawings %}checked{% endif %}>
@@ -41,8 +96,6 @@
 
     <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
       <a href="{% url 'pozicijos:detail' pozicija.pk %}" class="btn btn-secondary">Atgal</a>
-
-      {# Mygtuko „Atnaujinti“ NEBĖRA – varnelės persiunčia formą automatiškai #}
 
       <a href="#" class="btn btn-secondary"
          id="btn-preview-html"
@@ -75,23 +128,31 @@
 
       if (showPricesField && showPricesField.checked) {
         params.set('show_prices', '1');
+
+        // pasirinktų kainų ID (multi)
+        const checked = form.querySelectorAll('input[name="kaina_id"]:checked');
+        checked.forEach(cb => params.append('kaina_id', cb.value));
       }
+
       if (showDrawingsField && showDrawingsField.checked) {
         params.set('show_drawings', '1');
       }
+
       if (langField && langField.value) {
         params.set('lang', langField.value);
       }
+
       if (notesField) {
         const notesVal = notesField.value.trim();
         if (notesVal) {
           params.set('notes', notesVal);
         }
       }
+
       return params.toString();
     }
 
-    // automatinis submit, kai keičiasi varnelės
+    // automatinis submit tik varnelių "rodyti kainas" / "rodyti brėžinius" pasikeitimui
     form.addEventListener('change', function (e) {
       const t = e.target;
       if (!t || !t.name) return;
@@ -124,6 +185,20 @@
           url += '?' + finalQs;
         }
         window.location.href = url;
+      });
+    }
+
+    // select all/none (kainoms)
+    const btnAll = document.getElementById('btn-kainos-all');
+    const btnNone = document.getElementById('btn-kainos-none');
+    if (btnAll) {
+      btnAll.addEventListener('click', function(){
+        form.querySelectorAll('input[name="kaina_id"]').forEach(cb => cb.checked = true);
+      });
+    }
+    if (btnNone) {
+      btnNone.addEventListener('click', function(){
+        form.querySelectorAll('input[name="kaina_id"]').forEach(cb => cb.checked = false);
       });
     }
 

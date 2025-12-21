@@ -36,33 +36,30 @@ LANG_LABELS = {
         "offer_title": "PASIŪLYMAS",
         "date_label": "Data",
         "section_main": "Pagrindinė informacija",
-        "section_prices": "Kainos (aktualios eilutės)",
+        "section_prices": "Kainos (pasirinktos eilutės)",
         "section_drawings": "Brėžinių miniatiūros",
         "section_notes": "Pastabos / sąlygos",
         "no_data": "Nėra duomenų.",
-        "no_prices": "Aktyvių kainų eilučių šiai pozicijai nėra.",
+        "no_prices": "Pasirinktų (ar aktyvių) kainų eilučių šiai pozicijai nėra.",
         "no_drawings": "Brėžinių nėra.",
-        # KAINŲ LENTELĖ (be fiksuotos logikos)
         "col_price": "Kaina €",
         "col_unit": "Matas",
         "col_qty_from": "Kiekis nuo",
         "col_qty_to": "Kiekis iki",
         "col_valid_from": "Galioja nuo",
         "col_valid_to": "Galioja iki",
-        # HTML peržiūrai
         "preview_hint": "HTML peržiūra – galutinis PDF gali šiek tiek skirtis.",
     },
     "en": {
         "offer_title": "OFFER",
         "date_label": "Date",
         "section_main": "Main information",
-        "section_prices": "Prices (current lines)",
+        "section_prices": "Prices (selected lines)",
         "section_drawings": "Drawing thumbnails",
         "section_notes": "Notes / terms",
         "no_data": "No data.",
-        "no_prices": "There are no active price lines for this position.",
+        "no_prices": "There are no selected (or active) price lines for this position.",
         "no_drawings": "No drawings.",
-        # PRICE TABLE (no fixed logic)
         "col_price": "Price €",
         "col_unit": "Unit",
         "col_qty_from": "Qty from",
@@ -182,12 +179,9 @@ def _register_fonts() -> tuple[str, str]:
 
 
 def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
-    """(label, value) sąrašas iš užpildytų Pozicija laukų."""
     rows: list[tuple[str, str]] = []
 
-    # praleidžiam legacy datą, kad nesimaišytų su darbo dienų lauku
     skip = {"id", "created", "updated", "atlikimo_terminas_data"}
-
     labels_map = FIELD_LABELS.get(lang, FIELD_LABELS["lt"])
 
     for field in pozicija._meta.fields:
@@ -198,13 +192,11 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
         if value in (None, ""):
             continue
 
-        # label
         label = labels_map.get(field.name)
         if not label:
             vn = field.verbose_name or field.name
             label = str(vn).capitalize()
 
-        # value (choices -> get_display)
         value_str: str
         get_disp = getattr(pozicija, f"get_{field.name}_display", None)
         if callable(get_disp) and getattr(field, "choices", None):
@@ -213,7 +205,6 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
             except Exception:
                 value_str = str(value)
         else:
-            # special-case: darbo dienos
             if field.name == "atlikimo_terminas":
                 try:
                     n = int(value)
@@ -228,9 +219,39 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
     return rows
 
 
-def _get_kainos_for_pdf(pozicija: Pozicija):
-    """Naudojam tik 'aktuali' KainosEilute eilutes."""
-    return pozicija.kainos_eilutes.filter(busena="aktuali").order_by(
+def _get_selected_kaina_ids(request) -> list[int]:
+    """
+    Skaitom pasirinktų kainų ID iš querystring:
+      ?kaina_id=12&kaina_id=15
+    """
+    raw = request.GET.getlist("kaina_id")
+    ids: list[int] = []
+    for r in raw:
+        try:
+            ids.append(int(r))
+        except Exception:
+            continue
+    # unikalumas, bet išlaikom eiliškumą
+    seen = set()
+    out: list[int] = []
+    for i in ids:
+        if i not in seen:
+            out.append(i)
+            seen.add(i)
+    return out
+
+
+def _get_kainos_for_pdf(pozicija: Pozicija, selected_ids: list[int] | None = None):
+    """
+    Naudojam tik 'aktuali' KainosEilute eilutes.
+    Jei selected_ids pateikta – imam tik jas (tik tos pozicijos ribose).
+    """
+    qs = pozicija.kainos_eilutes.filter(busena="aktuali")
+
+    if selected_ids:
+        qs = qs.filter(pk__in=selected_ids)
+
+    return qs.order_by(
         "matas",
         "kiekis_nuo",
         "kiekis_iki",
@@ -256,7 +277,6 @@ def _draw_wrapped_text(
     bottom_margin: float,
     leading: float | None = None,
 ) -> float:
-    """Paprastas word-wrap tekstui; grąžina naują y."""
     if leading is None:
         leading = font_size * 1.3
 
@@ -299,7 +319,7 @@ def _draw_wrapped_text(
 
 
 def proposal_prepare(request, pk: int):
-    """UI puslapis – varnelių + pastabų pasirinkimas."""
+    """UI puslapis – pasirinkimai + kainų eilučių checkbox'ai."""
     pozicija = get_object_or_404(Pozicija, pk=pk)
     lang = _get_lang(request)
 
@@ -307,15 +327,27 @@ def proposal_prepare(request, pk: int):
     show_drawings = bool(request.GET.get("show_drawings"))
     notes = request.GET.get("notes", "")
 
-    params: dict[str, str] = {}
+    # Kainų pasirinkimas
+    selected_ids = _get_selected_kaina_ids(request)
+    available_kainos = list(_get_kainos_for_pdf(pozicija, selected_ids=None))  # visos aktualios
+
+    # Jei vartotojas įjungė "rodyti kainas", bet nieko nepasirinko -> default: visos aktualios
+    if show_prices and not selected_ids:
+        selected_ids = [k.id for k in available_kainos]
+
+    params: list[tuple[str, str]] = []
     if show_prices:
-        params["show_prices"] = "1"
+        params.append(("show_prices", "1"))
     if show_drawings:
-        params["show_drawings"] = "1"
+        params.append(("show_drawings", "1"))
     if notes:
-        params["notes"] = notes
+        params.append(("notes", notes))
     if lang:
-        params["lang"] = lang
+        params.append(("lang", lang))
+    # į qs įdedam pasirinktus kainų ID (kad preview puslapyje PDF mygtukas turėtų tą patį rinkinį)
+    for kid in selected_ids:
+        params.append(("kaina_id", str(kid)))
+
     qs = urlencode(params)
 
     context = {
@@ -325,6 +357,8 @@ def proposal_prepare(request, pk: int):
         "notes": notes,
         "qs": qs,
         "lang": lang,
+        "available_kainos": available_kainos,
+        "selected_kaina_ids": set(selected_ids),
     }
     return render(request, "pozicijos/proposal_prepare.html", context)
 
@@ -344,19 +378,27 @@ def proposal_pdf(request, pk: int):
     notes = request.GET.get("notes", "").strip()
     preview = bool(request.GET.get("preview"))
 
-    params: dict[str, str] = {}
+    selected_ids = _get_selected_kaina_ids(request)
+
+    # jei show_prices=1 ir nieko nenurodyta -> default: visos aktualios
+    if show_prices and not selected_ids:
+        selected_ids = [k.id for k in _get_kainos_for_pdf(pozicija, selected_ids=None)]
+
+    params: list[tuple[str, str]] = []
     if show_prices:
-        params["show_prices"] = "1"
+        params.append(("show_prices", "1"))
     if show_drawings:
-        params["show_drawings"] = "1"
+        params.append(("show_drawings", "1"))
     if notes:
-        params["notes"] = notes
+        params.append(("notes", notes))
     if lang:
-        params["lang"] = lang
+        params.append(("lang", lang))
+    for kid in selected_ids:
+        params.append(("kaina_id", str(kid)))
     qs = urlencode(params)
 
     field_rows = _build_field_rows(pozicija, lang)
-    kainos = list(_get_kainos_for_pdf(pozicija))
+    kainos = list(_get_kainos_for_pdf(pozicija, selected_ids if show_prices else []))
     brez = list(pozicija.breziniai.all())
     poz_pastabos = (pozicija.pastabos or "").strip()
 
@@ -512,7 +554,7 @@ def proposal_pdf(request, pk: int):
         c.drawString(margin_left, y, labels["no_data"])
         y -= 12
 
-    # ===== Prices (no fixed logic) =====
+    # ===== Prices =====
     if show_prices:
         draw_section_title(labels["section_prices"])
 
@@ -541,12 +583,12 @@ def proposal_pdf(request, pk: int):
                 rows.append(row)
 
             col_widths = [
-                26 * mm,  # kaina
-                18 * mm,  # matas
-                18 * mm,  # nuo
-                18 * mm,  # iki
-                28 * mm,  # galioja nuo
-                28 * mm,  # galioja iki
+                26 * mm,
+                18 * mm,
+                18 * mm,
+                18 * mm,
+                28 * mm,
+                28 * mm,
             ]
 
             tbl = Table(rows, colWidths=col_widths)
@@ -579,7 +621,7 @@ def proposal_pdf(request, pk: int):
             c.drawString(margin_left, y, labels["no_prices"])
             y -= 12
 
-    # ===== Drawing thumbnails (up to 3) =====
+    # ===== Drawings =====
     if show_drawings:
         draw_section_title(labels["section_drawings"])
 
@@ -593,7 +635,7 @@ def proposal_pdf(request, pk: int):
             available = width - margin_left - margin_right
             gap = 6 * mm
             thumb_w = (available - gap * 2) / 3
-            thumb_h = thumb_w * 0.75  # ~4:3
+            thumb_h = thumb_w * 0.75
             label_h = 5 * mm
 
             needed_h = thumb_h + label_h + 6
@@ -604,7 +646,6 @@ def proposal_pdf(request, pk: int):
             for i, b in enumerate(drawings):
                 x = margin_left + i * (thumb_w + gap)
 
-                # frame
                 c.setStrokeColor(colors.HexColor("#e5e7eb"))
                 c.setLineWidth(0.6)
                 c.rect(x, top_y - thumb_h, thumb_w, thumb_h, stroke=1, fill=0)
@@ -641,7 +682,6 @@ def proposal_pdf(request, pk: int):
                     c.setFillColor(colors.HexColor("#6b7280"))
                     c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, label)
 
-                # caption
                 c.setFont(font_regular, 7.5)
                 c.setFillColor(colors.HexColor("#111827"))
                 name = (getattr(b, "pavadinimas", "") or "").strip() or getattr(b, "filename", "")
