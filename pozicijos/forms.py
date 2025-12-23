@@ -16,6 +16,12 @@ class PozicijaForm(forms.ModelForm):
             "metalas",
             "plotas",
             "svoris",
+
+            # Matmenys (mm) - NAUJA
+            "x_mm",
+            "y_mm",
+            "z_mm",
+
             "kabinimo_budas",
             "kabinimas_reme",
             "detaliu_kiekis_reme",
@@ -51,6 +57,11 @@ class PozicijaForm(forms.ModelForm):
             "paslaugu_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "papildomos_paslaugos_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "pastabos": forms.Textarea(attrs={"rows": 3, "data-autoresize": "1"}),
+
+            # Matmenys (mm) - NAUJA
+            "x_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
+            "y_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
+            "z_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -109,7 +120,7 @@ class PozicijaForm(forms.ModelForm):
         if miltai and not ktl:
             cleaned["spalva"] = ""
 
-        # --- Papildomos paslaugos (NAUJA) ---
+        # --- Papildomos paslaugos ---
         pp = (cleaned.get("papildomos_paslaugos") or "ne").strip().lower()
         pp_txt = (cleaned.get("papildomos_paslaugos_aprasymas") or "").strip()
 

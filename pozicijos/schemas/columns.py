@@ -79,6 +79,15 @@ COLUMNS: list[dict] = [
         "default": False,
         "align": "right",
     },
+    {
+        "key": "matmenys_xyz",
+        "label": "Matmenys (xyz)",
+        "type": "virtual",
+        "filter": None,
+        "searchable": False,
+        "width": 140,
+        "default": True,
+    },
 
     # ---------------- Kabinimas ----------------
     {

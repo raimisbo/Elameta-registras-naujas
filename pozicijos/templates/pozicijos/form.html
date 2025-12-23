@@ -135,7 +135,7 @@
       </section>
 
       <section class="poz-card">
-        <h2 class="poz-card-title">Medžiaga</h2>
+        <h2 class="poz-card-title">Detalė</h2>
 
         <div class="field-row">
           <div class="field-label">{{ form.metalas.label }}</div>
@@ -158,6 +158,40 @@
           <div class="field-control">
             {{ form.svoris }}
             {% if form.svoris.errors %}<div class="field-errors">{{ form.svoris.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        {# Matmenys XYZ (mm) - NAUJA #}
+        <div class="field-row">
+          <div class="field-label">{{ form.x_mm.label }}</div>
+          <div class="field-control">
+            {{ form.x_mm }}
+            {% if form.x_mm.errors %}<div class="field-errors">{{ form.x_mm.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">{{ form.y_mm.label }}</div>
+          <div class="field-control">
+            {{ form.y_mm }}
+            {% if form.y_mm.errors %}<div class="field-errors">{{ form.y_mm.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">{{ form.z_mm.label }}</div>
+          <div class="field-control">
+            {{ form.z_mm }}
+            {% if form.z_mm.errors %}<div class="field-errors">{{ form.z_mm.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">Matmenys (xyz)</div>
+          <div class="field-control">
+            <div id="matmenys-xyz-preview" style="padding-top:6px;">
+              {% if pozicija %}{{ pozicija.matmenys_xyz }}{% else %}—{% endif %}
+            </div>
           </div>
         </div>
       </section>
@@ -516,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(chkMiltai);
   bind(chkPar);
 
-    // --- Papildomos paslaugos: Taip/Ne ---
+  // --- Papildomos paslaugos: Taip/Ne ---
   var ppSel = document.getElementById('id_papildomos_paslaugos');
   var ppRow = document.getElementById('papildomos-paslaugos-aprasymas-row');
   var ppTxt = document.getElementById('id_papildomos_paslaugos_aprasymas');
@@ -535,11 +569,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (ppSel) ppSel.addEventListener('change', syncPapildomosPaslaugosUI);
 
+  // --- Matmenys XYZ preview (mm) ---
+  var xEl = document.getElementById('id_x_mm');
+  var yEl = document.getElementById('id_y_mm');
+  var zEl = document.getElementById('id_z_mm');
+  var xyzPreview = document.getElementById('matmenys-xyz-preview');
+
+  function fmtDim(v) {
+    v = (v || '').toString().trim();
+    return v ? v : '—';
+  }
+
+  function syncXYZ() {
+    if (!xyzPreview) return;
+
+    var x = xEl ? fmtDim(xEl.value) : '—';
+    var y = yEl ? fmtDim(yEl.value) : '—';
+    var z = zEl ? fmtDim(zEl.value) : '—';
+
+    if (x === '—' && y === '—' && z === '—') {
+      xyzPreview.textContent = '—';
+      return;
+    }
+    xyzPreview.textContent = x + '×' + y + '×' + z + ' mm';
+  }
+
+  if (xEl) xEl.addEventListener('input', syncXYZ);
+  if (yEl) yEl.addEventListener('input', syncXYZ);
+  if (zEl) zEl.addEventListener('input', syncXYZ);
 
   // init
   syncMaskavimasUI();
   syncPaslaugosUI(null);
   syncPapildomosPaslaugosUI();
+  syncXYZ();
 });
 </script>
 

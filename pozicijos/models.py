@@ -1,6 +1,8 @@
+# pozicijos/models.py
 from __future__ import annotations
 
 import os
+from decimal import Decimal
 
 from django.db import models
 from simple_history.models import HistoricalRecords
@@ -30,10 +32,15 @@ class Pozicija(models.Model):
     poz_kodas = models.CharField("Pozicijos kodas", max_length=100, blank=True, default="")
     poz_pavad = models.CharField("Pozicijos pavadinimas", max_length=255, blank=True, default="")
 
-    # Medžiaga
+    # Medžiaga / detalė
     metalas = models.CharField("Metalas", max_length=120, blank=True, default="")
     plotas = models.CharField("Plotas", max_length=120, blank=True, default="")
     svoris = models.CharField("Svoris", max_length=120, blank=True, default="")
+
+    # Matmenys (mm) - NAUJA
+    x_mm = models.DecimalField("X (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
+    y_mm = models.DecimalField("Y (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
+    z_mm = models.DecimalField("Z (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
 
     # Kabinimas
     kabinimo_budas = models.CharField("Kabinimo būdas", max_length=120, blank=True, default="")
@@ -88,7 +95,7 @@ class Pozicija(models.Model):
     pakavimas = models.CharField("Pakavimas", max_length=255, blank=True, default="")
     instrukcija = models.TextField("Instrukcija", blank=True, default="")
 
-    # --- Papildomos paslaugos (NAUJA) ---
+    # --- Papildomos paslaugos ---
     papildomos_paslaugos = models.CharField(
         "Papildomos paslaugos",
         max_length=4,
@@ -117,6 +124,36 @@ class Pozicija(models.Model):
 
     def __str__(self):
         return f"{self.poz_kodas or self.id} — {self.poz_pavad}".strip()
+
+    # ---- Matmenys XYZ (suvestinė) ----
+    @staticmethod
+    def _fmt_dim(val: Decimal | None) -> str:
+        """
+        Gražinam reikšmę kaip tekstą:
+        - None -> "—"
+        - 12.00 -> "12"
+        - 12.50 -> "12.5"
+        """
+        if val is None:
+            return "—"
+        s = format(val, "f")
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s or "0"
+
+    @property
+    def matmenys_xyz(self) -> str:
+        """
+        Suvestinis formatas: X×Y×Z mm
+        - Jei visi trys tušti -> "—"
+        - Jei dalis trūksta -> trūkstamos rodomos kaip "—" (pvz. 120×80×— mm)
+        """
+        if self.x_mm is None and self.y_mm is None and self.z_mm is None:
+            return "—"
+        x = self._fmt_dim(self.x_mm)
+        y = self._fmt_dim(self.y_mm)
+        z = self._fmt_dim(self.z_mm)
+        return f"{x}×{y}×{z} mm"
 
     # ---- Kainos API (naudojama views) ----
     def aktualios_kainos(self):

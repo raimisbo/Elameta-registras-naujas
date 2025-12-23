@@ -35,7 +35,7 @@
 
       <tbody id="kainu-formset-body-{{ formset.prefix }}">
         {% for form in formset %}
-          {% with st=form.instance.busena %}
+          {% with st=form.busena_ui.value %}
           <tr class="kaina-row {% if st == 'aktuali' %}kaina-row--aktuali{% else %}kaina-row--neaktuali{% endif %}">
             <td class="cell-kaina">
               {{ form.id }}
@@ -67,6 +67,7 @@
 
             <td class="cell-bus">
               {{ form.busena_ui }}
+              {% if form.busena_ui.errors %}<div class="errorlist">{{ form.busena_ui.errors }}</div>{% endif %}
             </td>
 
             <td class="cell-past">

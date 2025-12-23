@@ -21,15 +21,13 @@ MATAS_CHOICES = [
 
 class KainosEiluteForm(forms.ModelForm):
     """
-    Intervalinė kainodara (be fiksuotos kainos UI):
+    Intervalinė kainodara (be fiksuotos kainos UI).
 
-    - UI: Būsena = Aktuali / Neaktuali (Neaktuali -> DB "sena")
-    - Privaloma: Kiekis nuo IR Kiekis iki (kai eilutė realiai pildoma)
-    - Matas: Vnt. / kg / komplektas
-
-    Svarbu: naujai pridėtai (bet paliktai tuščiai) eilutei naršyklė parenka matas=Vnt.
-    Jeigu serverio initial būna None, Django laiko, kad forma "pasikeitė" ir pradeda validuoti,
-    tada clean() priverstinai meta klaidas už Nuo/Iki. Todėl privalom suderinti initial su UI default.
+    Taisyklė (sutarta):
+    - Jei eilutė pažymėta DELETE -> jos nevaliduojam.
+    - Jei eilutė nauja ir "efektyviai tuščia" -> leidžiam praeiti be klaidų ir jos neišsaugom.
+    - Jei pildoma (užpildytas bent vienas iš esminių laukų) -> privaloma kaina + kiekis_nuo + kiekis_iki; nuo <= iki.
+    - Esamai (instance.pk) eilutei (jei ne DELETE) visada taikom privalomumą (neleidžiam paversti į „tuščią“).
     """
 
     busena_ui = forms.ChoiceField(
@@ -55,6 +53,9 @@ class KainosEiluteForm(forms.ModelForm):
             "pastaba": forms.Textarea(attrs={"rows": 1, "data-autoresize": "1"}),
         }
 
+    # Esminiai laukai, pagal kuriuos sprendžiam "pildoma ar tuščia"
+    _CORE_FIELDS = ("kaina", "kiekis_nuo", "kiekis_iki", "galioja_nuo", "galioja_iki", "pastaba")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -63,19 +64,16 @@ class KainosEiluteForm(forms.ModelForm):
             css = f.widget.attrs.get("class", "")
             f.widget.attrs["class"] = (css + " poz-field").strip()
 
-        # matas = select su ribotais pasirinkimais
+        # Matas: select su ribotais pasirinkimais + initial suderinimas su UI default
         if "matas" in self.fields:
             self.fields["matas"].required = True
             self.fields["matas"].widget = forms.Select(choices=MATAS_CHOICES)
 
-            # UŽDĖT INITIAL:
-            # - esamai eilutei: iš instancijos
-            # - naujai (empty_form): sutampa su naršyklės default (pirma reikšmė = "Vnt.")
             default_matas = MATAS_CHOICES[0][0] if MATAS_CHOICES else None
             inst_matas = getattr(self.instance, "matas", None)
             self.fields["matas"].initial = inst_matas or default_matas
 
-        # skaitiniai – patogesni input'ai
+        # Skaitiniai – patogesni input'ai
         if "kaina" in self.fields:
             w = self.fields["kaina"].widget
             w.input_type = "text"
@@ -89,21 +87,84 @@ class KainosEiluteForm(forms.ModelForm):
                 w.attrs.setdefault("inputmode", "numeric")
                 w.attrs.setdefault("placeholder", "")
 
-        # inicializuojam busena_ui iš DB (empty_form -> bus "aktuali", kas ir ok)
+        # Leisti tuščias naujas eilutes (validuosim patys clean'e, kai "pildoma")
+        # (Svarbu: kitaip tuščia nauja eilutė gali užkristi ant privalomumo dar prieš clean())
+        for n in ("kaina", "kiekis_nuo", "kiekis_iki", "galioja_nuo", "galioja_iki", "pastaba"):
+            if n in self.fields:
+                self.fields[n].required = False
+
+        # Inicializuojam busena_ui iš DB (empty_form -> "aktuali")
         db_busena = getattr(self.instance, "busena", None) or "aktuali"
         self.fields["busena_ui"].initial = "aktuali" if db_busena == "aktuali" else "neaktuali"
 
+        # Vidiniai flag'ai:
+        self._skip_model_validation = False
+        self._skip_save = False
+
+    def _is_new(self) -> bool:
+        return not bool(getattr(self.instance, "pk", None))
+
+    def _is_effectively_empty(self, cleaned: dict | None = None) -> bool:
+        """
+        Tuščia laikom tik naują eilutę (instance.pk nėra), kai neįvesta nieko iš CORE laukų.
+        """
+        if not self._is_new():
+            return False
+
+        data = cleaned if cleaned is not None else getattr(self, "cleaned_data", None)
+        if not isinstance(data, dict):
+            return False
+
+        for key in self._CORE_FIELDS:
+            val = data.get(key)
+            if val is None:
+                continue
+            if isinstance(val, str):
+                if val.strip() != "":
+                    return False
+            else:
+                # date/decimal/int ir pan.
+                return False
+        return True
+
+    def has_changed(self) -> bool:
+        """
+        Kritinis stabdys: jei nauja eilutė "efektyviai tuščia", laikom, kad ji nepasikeitė,
+        kad formset jos neišsaugotų kaip naujo objekto.
+        """
+        base = super().has_changed()
+        if not base:
+            return False
+
+        if self._is_new() and hasattr(self, "cleaned_data"):
+            if self._is_effectively_empty(self.cleaned_data):
+                return False
+        return base
+
     def clean(self):
         cleaned = super().clean()
+
+        # Jei pažymėta trinti – nevaliduojam
+        if cleaned.get("DELETE"):
+            return cleaned
 
         # UI -> DB busena
         bus_ui = cleaned.get("busena_ui") or "aktuali"
         cleaned["busena"] = "aktuali" if bus_ui == "aktuali" else "sena"
 
+        # Nauja ir tuščia -> leidžiam praeiti, bet neišsaugom ir praleidžiam model validation
+        if self._is_new() and self._is_effectively_empty(cleaned):
+            self._skip_model_validation = True
+            self._skip_save = True
+            return cleaned
+
+        # Esamai eilutei (ir naujai pildomai) – privalomumai
         kn = cleaned.get("kiekis_nuo")
         kk = cleaned.get("kiekis_iki")
+        kaina = cleaned.get("kaina")
 
-        # PRIVALOMA: abu (kai forma realiai validuojama)
+        if kaina in (None, ""):
+            self.add_error("kaina", "Privaloma užpildyti „Kaina“.")
         if kn in (None, ""):
             self.add_error("kiekis_nuo", "Privaloma užpildyti „Kiekis nuo“.")
         if kk in (None, ""):
@@ -120,7 +181,17 @@ class KainosEiluteForm(forms.ModelForm):
 
         return cleaned
 
+    def _post_clean(self):
+        # Jei nauja tuščia eilutė – praleidžiam model full_clean, kad niekas nebandytų jos versti "privaloma"
+        if getattr(self, "_skip_model_validation", False):
+            return
+        super()._post_clean()
+
     def save(self, commit=True):
+        # Jei sutarta: tuščios naujos eilutės nesaugom
+        if getattr(self, "_skip_save", False):
+            return self.instance
+
         inst: KainosEilute = super().save(commit=False)
 
         # busena_ui -> inst.busena
