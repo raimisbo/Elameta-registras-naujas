@@ -157,6 +157,17 @@ COLUMNS: list[dict] = [
         "width": 160,
         "default": False,
     },
+    # --- NAUJA: padengimo storis (µm) ---
+    {
+        "key": "padengimo_storis_um",
+        "label": "Storis, µm",
+        "type": "number",
+        "filter": "range",
+        "searchable": False,
+        "width": 110,
+        "default": False,
+        "align": "right",
+    },
     {
         "key": "spalva",
         "label": "Spalva",

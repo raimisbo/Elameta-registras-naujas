@@ -30,6 +30,7 @@ class PozicijaForm(forms.ModelForm):
             "padengimas",
             "padengimo_standartas",
             "spalva",
+            "padengimo_storis_um",
             "paslauga_ktl",
             "paslauga_miltai",
             "paslauga_paruosimas",
@@ -52,6 +53,12 @@ class PozicijaForm(forms.ModelForm):
         ]
         widgets = {
             "atlikimo_terminas": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
+            "padengimo_storis_um": forms.NumberInput(attrs={
+                "min": 0,
+                "step": "0.01",
+                "inputmode": "decimal",
+                "placeholder": "pvz. 80",
+            }),
             "maskavimas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "instrukcija": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "paslaugu_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),

@@ -82,20 +82,18 @@
     align-items:flex-start;
   }
 
-  /* Pozicijos kortelės – tokia pati subtili išvaizda */
   .pozicija-detail-page .poz-card {
-    background:#f9fafb;                 /* vos melsvas fonas */
+    background:#f9fafb;
     border:1px solid #e5e7eb;
     border-radius:6px;
     padding:12px 14px 10px;
-    box-shadow:0 1px 3px rgba(15,23,42,0.06);  /* labai švelnus šešėlis */
+    box-shadow:0 1px 3px rgba(15,23,42,0.06);
   }
 
   .pozicija-detail-page .poz-card--full {
     grid-column:1 / -1;
   }
 
-  /* Top išdėstymas: kairėje 2 kortelės, dešinėje – Brėžiniai */
   .pozicija-detail-page .poz-card--client {
     grid-column:1;
     grid-row:1;
@@ -144,7 +142,6 @@
     overflow-wrap:anywhere;
   }
 
-  /* MIRKSĖJIMAS faktiniam kiekiui rėme */
   .pozicija-detail-page .poz-field-value--alert {
     color:#b91c1c;
     font-weight:600;
@@ -163,14 +160,12 @@
     font-style:italic;
   }
 
-  /* Pastabos / aprašymai su eilutėmis */
   .pozicija-detail-page .poz-notes-text {
     font-size:0.9rem;
     line-height:1.4;
     white-space:pre-wrap;
   }
 
-  /* Kainų lentelė */
   .pozicija-detail-page .poz-price-table-wrapper {
     margin-top:8px;
     overflow-x:auto;
@@ -209,7 +204,6 @@
     justify-content:flex-end;
   }
 
-  /* Brėžinių blokas */
   .pozicija-detail-page .poz-brez-grid {
     display:flex;
     flex-wrap:wrap;
@@ -393,7 +387,18 @@
           {% for brez in breziniai %}
             <div class="poz-brez-item">
               <a href="{{ brez.failas.url }}" target="_blank" class="poz-brez-thumb-wrap">
-                <img src="{{ brez.thumb_url|default:brez.failas.url }}" alt="{{ brez.pavadinimas|default:'Brėžinys' }}" class="poz-brez-thumb">
+                {% with e=brez.ext|lower %}
+                  {% if e == "stp" or e == "step" %}
+                    <img src="{% static 'pozicijos/img/icon-3d.png' %}"
+                         alt="3D"
+                         class="poz-brez-thumb">
+                  {% else %}
+                    <img src="{% if brez.thumb_url %}{{ brez.thumb_url }}{% else %}{{ brez.failas.url }}{% endif %}"
+                         alt="{{ brez.pavadinimas|default:'Brėžinys' }}"
+                         class="poz-brez-thumb">
+                  {% endif %}
+                {% endwith %}
+
               </a>
               <div class="poz-brez-title">
                 {{ brez.pavadinimas|default:brez.filename }}
@@ -500,7 +505,18 @@
           <span class="poz-field-value">{{ pozicija.padengimo_standartas|default:"—" }}</span>
         </div>
 
-        {# Spalva rodoma tik jei NE „Miltai“ (nes formoje ją slepi ir išvalai) #}
+        {# NAUJA: Padengimo storis (µm) #}
+        <div class="poz-field-row">
+          <span class="poz-field-label">Padengimo storis</span>
+          <span class="poz-field-value">
+            {% if pozicija.padengimo_storis_um is not None %}
+              {{ pozicija.padengimo_storis_um }} µm
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+
         {% if not pozicija.paslauga_miltai %}
           <div class="poz-field-row">
             <span class="poz-field-label">Spalva</span>
@@ -508,7 +524,6 @@
           </div>
         {% endif %}
 
-        {# Miltų subblokas detail'e – rodom tik jei pasirinkta „Miltai“ #}
         {% if pozicija.paslauga_miltai %}
           <div class="poz-field-row">
             <span class="poz-field-label">Miltelių kodas</span>
@@ -618,7 +633,7 @@
       </div>
     </section>
 
-    {# 8. Papildomos paslaugos (NAUJA) #}
+    {# 8. Papildomos paslaugos #}
     <section class="poz-card">
       <h2 class="poz-card-title">Papildomos paslaugos</h2>
       <div class="poz-fields">
@@ -671,7 +686,7 @@
       </div>
     </section>
 
-    {# 11. Kaina – tik rėžinės eilutės (be "bendra kaina") #}
+    {# 11. Kaina – tik rėžinės eilutės #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Kaina</h2>
 

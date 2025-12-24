@@ -53,6 +53,13 @@ class Pozicija(models.Model):
     padengimas = models.CharField("Padengimas", max_length=200, blank=True, default="")
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, blank=True, default="")
     spalva = models.CharField("Spalva", max_length=120, blank=True, default="")
+    padengimo_storis_um = models.DecimalField(
+        "Padengimo storis (µm)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
 
     # Paslaugos logika: KTL / Miltai / Paruošimas
     paslauga_ktl = models.BooleanField("KTL", default=False)

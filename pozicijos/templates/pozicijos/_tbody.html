@@ -8,16 +8,29 @@
         {# Specialūs atvaizdavimai pasirinkimams (choices) #}
         {% if c.key == "maskavimo_tipas" %}
           {{ it.get_maskavimo_tipas_display|default:"—" }}
+
         {% elif c.key == "pakavimo_tipas" %}
           {{ it.get_pakavimo_tipas_display|default:"—" }}
+
         {% elif c.key == "atlikimo_terminas" %}
           {% if it.atlikimo_terminas is not None %}
             {{ it.atlikimo_terminas }} d.d.
           {% else %}
             —
           {% endif %}
+
+        {% elif c.key == "matmenys_xyz" %}
+          {{ it.matmenys_xyz|default:"—" }}
+
+        {% elif c.key == "padengimo_storis_um" %}
+          {% if it.padengimo_storis_um is not None %}
+            {{ it.padengimo_storis_um }} µm
+          {% else %}
+            —
+          {% endif %}
+
         {% else %}
-          {{ it|attr:c.key }}
+          {{ it|attr:c.key|default:"—" }}
         {% endif %}
       </td>
     {% endif %}

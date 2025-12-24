@@ -265,6 +265,16 @@
           </div>
         </div>
 
+        <div class="field-row">
+          <div class="field-label">{{ form.padengimo_storis_um.label }}</div>
+          <div class="field-control">
+            {{ form.padengimo_storis_um }}
+            {% if form.padengimo_storis_um.errors %}<div class="field-errors">{{ form.padengimo_storis_um.errors|striptags }}</div>{% endif %}
+            <div class="field-help">µm (mikronai), pvz. 60.00–120.00</div>
+          </div>
+        </div>
+
+
         <div class="field-row" id="row-spalva-top">
           <div class="field-label">{{ form.spalva.label }}</div>
           <div class="field-control">
