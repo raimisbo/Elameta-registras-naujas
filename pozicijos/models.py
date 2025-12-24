@@ -5,6 +5,7 @@ import os
 from decimal import Decimal
 
 from django.db import models
+from django.utils.text import slugify
 from simple_history.models import HistoricalRecords
 
 
@@ -243,6 +244,28 @@ class PozicijosBrezinys(models.Model):
     @property
     def is_step(self) -> bool:
         return self.ext in ("stp", "step")
+
+    def _preview_relpath(self) -> str:
+        """
+        Media-relative kelias, kur saugom PNG miniatiūrą.
+
+        Pastaba:
+        - naudojam pozicija_id + brez_id, kad nesikirstų pavadinimai
+        - slugify, kad būtų saugūs failų vardai
+        """
+        pid = self.pozicija_id or "poz"
+        bid = self.pk or "x"
+        base = os.path.splitext(self.filename or "")[0] or f"brezinys-{bid}"
+        safe = slugify(base) or f"brezinys-{bid}"
+        safe = safe[:80]
+        return f"pozicijos/breziniai/previews/{pid}-{bid}-{safe}.png"
+
+    def _legacy_preview_relpath(self) -> str:
+        """
+        Jei anksčiau buvo naudotas kitoks kelias (legacy) – čia laikom fallback valymui.
+        Jei neturi legacy – grąžinam tuščią string.
+        """
+        return ""
 
     @property
     def thumb_url(self) -> str:

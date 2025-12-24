@@ -48,6 +48,16 @@ def _get_form_suggestions() -> dict[str, list[str]]:
     return suggestions
 
 
+def _with_virtual_counts(qs):
+    """
+    Prideda virtualius stulpelius, kuriuos rodome sąraše (COLUMNS su type="virtual"):
+    - brez_count: brėžinių kiekis pozicijai
+
+    IMPORTANT: be šito `brez_count` šablone neturės ką rodyti.
+    """
+    return qs.annotate(brez_count=Count("breziniai", distinct=True))
+
+
 def pozicijos_list(request):
     visible_cols = visible_cols_from_request(request)
     q = request.GET.get("q", "").strip()
@@ -57,6 +67,7 @@ def pozicijos_list(request):
     current_dir = request.GET.get("dir", "asc")
 
     qs = Pozicija.objects.all()
+    qs = _with_virtual_counts(qs)
     qs = apply_filters(qs, request)
     qs = apply_sorting(qs, request)[:page_size]
 
@@ -81,6 +92,7 @@ def pozicijos_tbody(request):
     current_dir = request.GET.get("dir", "asc")
 
     qs = Pozicija.objects.all()
+    qs = _with_virtual_counts(qs)
     qs = apply_filters(qs, request)
     qs = apply_sorting(qs, request)[:page_size]
 
@@ -116,7 +128,9 @@ def pozicijos_stats(request):
 
 
 def pozicija_detail(request, pk):
-    poz = get_object_or_404(Pozicija, pk=pk)
+    # (bonus) pridedam ir detail'e, kad "Sistemos informacija -> Brėžinių skaičius" irgi būtų teisingas
+    poz = get_object_or_404(_with_virtual_counts(Pozicija.objects.all()), pk=pk)
+
     breziniai = PozicijosBrezinys.objects.filter(pozicija=poz).order_by("id")
     kainos_akt = poz.aktualios_kainos()
 
@@ -144,15 +158,12 @@ def pozicija_create(request):
 
     if request.method == "POST":
         form = PozicijaForm(request.POST, request.FILES)
-
-        # NOTE: formset prefix svarbus, kad niekas nesusipainiotų su kitom formom
         formset = KainaFormSet(request.POST, prefix="kainos", queryset=KainosEilute.objects.none())
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                pozicija = form.save()  # sukuria poziciją (atsiranda pk)
+                pozicija = form.save()
 
-                # dabar perrišam formset ant instance
                 formset.instance = pozicija
                 instances = formset.save(commit=False)
                 for inst in instances:
@@ -231,15 +242,26 @@ def pozicija_edit(request, pk):
 @require_POST
 def brezinys_upload(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
-    if request.method == "POST" and request.FILES.get("failas"):
+
+    if request.FILES.get("failas"):
         f = request.FILES["failas"]
         title = request.POST.get("pavadinimas", "").strip()
         br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
-        res = regenerate_missing_preview(br)
-        if res.ok:
-            messages.success(request, "Įkelta. Miniatiūra paruošta.")
+
+        if br.is_step:
+            messages.success(request, "Įkelta. STP/STEP miniatiūrai rodoma 3D ikona.")
         else:
-            messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {res.message}")
+            try:
+                res = regenerate_missing_preview(br)
+                if res.ok:
+                    messages.success(request, "Įkelta. Miniatiūra paruošta.")
+                else:
+                    messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {res.message}")
+            except Exception as e:
+                messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {e}")
+    else:
+        messages.error(request, "Pasirink failą.")
+
     return redirect("pozicijos:detail", pk=poz.pk)
 
 

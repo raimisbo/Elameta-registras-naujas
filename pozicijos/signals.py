@@ -12,8 +12,6 @@ from .services.previews import regenerate_missing_preview
 logger = logging.getLogger(__name__)
 
 
-
-
 @receiver(post_save, sender=PozicijosBrezinys)
 def auto_preview_on_create(sender, instance: PozicijosBrezinys, created: bool, **kwargs):
     """
@@ -23,6 +21,13 @@ def auto_preview_on_create(sender, instance: PozicijosBrezinys, created: bool, *
     Jei nepavyksta – request'o negadinam, tik log.
     """
     if not created or not instance.failas:
+        return
+
+    # STEP/STP – nieko negeneruojam
+    try:
+        if instance.is_step:
+            return
+    except Exception:
         return
 
     try:

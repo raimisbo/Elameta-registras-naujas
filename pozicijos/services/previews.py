@@ -1,5 +1,6 @@
 # pozicijos/services/previews.py
 from __future__ import annotations
+
 import io
 import os
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from typing import Optional
 from django.core.files.base import ContentFile
 
 from PIL import Image
+
 try:
     import fitz  # PyMuPDF
 except Exception:
@@ -21,6 +23,7 @@ THUMB_MAX_W = 1000   # generuojamo PNG maksimalus plotis (px)
 THUMB_MAX_H = 1000   # generuojamo PNG maksimalus aukštis (px)
 PDF_DPI = 144        # PDF rasterizavimo „dpi“ (~ kokybė vs. dydis)
 PNG_QUALITY = 85     # PNG kompresija (Pillow pats parinks tinkamai)
+
 
 @dataclass
 class PreviewResult:
@@ -42,6 +45,7 @@ def _pil_to_png_bytes(img: Image.Image) -> bytes:
 def _save_preview(b: PozicijosBrezinys, png_bytes: bytes) -> PreviewResult:
     rel = b._preview_relpath()  # pvz. pozicijos/breziniai/previews/<vardas>.png
     storage = b.failas.storage
+
     # užtikrinam katalogą (jei FileSystemStorage)
     if hasattr(storage, "path"):
         try:
@@ -50,18 +54,20 @@ def _save_preview(b: PozicijosBrezinys, png_bytes: bytes) -> PreviewResult:
             os.makedirs(abs_folder, exist_ok=True)
         except Exception:
             pass
+
     # įrašom
     content = ContentFile(png_bytes)
+
     # jei buvo – perrašom
     if storage.exists(rel):
         storage.delete(rel)
+
     saved_name = storage.save(rel, content)
 
     # sinchronizuojam su ImageField (kad būtų aiškus "source of truth")
     try:
         if getattr(b, "preview", None) is not None:
             b.preview.name = saved_name
-            # išsaugom tik preview – kad neperrašytumėm kitų laukų
             b.save(update_fields=["preview"])
     except Exception:
         # preview failas vis tiek yra storage'e – neblokuojam
@@ -75,8 +81,9 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
     Sugeneruoja PNG 'preview' pagal b.failas:
     - PDF -> pirmas puslapis per PyMuPDF (jei įdiegtas)
     - TIFF (ir multi-page) -> pirmas kadras per Pillow
-    - Dideli JPEG/PNG ir pan. -> sumažinta kopija (nebūtina, bet naudinga)
-    - Kitam (CAD ir pan.) – neatpažintas: grįžta ok=False (rodys fallback ikoną)
+    - Dideli JPEG/PNG ir pan. -> sumažinta kopija
+    - STEP/STP -> miniatiūros negeneruojam (UI rodo statinę 3D ikoną)
+    - Kiti formatai -> ok=False
     """
     name_lower = (getattr(b.failas, "name", "") or "").lower()
     if not name_lower:
@@ -85,14 +92,15 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
     _, ext = os.path.splitext(name_lower)
     ext = (ext or "").lstrip(".").lower()
 
+    # STEP/STP – miniatiūros negeneruojam (rodysim statinę ikoną)
+    if ext in ("stp", "step"):
+        return PreviewResult(ok=True, message="STP/STEP: rodoma 3D ikona (miniatiūra negeneruojama)")
+
     # PDF
     if ext == "pdf":
         if not fitz:
             return PreviewResult(ok=False, message="PyMuPDF neįdiegtas – PDF peržiūra negalima")
         try:
-            # skaitom iš failo
-            # Jei storage turi .path: naudoti path, kitaip – bytes
-            storage = b.failas.storage
             stream = b.failas.open("rb").read()
             doc = fitz.open(stream=stream, filetype="pdf")
             if doc.page_count == 0:
@@ -102,6 +110,7 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
             mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat, alpha=False)  # be alfa
             png_bytes = pix.tobytes("png")
+
             # dar kartą praleidžiam per Pillow, kad unifikuotume max dydį
             img = Image.open(io.BytesIO(png_bytes))
             png_bytes = _pil_to_png_bytes(img)
@@ -123,12 +132,11 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
         except Exception as e:
             return PreviewResult(ok=False, message=f"TIFF preview klaida: {e}")
 
-    # Standartiniai vaizdai (dideli) – galim sugeneruoti sumažintą preview
+    # Standartiniai vaizdai – sugeneruojam sumažintą preview
     if ext in ("jpg", "jpeg", "png", "webp", "bmp", "gif"):
         try:
             b.failas.seek(0)
             img = Image.open(b.failas)
-            # jei jau mažas – galima tiesiog praleisti; bet išlaikom vienodą kelią
             png_bytes = _pil_to_png_bytes(img)
             return _save_preview(b, png_bytes)
         except Exception as e:
@@ -140,13 +148,22 @@ def generate_preview_for_instance(b: PozicijosBrezinys) -> PreviewResult:
 
 def regenerate_missing_preview(b: PozicijosBrezinys) -> PreviewResult:
     """Sugeneruoja, jei nėra. Jei yra – grįžta ok=True be veiksmų."""
+    # Jei STEP/STP – preview nenaudojam
+    try:
+        if getattr(b, "is_step", False):
+            return PreviewResult(ok=True, message="STP/STEP: rodoma 3D ikona")
+    except Exception:
+        pass
+
     try:
         if getattr(b, "preview", None) and getattr(b.preview, "name", ""):
             return PreviewResult(ok=True, message="Jau yra", saved_path=b.preview.name)
     except Exception:
         pass
+
     storage = b.failas.storage
     rel = b._preview_relpath()
     if rel and storage.exists(rel):
         return PreviewResult(ok=True, message="Jau yra", saved_path=rel)
+
     return generate_preview_for_instance(b)
