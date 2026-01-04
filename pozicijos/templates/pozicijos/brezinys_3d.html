@@ -91,6 +91,15 @@
       box-shadow: 0 0 0 2px rgba(0,0,0,.25);
       transform: translate(-9999px, -9999px);
     }
+
+    /* Preview taškas (snap indikacija) */
+    .mpt.preview {
+      width: 12px;
+      height: 12px;
+      background: rgba(253, 224, 71, .95);
+      border-color: rgba(255,255,255,.90);
+    }
+
     .mlabel {
       position:absolute;
       padding: 4px 8px;
@@ -113,6 +122,11 @@
     const MEASURE_SCALE = 1.0;
     const MEASURE_UNIT  = "mm";
 
+    // Snap slenksčiai (px overlay koordinatėse).
+    // Didesnis -> agresyvesnis snap.
+    const SNAP_VERTEX_PX = 14;
+    const SNAP_EDGE_PX   = 10;
+
     function setStatus(msg, show = true) {
       const el = document.getElementById('status');
       el.textContent = msg;
@@ -126,8 +140,13 @@
 
     function isThreeCamera(obj) {
       if (!obj) return false;
-      // Tipiškai THREE.Camera turi projectionMatrix ir matrixWorldInverse
       return !!(obj.projectionMatrix && obj.matrixWorldInverse) || !!(obj.isCamera || obj.isPerspectiveCamera || obj.isOrthographicCamera);
+    }
+
+    function dist2d(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return Math.sqrt(dx*dx + dy*dy);
     }
 
     window.addEventListener('load', () => {
@@ -138,6 +157,7 @@
 
       const host = document.getElementById('viewer');
       const overlay = document.getElementById('measureOverlay');
+      const pprev = document.getElementById('mprev');
       const p1el = document.getElementById('mpt1');
       const p2el = document.getElementById('mpt2');
       const line = document.getElementById('mline');
@@ -152,11 +172,21 @@
       let measureOn = false;
       let P1v = null; // THREE.Vector3
       let P2v = null; // THREE.Vector3
+      let P1snap = null; // 'V' | 'E' | 'F'
+      let P2snap = null; // 'V' | 'E' | 'F'
+
       // fallback screen coords (kad NIEKADA nedingtų, net jei camera nerandam)
       let S1f = null; // {x,y,visible}
       let S2f = null;
 
+      // Preview snap
+      let preview = null; // {snap:'V'|'E'|'F', s:{x,y,visible}}
+
       let rafId = null;
+
+      // throttling move
+      let moveRaf = null;
+      let lastMove = null;
 
       function showOverlay(on) {
         overlay.style.display = on ? 'block' : 'none';
@@ -167,7 +197,9 @@
           el.style.transform = 'translate(-9999px, -9999px)';
           return;
         }
-        el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-5px, -5px)`;
+        // čia el yra 10x10 (ar 12x12 preview), perkeliam į centrą
+        const sz = el.classList.contains('preview') ? 6 : 5;
+        el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-${sz}px, -${sz}px)`;
       }
 
       function setLine(a, b) {
@@ -194,7 +226,12 @@
 
       function clearMeasure(keepMode=false) {
         P1v = null; P2v = null;
+        P1snap = null; P2snap = null;
         S1f = null; S2f = null;
+
+        preview = null;
+        setMarker(pprev, null);
+
         setMarker(p1el, null);
         setMarker(p2el, null);
         setLine(null, null);
@@ -204,7 +241,11 @@
         btnClear.style.display = (measureOn ? 'inline-block' : 'none');
 
         if (keepMode && measureOn) {
-          setStatus("Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\nESC – išjungti. \"Išvalyti\" – nuvalyti.");
+          setStatus(
+            "Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\n" +
+            "Auto-snap: Vertex > Edge > Free.\n" +
+            "ESC – išjungti. \"Išvalyti\" – nuvalyti."
+          );
         } else if (!measureOn) {
           setStatus("", false);
         }
@@ -233,7 +274,6 @@
       function getThreeCam() {
         if (!innerViewer) return null;
 
-        // bandome kelis kandidatus
         const cands = [];
         try {
           if (typeof innerViewer.GetCamera === "function") cands.push(innerViewer.GetCamera());
@@ -246,11 +286,9 @@
           if (!c) continue;
           if (isThreeCamera(c)) return c;
 
-          // wrapper'iai (pvz. { camera: THREE.Camera } arba { threeCamera: ... })
           if (c.camera && isThreeCamera(c.camera)) return c.camera;
           if (c.threeCamera && isThreeCamera(c.threeCamera)) return c.threeCamera;
 
-          // metodai (retai, bet būna)
           try {
             if (typeof c.GetThreeCamera === "function") {
               const tc = c.GetThreeCamera();
@@ -274,7 +312,6 @@
         const x = (v.x * 0.5 + 0.5) * w;
         const y = (-v.y * 0.5 + 0.5) * h;
 
-        // mažiau agresyvus visible (kad “neužmuštų” vaizdo)
         const visible =
           isFinite(x) && isFinite(y) &&
           x >= -100 && x <= (w + 100) &&
@@ -295,6 +332,13 @@
         setMarker(p1el, s1);
         setMarker(p2el, s2);
         setLine(s1, s2);
+
+        // preview (tik kai renkam taškus)
+        if (preview && (!P1v || !P2v)) {
+          setMarker(pprev, preview.s);
+        } else {
+          setMarker(pprev, null);
+        }
 
         if (P1v && P2v) {
           const raw = (typeof P1v.distanceTo === "function") ? P1v.distanceTo(P2v) : null;
@@ -328,6 +372,227 @@
         rafId = null;
       }
 
+      // --------- SNAP: intersection normalizavimas ir triange/edge logika ---------
+
+      function normalizeIntersection(rawHit) {
+        if (!rawHit) return null;
+
+        // dažniausi wrapper'iai
+        let cand = rawHit.intersection || rawHit.hit || rawHit.result || rawHit;
+
+        if (!cand || !cand.point) return null;
+
+        // Jei cand yra rawHit.intersection, bet object/face yra rawHit lygyje – pamėginam sulieti.
+        if (cand === rawHit.intersection) {
+          const merged = Object.assign({}, cand);
+          if (!merged.object && rawHit.object) merged.object = rawHit.object;
+          if (!merged.face && rawHit.face) merged.face = rawHit.face;
+          if (typeof merged.faceIndex !== 'number' && typeof rawHit.faceIndex === 'number') merged.faceIndex = rawHit.faceIndex;
+          if (!merged.point && rawHit.point) merged.point = rawHit.point;
+          return merged;
+        }
+
+        return cand;
+      }
+
+      function getVector3CtorFrom(inter) {
+        if (inter && inter.point && inter.point.constructor) return inter.point.constructor;
+        const cam = getThreeCam();
+        if (cam && cam.position && cam.position.constructor) return cam.position.constructor;
+        return null;
+      }
+
+      function getTriangleWorldVerts(inter) {
+        // Reikia: inter.object + geometry.position + (face arba faceIndex)
+        if (!inter || !inter.object || !inter.object.geometry) return null;
+
+        const obj = inter.object;
+        const geom = obj.geometry;
+
+        const posAttr = geom.attributes && geom.attributes.position;
+        if (!posAttr) return null;
+
+        const Vector3 = getVector3CtorFrom(inter);
+        if (typeof Vector3 !== 'function') return null;
+
+        let ia = null, ib = null, ic = null;
+
+        if (inter.face && typeof inter.face.a === 'number') {
+          ia = inter.face.a;
+          ib = inter.face.b;
+          ic = inter.face.c;
+        } else if (typeof inter.faceIndex === 'number') {
+          if (geom.index && geom.index.array) {
+            const idx = geom.index.array;
+            const i = inter.faceIndex * 3;
+            ia = idx[i];
+            ib = idx[i+1];
+            ic = idx[i+2];
+          } else {
+            const i = inter.faceIndex * 3;
+            ia = i; ib = i+1; ic = i+2;
+          }
+        } else {
+          return null;
+        }
+
+        try {
+          const vA = new Vector3().fromBufferAttribute(posAttr, ia).applyMatrix4(obj.matrixWorld);
+          const vB = new Vector3().fromBufferAttribute(posAttr, ib).applyMatrix4(obj.matrixWorld);
+          const vC = new Vector3().fromBufferAttribute(posAttr, ic).applyMatrix4(obj.matrixWorld);
+          return { vA, vB, vC };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function closestPointOnSegment(p, a, b) {
+        // p,a,b - Vector3
+        if (!p || !a || !b || typeof p.clone !== 'function') return null;
+
+        const ab = b.clone().sub(a);
+        const ap = p.clone().sub(a);
+        const denom = (typeof ab.lengthSq === 'function') ? ab.lengthSq() : null;
+        if (!denom || denom <= 1e-12) return a.clone();
+
+        let t = ap.dot(ab) / denom;
+        t = Math.max(0, Math.min(1, t));
+
+        return a.clone().add(ab.multiplyScalar(t));
+      }
+
+      function computeSnap(interRaw, mouseCoords) {
+        const inter = normalizeIntersection(interRaw);
+        if (!inter || !inter.point) return null;
+
+        const cam = getThreeCam();
+        const mouse = { x: mouseCoords.x, y: mouseCoords.y };
+
+        // Jei nėra kameros arba nėra tri info – grąžinam free
+        if (!cam) {
+          const pt = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
+          return { pt, snap: 'F', screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
+        }
+
+        const tri = getTriangleWorldVerts(inter);
+        if (!tri) {
+          const pt = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
+          const s = projectToOverlay(pt, cam);
+          return { pt, snap: 'F', screen: s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
+        }
+
+        // 1) Vertex snap (arčiausias iš 3)
+        const vList = [tri.vA, tri.vB, tri.vC];
+        let bestV = null;
+
+        for (const v of vList) {
+          const s = projectToOverlay(v, cam);
+          if (!s) continue;
+          const d = dist2d(s, mouse);
+          if (!bestV || d < bestV.d) bestV = { v, s, d };
+        }
+
+        if (bestV && bestV.d <= SNAP_VERTEX_PX) {
+          return {
+            pt: bestV.v.clone(),
+            snap: 'V',
+            screen: bestV.s,
+            screenFallback: { x: mouse.x, y: mouse.y, visible: true }
+          };
+        }
+
+        // 2) Edge snap (AB, BC, CA) – artimiausias taškas ant segmento (3D), tada patikrinam px atstumą
+        const p = inter.point.clone ? inter.point.clone() : inter.point;
+        const edges = [
+          { a: tri.vA, b: tri.vB },
+          { a: tri.vB, b: tri.vC },
+          { a: tri.vC, b: tri.vA },
+        ];
+
+        let bestE = null;
+        for (const e of edges) {
+          const cp = closestPointOnSegment(p, e.a, e.b);
+          if (!cp) continue;
+          const s = projectToOverlay(cp, cam);
+          if (!s) continue;
+          const d = dist2d(s, mouse);
+          if (!bestE || d < bestE.d) bestE = { cp, s, d };
+        }
+
+        if (bestE && bestE.d <= SNAP_EDGE_PX) {
+          return {
+            pt: bestE.cp.clone ? bestE.cp.clone() : bestE.cp,
+            snap: 'E',
+            screen: bestE.s,
+            screenFallback: { x: mouse.x, y: mouse.y, visible: true }
+          };
+        }
+
+        // 3) Free
+        const pt = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
+        const s = projectToOverlay(pt, cam);
+        return { pt, snap: 'F', screen: s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
+      }
+
+      // --------- Preview (mousemove) ---------
+
+      function hidePreview() {
+        preview = null;
+        setMarker(pprev, null);
+      }
+
+      function onHostMouseMove(ev) {
+        if (!measureOn) return;
+        if (!isLoaded || !innerViewer) return;
+        if (P1v && P2v) return; // baigta – preview nebūtinas
+
+        const rect = overlay.getBoundingClientRect();
+        const x = ev.clientX - rect.left;
+        const y = ev.clientY - rect.top;
+
+        // už ribų – slėpti
+        if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > rect.width || y > rect.height) {
+          hidePreview();
+          return;
+        }
+
+        lastMove = { x, y };
+        if (moveRaf) return;
+
+        moveRaf = requestAnimationFrame(() => {
+          moveRaf = null;
+          if (!lastMove || !measureOn) return;
+
+          let hit = null;
+          try {
+            hit = innerViewer.GetMeshIntersectionUnderMouse(OVNS.IntersectionMode.MeshAndLine, lastMove);
+          } catch (e) {
+            hidePreview();
+            return;
+          }
+
+          if (!hit || !hit.point) {
+            hidePreview();
+            return;
+          }
+
+          const snap = computeSnap(hit, lastMove);
+          if (!snap) {
+            hidePreview();
+            return;
+          }
+
+          // Preview ekraninė pozicija:
+          // - jei turim projektuotą 'screen' – naudojam ją
+          // - jei ne – fallback į mouse coords
+          const s = snap.screen || snap.screenFallback;
+          preview = { snap: snap.snap, s };
+          updateOverlay();
+        });
+      }
+
+      // --------- Click handler (naudoja snap) ---------
+
       function onMeasureClick(button, mouseCoords) {
         if (!measureOn) return;
         if (button !== 1) return;
@@ -337,32 +602,42 @@
           return;
         }
 
-        let isect = null;
+        let hit = null;
         try {
-          isect = innerViewer.GetMeshIntersectionUnderMouse(OVNS.IntersectionMode.MeshAndLine, mouseCoords);
+          hit = innerViewer.GetMeshIntersectionUnderMouse(OVNS.IntersectionMode.MeshAndLine, mouseCoords);
         } catch (e) {
           setStatus("Nepavyko atlikti picking (GetMeshIntersectionUnderMouse).\n" + (e && e.message ? e.message : String(e)));
           return;
         }
 
-        if (!isect || !isect.point) {
+        if (!hit || !hit.point) {
           setStatus("Nepataikei ant modelio. Bandyk spustelėti ant geometrijos.");
           return;
         }
 
-        // 3D taškas
-        const pt = (typeof isect.point.clone === "function") ? isect.point.clone() : isect.point;
+        const snap = computeSnap(hit, mouseCoords);
+        if (!snap || !snap.pt) {
+          setStatus("Nepavyko apskaičiuoti snap (trūksta geometrijos/faceIndex). Bus naudojamas Free.");
+        }
 
-        // fallback 2D coords (visada veikia)
-        const sc = { x: mouseCoords.x, y: mouseCoords.y, visible: true };
+        const pt = (snap && snap.pt) ? snap.pt : (typeof hit.point.clone === "function" ? hit.point.clone() : hit.point);
+        const st = (snap && snap.snap) ? snap.snap : 'F';
+
+        // Screen coords:
+        // - jei turim projektuotą 'screen' – naudojam ją (tiksliau, ypač vertex/edge)
+        // - fallback: mouseCoords (visada veikia)
+        const sc = (snap && (snap.screen || snap.screenFallback)) ? (snap.screen || snap.screenFallback) : { x: mouseCoords.x, y: mouseCoords.y, visible: true };
 
         if (!P1v) {
           P1v = pt;
+          P1snap = st;
           S1f = sc;
+          hidePreview();
           updateOverlay();
+
           setStatus(
             "Matavimas: pasirinktas 1 taškas.\n" +
-            `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
+            `P1[${P1snap}]: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
             "Dabar spausk 2 tašką."
           );
           return;
@@ -370,7 +645,9 @@
 
         if (!P2v) {
           P2v = pt;
+          P2snap = st;
           S2f = sc;
+          hidePreview();
           updateOverlay();
 
           const raw = (typeof P1v.distanceTo === "function") ? P1v.distanceTo(P2v) : null;
@@ -378,9 +655,9 @@
 
           setStatus(
             "Matavimas: parinkti 2 taškai.\n" +
-            (d !== null ? `Atstumas: ${fmt(d, 2)} ${MEASURE_UNIT}\n\n` : "") +
-            `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
-            `P2: X=${fmt(P2v.x)} Y=${fmt(P2v.y)} Z=${fmt(P2v.z)}\n\n` +
+            (d !== null ? `Atstumas: ${fmt(d, 2)} ${MEASURE_UNIT}\n` : "") +
+            `P1[${P1snap}]: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
+            `P2[${P2snap}]: X=${fmt(P2v.x)} Y=${fmt(P2v.y)} Z=${fmt(P2v.z)}\n\n` +
             "\"Išvalyti\" – naujam matavimui. ESC – išjungti matavimą."
           );
           return;
@@ -389,11 +666,14 @@
         // 3-ias click -> pradėti iš naujo
         clearMeasure(true);
         P1v = pt;
+        P1snap = st;
         S1f = sc;
+        hidePreview();
         updateOverlay();
+
         setStatus(
           "Matavimas: pasirinktas 1 taškas.\n" +
-          `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
+          `P1[${P1snap}]: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
           "Dabar spausk 2 tašką."
         );
       }
@@ -405,7 +685,11 @@
           onModelLoaded: () => {
             isLoaded = true;
             if (measureOn) {
-              setStatus("Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\nESC – išjungti. \"Išvalyti\" – nuvalyti.");
+              setStatus(
+                "Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\n" +
+                "Auto-snap: Vertex > Edge > Free.\n" +
+                "ESC – išjungti. \"Išvalyti\" – nuvalyti."
+              );
             } else {
               setStatus("", false);
             }
@@ -430,6 +714,10 @@
           }
           onMeasureClick(button, mouseCoords);
         });
+
+        // Preview mousemove: klausom ant host (nes overlay pointer-events: none)
+        host.addEventListener('mousemove', onHostMouseMove, { passive: true });
+        host.addEventListener('mouseleave', () => { hidePreview(); }, { passive: true });
 
         window.addEventListener('resize', () => {
           try { embedded.Resize(); } catch (e) {}
@@ -483,6 +771,10 @@
       <line id="mline" x1="-9999" y1="-9999" x2="-9999" y2="-9999"
             stroke="rgba(147,197,253,.95)" stroke-width="2" />
     </svg>
+
+    <!-- Preview snap marker -->
+    <div id="mprev" class="mpt preview"></div>
+
     <div id="mpt1" class="mpt"></div>
     <div id="mpt2" class="mpt"></div>
     <div id="mlabel" class="mlabel"></div>
