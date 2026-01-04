@@ -143,7 +143,7 @@
                     <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" target="_blank" class="btn-ghost-sm">3D</a>
                   {% endif %}
                 {% endwith %}
-                <form method="post"l" action="{% url 'pozicijos:brezinys_delete' pozicija.id brez.id %}" onsubmit="return confirm('Ar tikrai šalinti brėžinį?');">
+                <form method="post"1" action="{% url 'pozicijos:brezinys_delete' pozicija.id brez.id %}" onsubmit="return confirm('Ar tikrai šalinti brėžinį?');">
                   {% csrf_token %}
                   <button type="submit" class="btn-link-sm">Šalinti</button>
                 </form>

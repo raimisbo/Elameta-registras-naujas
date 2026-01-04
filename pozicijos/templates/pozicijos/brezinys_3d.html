@@ -21,7 +21,6 @@
       box-sizing: border-box;
       gap: 12px;
     }
-
     .topbar .left, .topbar .right { display:flex; gap:10px; align-items:center; }
     .topbar .title { min-width: 0; text-align: center; flex: 1; }
     .topbar .title .main { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -50,7 +49,6 @@
       width: 100%;
     }
 
-    /* Status box */
     #status {
       position: fixed;
       left: 12px;
@@ -60,13 +58,13 @@
       padding: 8px 10px;
       border-radius: 8px;
       font-size: 12px;
-      max-width: min(720px, calc(100vw - 24px));
+      max-width: min(820px, calc(100vw - 24px));
       display: none;
       white-space: pre-wrap;
       z-index: 9999;
     }
 
-    /* Measure overlay (markers + line) */
+    /* Overlay (NE viduje #viewer, kad O3DV jo neištrintų) */
     #measureOverlay {
       position: fixed;
       left: 0;
@@ -77,23 +75,32 @@
       display: none;
       z-index: 9000;
     }
-
-    .mpt {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(147,197,253,.85);
-      border: 2px solid rgba(255,255,255,.75);
-      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
-      transform: translate(-9999px, -9999px);
-    }
-
     #measureSvg {
       position:absolute;
       left:0; top:0;
       width:100%;
       height:100%;
+    }
+    .mpt {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(147,197,253,.90);
+      border: 2px solid rgba(255,255,255,.80);
+      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+      transform: translate(-9999px, -9999px);
+    }
+    .mlabel {
+      position:absolute;
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #e5e7eb;
+      transform: translate(-9999px, -9999px);
+      white-space: nowrap;
     }
   </style>
 
@@ -101,9 +108,8 @@
   <script>
     const STEP_MODEL_URL = "{{ brezinys.failas.url|escapejs }}";
 
-    // Jei vienetai “ne tie” – koreguok čia:
-    // Pvz. jei modelio vienetai yra mm, palik 1.0 ir "mm".
-    // Jei nori metrais iš mm: scale = 0.001, unit = "m".
+    // Jei reikia vienetų konversijos:
+    // mm -> m: 0.001 ir "m"
     const MEASURE_SCALE = 1.0;
     const MEASURE_UNIT  = "mm";
 
@@ -118,49 +124,46 @@
       return n.toFixed(d);
     }
 
-    function dist3(a, b) {
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const dz = b.z - a.z;
-      return Math.sqrt(dx*dx + dy*dy + dz*dz);
+    function isThreeCamera(obj) {
+      if (!obj) return false;
+      // Tipiškai THREE.Camera turi projectionMatrix ir matrixWorldInverse
+      return !!(obj.projectionMatrix && obj.matrixWorldInverse) || !!(obj.isCamera || obj.isPerspectiveCamera || obj.isOrthographicCamera);
     }
 
     window.addEventListener('load', () => {
       const OVNS = window.OV || (typeof OV !== 'undefined' ? OV : null);
-      if (!OVNS) {
-        setStatus("O3DV nepasiekiamas: nerastas global OV.\nPatikrink, ar /static/pozicijos/js/o3dv.min.js tikrai užsikrauna be JS klaidų.");
-        return;
-      }
-      if (!OVNS.EmbeddedViewer) {
-        setStatus("O3DV įkeltas, bet nerastas OV.EmbeddedViewer.\nTai reiškia, kad o3dv.min.js build'as ne tas, kurio tikisi šitas šablonas.");
-        return;
-      }
-      if (!STEP_MODEL_URL) {
-        setStatus("Tuščias STEP_MODEL_URL (brezinys.failas.url). Patikrink, ar brėžiniui priskirtas failas.");
-        return;
-      }
+      if (!OVNS) { setStatus("O3DV nepasiekiamas: nerastas global OV."); return; }
+      if (!OVNS.EmbeddedViewer) { setStatus("O3DV įkeltas, bet nerastas OV.EmbeddedViewer."); return; }
+      if (!STEP_MODEL_URL) { setStatus("Tuščias STEP_MODEL_URL (brezinys.failas.url)."); return; }
 
-      const parent = document.getElementById('viewer');
+      const host = document.getElementById('viewer');
       const overlay = document.getElementById('measureOverlay');
       const p1el = document.getElementById('mpt1');
       const p2el = document.getElementById('mpt2');
       const line = document.getElementById('mline');
+      const label = document.getElementById('mlabel');
 
+      let embedded = null;
+      let innerViewer = null;
+      let navigation = null;
       let isLoaded = false;
 
       // Measure state
       let measureOn = false;
-      let P1 = null, P2 = null;          // 3D points {x,y,z}
-      let S1 = null, S2 = null;          // screen points {x,y} (local canvas coords)
-      let innerViewer = null;
-      let navigation = null;
+      let P1v = null; // THREE.Vector3
+      let P2v = null; // THREE.Vector3
+      // fallback screen coords (kad NIEKADA nedingtų, net jei camera nerandam)
+      let S1f = null; // {x,y,visible}
+      let S2f = null;
+
+      let rafId = null;
 
       function showOverlay(on) {
         overlay.style.display = on ? 'block' : 'none';
       }
 
       function setMarker(el, s) {
-        if (!s) {
+        if (!s || !s.visible) {
           el.style.transform = 'translate(-9999px, -9999px)';
           return;
         }
@@ -168,11 +171,9 @@
       }
 
       function setLine(a, b) {
-        if (!a || !b) {
-          line.setAttribute('x1', '-9999');
-          line.setAttribute('y1', '-9999');
-          line.setAttribute('x2', '-9999');
-          line.setAttribute('y2', '-9999');
+        if (!a || !b || !a.visible || !b.visible) {
+          line.setAttribute('x1', '-9999'); line.setAttribute('y1', '-9999');
+          line.setAttribute('x2', '-9999'); line.setAttribute('y2', '-9999');
           return;
         }
         line.setAttribute('x1', String(a.x));
@@ -181,12 +182,23 @@
         line.setAttribute('y2', String(b.y));
       }
 
+      function setLabel(s, text) {
+        if (!s || !s.visible) {
+          label.style.transform = 'translate(-9999px, -9999px)';
+          label.textContent = '';
+          return;
+        }
+        label.textContent = text;
+        label.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -120%)`;
+      }
+
       function clearMeasure(keepMode=false) {
-        P1 = null; P2 = null;
-        S1 = null; S2 = null;
+        P1v = null; P2v = null;
+        S1f = null; S2f = null;
         setMarker(p1el, null);
         setMarker(p2el, null);
         setLine(null, null);
+        setLabel(null, "");
 
         const btnClear = document.getElementById('btnClear');
         btnClear.style.display = (measureOn ? 'inline-block' : 'none');
@@ -210,33 +222,123 @@
         if (measureOn) {
           showOverlay(true);
           clearMeasure(true);
+          startTick();
         } else {
           showOverlay(false);
           clearMeasure(false);
+          stopTick();
         }
       }
 
-      function onMeasureClick(button, mouseCoords) {
-        // mouseCoords yra local canvas coords (Coord2D su x/y)
-        if (!measureOn) {
-          // jei ateityje turėsi kažkokį click handlerį – čia galima būtų jį kviesti
-          return;
-        }
+      function getThreeCam() {
+        if (!innerViewer) return null;
 
-        // tik kairys pelės mygtukas
-        if (button !== 1) {
-          return;
+        // bandome kelis kandidatus
+        const cands = [];
+        try {
+          if (typeof innerViewer.GetCamera === "function") cands.push(innerViewer.GetCamera());
+        } catch (e) {}
+        cands.push(innerViewer.camera);
+        cands.push(innerViewer.renderer && innerViewer.renderer.camera);
+        cands.push(innerViewer.renderer && innerViewer.renderer.threeCamera);
+
+        for (const c of cands) {
+          if (!c) continue;
+          if (isThreeCamera(c)) return c;
+
+          // wrapper'iai (pvz. { camera: THREE.Camera } arba { threeCamera: ... })
+          if (c.camera && isThreeCamera(c.camera)) return c.camera;
+          if (c.threeCamera && isThreeCamera(c.threeCamera)) return c.threeCamera;
+
+          // metodai (retai, bet būna)
+          try {
+            if (typeof c.GetThreeCamera === "function") {
+              const tc = c.GetThreeCamera();
+              if (isThreeCamera(tc)) return tc;
+            }
+          } catch (e) {}
         }
+        return null;
+      }
+
+      function projectToOverlay(vec3, cam) {
+        if (!vec3 || !cam) return null;
+
+        const w = overlay.clientWidth;
+        const h = overlay.clientHeight;
+        if (!w || !h) return null;
+
+        if (typeof vec3.clone !== "function" || typeof vec3.project !== "function") return null;
+
+        const v = vec3.clone().project(cam); // NDC
+        const x = (v.x * 0.5 + 0.5) * w;
+        const y = (-v.y * 0.5 + 0.5) * h;
+
+        // mažiau agresyvus visible (kad “neužmuštų” vaizdo)
+        const visible =
+          isFinite(x) && isFinite(y) &&
+          x >= -100 && x <= (w + 100) &&
+          y >= -100 && y <= (h + 100);
+
+        return { x, y, visible };
+      }
+
+      function updateOverlay() {
+        if (!measureOn) return;
+
+        const cam = getThreeCam();
+
+        // jei cam nerandam – rodom fallback (iš click coords)
+        const s1 = (cam && P1v) ? projectToOverlay(P1v, cam) : S1f;
+        const s2 = (cam && P2v) ? projectToOverlay(P2v, cam) : S2f;
+
+        setMarker(p1el, s1);
+        setMarker(p2el, s2);
+        setLine(s1, s2);
+
+        if (P1v && P2v) {
+          const raw = (typeof P1v.distanceTo === "function") ? P1v.distanceTo(P2v) : null;
+          const d = (raw !== null) ? (raw * MEASURE_SCALE) : null;
+
+          if (s1 && s2 && s1.visible && s2.visible && d !== null) {
+            const mid = { x: (s1.x + s2.x)/2, y: (s1.y + s2.y)/2, visible: true };
+            setLabel(mid, `${fmt(d, 2)} ${MEASURE_UNIT}`);
+          } else {
+            setLabel(null, "");
+          }
+        } else {
+          setLabel(null, "");
+        }
+      }
+
+      function tick() {
+        if (!measureOn) { rafId = null; return; }
+        updateOverlay();
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function startTick() {
+        if (rafId !== null) return;
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function stopTick() {
+        if (rafId === null) return;
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+
+      function onMeasureClick(button, mouseCoords) {
+        if (!measureOn) return;
+        if (button !== 1) return;
 
         if (!isLoaded || !innerViewer) {
-          setStatus("Modelis dar kraunasi… palauk, kol užsikraus.");
+          setStatus("Modelis dar kraunasi… palauk.");
           return;
         }
 
-        // Paimam sankirtą su modeliu (mesh + line)
         let isect = null;
         try {
-          // Viewer klasė turi GetMeshIntersectionUnderMouse
           isect = innerViewer.GetMeshIntersectionUnderMouse(OVNS.IntersectionMode.MeshAndLine, mouseCoords);
         } catch (e) {
           setStatus("Nepavyko atlikti picking (GetMeshIntersectionUnderMouse).\n" + (e && e.message ? e.message : String(e)));
@@ -244,58 +346,60 @@
         }
 
         if (!isect || !isect.point) {
-          setStatus("Nepataikei ant modelio. Bandyk spustelėti ant geometrijos (ne fone).");
+          setStatus("Nepataikei ant modelio. Bandyk spustelėti ant geometrijos.");
           return;
         }
 
-        // 3D taškas (THREE.Vector3) -> plain object
-        const pt = { x: isect.point.x, y: isect.point.y, z: isect.point.z };
+        // 3D taškas
+        const pt = (typeof isect.point.clone === "function") ? isect.point.clone() : isect.point;
 
-        // Ekrano koordinatės overlay’ui: naudojam mouseCoords (local coords)
-        const sc = { x: mouseCoords.x, y: mouseCoords.y };
+        // fallback 2D coords (visada veikia)
+        const sc = { x: mouseCoords.x, y: mouseCoords.y, visible: true };
 
-        if (!P1) {
-          P1 = pt; S1 = sc;
-          setMarker(p1el, S1);
+        if (!P1v) {
+          P1v = pt;
+          S1f = sc;
+          updateOverlay();
           setStatus(
             "Matavimas: pasirinktas 1 taškas.\n" +
-            `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
+            `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
             "Dabar spausk 2 tašką."
           );
           return;
         }
 
-        if (!P2) {
-          P2 = pt; S2 = sc;
-          setMarker(p2el, S2);
-          setLine(S1, S2);
+        if (!P2v) {
+          P2v = pt;
+          S2f = sc;
+          updateOverlay();
 
-          const d = dist3(P1, P2);
-          const dScaled = d * MEASURE_SCALE;
+          const raw = (typeof P1v.distanceTo === "function") ? P1v.distanceTo(P2v) : null;
+          const d = (raw !== null) ? (raw * MEASURE_SCALE) : null;
 
           setStatus(
             "Matavimas: parinkti 2 taškai.\n" +
-            `Atstumas: ${fmt(dScaled, 2)} ${MEASURE_UNIT} (raw: ${fmt(d, 6)})\n\n` +
-            `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
-            `P2: X=${fmt(P2.x)} Y=${fmt(P2.y)} Z=${fmt(P2.z)}\n\n` +
+            (d !== null ? `Atstumas: ${fmt(d, 2)} ${MEASURE_UNIT}\n\n` : "") +
+            `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
+            `P2: X=${fmt(P2v.x)} Y=${fmt(P2v.y)} Z=${fmt(P2v.z)}\n\n` +
             "\"Išvalyti\" – naujam matavimui. ESC – išjungti matavimą."
           );
           return;
         }
 
-        // Jei jau turim 2 taškus – trečias click pradeda iš naujo (patogu)
+        // 3-ias click -> pradėti iš naujo
         clearMeasure(true);
-        P1 = pt; S1 = sc;
-        setMarker(p1el, S1);
+        P1v = pt;
+        S1f = sc;
+        updateOverlay();
         setStatus(
           "Matavimas: pasirinktas 1 taškas.\n" +
-          `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
+          `P1: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
           "Dabar spausk 2 tašką."
         );
       }
 
       try {
-        const embedded = new OVNS.EmbeddedViewer(parent, {
+        embedded = new OVNS.EmbeddedViewer(host, {
           backgroundColor : new OVNS.RGBAColor(11, 18, 32, 255),
           defaultColor    : new OVNS.RGBColor(200, 200, 200),
           onModelLoaded: () => {
@@ -311,30 +415,27 @@
           }
         });
 
-        // Užkrovimas
         embedded.LoadModelFromUrlList([STEP_MODEL_URL]);
 
-        // Prieigos taškai
-        innerViewer = embedded.GetViewer();      // Viewer
-        navigation = innerViewer.navigation;     // Navigation
+        innerViewer = embedded.GetViewer();
+        navigation = innerViewer.navigation;
 
-        // Įstatom click handlerį per Navigation (naudojam jų click detector)
+        // išsaugom buvusį click handlerį (jei yra)
         const prevClick = navigation.onMouseClick;
+
         navigation.SetMouseClickHandler((button, mouseCoords) => {
-          // jei matavimas išjungtas – atiduodam ankstesniam handleriui (jei buvo)
           if (!measureOn) {
-            if (typeof prevClick === 'function') prevClick(button, mouseCoords);
+            if (typeof prevClick === "function") prevClick(button, mouseCoords);
             return;
           }
           onMeasureClick(button, mouseCoords);
         });
 
-        // Resize
         window.addEventListener('resize', () => {
           try { embedded.Resize(); } catch (e) {}
+          if (measureOn) updateOverlay();
         });
 
-        // UI mygtukai
         document.getElementById('btnMeasure').addEventListener('click', () => {
           setMeasureMode(!measureOn);
         });
@@ -342,14 +443,12 @@
           clearMeasure(true);
         });
 
-        // ESC – išjungti matavimą
         window.addEventListener('keydown', (ev) => {
           if (ev.key === 'Escape' && measureOn) {
             setMeasureMode(false);
           }
         });
 
-        // Start state
         setMeasureMode(false);
       } catch (e) {
         setStatus("Klaida inicijuojant 3D peržiūrą:\n" + (e && e.message ? e.message : String(e)));
@@ -378,7 +477,7 @@
 
   <div id="viewer"></div>
 
-  <!-- Overlay: markeriai + linija -->
+  <!-- Overlay yra BODY lygyje (kad O3DV jo neištrintų) -->
   <div id="measureOverlay">
     <svg id="measureSvg" xmlns="http://www.w3.org/2000/svg">
       <line id="mline" x1="-9999" y1="-9999" x2="-9999" y2="-9999"
@@ -386,6 +485,7 @@
     </svg>
     <div id="mpt1" class="mpt"></div>
     <div id="mpt2" class="mpt"></div>
+    <div id="mlabel" class="mlabel"></div>
   </div>
 
   <div id="status"></div>
