@@ -1,4 +1,3 @@
-{# pozicijos/templates/pozicijos/detail.html #}
 {% extends "base.html" %}
 {% load static %}
 
@@ -7,314 +6,70 @@
 
 {% block page_css %}
 <style>
-  .pozicija-detail-page {
-    background:#f3f3f3;
-  }
+  .pozicija-detail-page { background:#f3f3f3; }
+  .pozicija-detail-page .poz-detail-container { max-width:1200px; margin:0 auto; padding:16px 20px 32px; }
 
-  .pozicija-detail-page .poz-detail-container {
-    max-width:1200px;
-    margin:0 auto;
-    padding:16px 20px 32px;
-  }
+  .pozicija-detail-page .detail-header-bar { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; }
+  .pozicija-detail-page .detail-header-main { min-width:0; }
+  .pozicija-detail-page .detail-header-title { margin:0 0 4px; font-size:1.35rem; font-weight:600; }
+  .pozicija-detail-page .detail-header-sub { margin:0; font-size:0.9rem; color:#666; }
 
-  .pozicija-detail-page .detail-header-bar {
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:12px;
-    margin-bottom:16px;
-  }
+  .pozicija-detail-page .detail-header-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+  .pozicija-detail-page .btn-action { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; font-size:0.85rem; border-radius:4px; border:1px solid #ccc; background:#fff; color:#333; text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .pozicija-detail-page .btn-action:hover { background:#f0f0f0; }
+  .pozicija-detail-page .btn-action.btn-secondary { background:#e7f0ff; border-color:#b6c9f0; }
+  .pozicija-detail-page .btn-action.btn-secondary:hover { background:#d7e4ff; }
 
-  .pozicija-detail-page .detail-header-main {
-    min-width:0;
-  }
+  .pozicija-detail-page .poz-cards-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr); gap:16px; align-items:flex-start; }
 
-  .pozicija-detail-page .detail-header-title {
-    margin:0 0 4px;
-    font-size:1.35rem;
-    font-weight:600;
-  }
+  .pozicija-detail-page .poz-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px 14px 10px; box-shadow:0 1px 3px rgba(15,23,42,0.06); }
+  .pozicija-detail-page .poz-card--full { grid-column:1 / -1; }
 
-  .pozicija-detail-page .detail-header-sub {
-    margin:0;
-    font-size:0.9rem;
-    color:#666;
-  }
+  .pozicija-detail-page .poz-card--client { grid-column:1; grid-row:1; }
+  .pozicija-detail-page .poz-card--detail { grid-column:1; grid-row:2; }
+  .pozicija-detail-page .poz-card--brez { grid-column:2; grid-row:1 / span 2; }
 
-  .pozicija-detail-page .detail-header-actions {
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    justify-content:flex-end;
-  }
+  .pozicija-detail-page .poz-card-title { margin:0 0 8px; font-size:0.95rem; font-weight:600; color:#333; }
 
-  .pozicija-detail-page .btn-action {
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:6px 10px;
-    font-size:0.85rem;
-    border-radius:4px;
-    border:1px solid #ccc;
-    background:#fff;
-    color:#333;
-    text-decoration:none;
-    cursor:pointer;
-    white-space:nowrap;
-  }
+  .pozicija-detail-page .poz-fields { display:flex; flex-direction:column; gap:4px; }
+  .pozicija-detail-page .poz-field-row { display:grid; grid-template-columns:minmax(0,42%) minmax(0,58%); column-gap:8px; align-items:flex-start; font-size:0.9rem; padding:2px 0; }
+  .pozicija-detail-page .poz-field-label { color:#777; text-align:left; }
+  .pozicija-detail-page .poz-field-value { color:#222; word-wrap:break-word; overflow-wrap:anywhere; }
 
-  .pozicija-detail-page .btn-action:hover {
-    background:#f0f0f0;
-  }
+  .pozicija-detail-page .poz-field-value--alert { color:#b91c1c; font-weight:600; animation:pozBlink 1s ease-in-out infinite alternate; }
+  @keyframes pozBlink { 0%{ color:#b91c1c; } 100%{ color:#f97316; } }
 
-  .pozicija-detail-page .btn-action.btn-secondary {
-    background:#e7f0ff;
-    border-color:#b6c9f0;
-  }
+  .pozicija-detail-page .poz-empty { margin:4px 0 0; font-size:0.88rem; color:#999; font-style:italic; }
+  .pozicija-detail-page .poz-notes-text { font-size:0.9rem; line-height:1.4; white-space:pre-wrap; }
 
-  .pozicija-detail-page .btn-action.btn-secondary:hover {
-    background:#d7e4ff;
-  }
+  .pozicija-detail-page .poz-price-table-wrapper { margin-top:8px; overflow-x:auto; }
+  .pozicija-detail-page .poz-price-table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+  .pozicija-detail-page .poz-price-table th, .pozicija-detail-page .poz-price-table td { border:1px solid #e1e1e1; padding:4px 6px; text-align:left; white-space:nowrap; }
+  .pozicija-detail-page .poz-price-table th { background:#eff6ff; font-weight:600; }
+  .pozicija-detail-page .poz-price-table tbody tr:nth-child(even) td { background:#f9fafb; }
+  .pozicija-detail-page .poz-price-table tbody tr:hover td { background:#e0ecff; }
+  .pozicija-detail-page .poz-card-footer { margin-top:8px; display:flex; justify-content:flex-end; }
 
-  .pozicija-detail-page .poz-cards-grid {
-    display:grid;
-    grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr);
-    gap:16px;
-    align-items:flex-start;
-  }
+  .pozicija-detail-page .poz-brez-grid { display:flex; flex-wrap:wrap; gap:10px; }
+  .pozicija-detail-page .poz-brez-item { width:130px; border:1px solid #e1e1e1; border-radius:4px; padding:4px; background:#fff; display:flex; flex-direction:column; gap:4px; }
+  .pozicija-detail-page .poz-brez-thumb-wrap { width:100%; aspect-ratio:4/3; border-radius:3px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; }
+  .pozicija-detail-page .poz-brez-thumb { max-width:100%; max-height:100%; display:block; }
+  .pozicija-detail-page .poz-brez-title { font-size:0.8rem; font-weight:500; color:#333; word-wrap:break-word; }
+  .pozicija-detail-page .poz-brez-actions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 
-  /* Pozicijos kortelės – tokia pati subtili išvaizda */
-  .pozicija-detail-page .poz-card {
-    background:#f9fafb;                 /* vos melsvas fonas */
-    border:1px solid #e5e7eb;
-    border-radius:6px;
-    padding:12px 14px 10px;
-    box-shadow:0 1px 3px rgba(15,23,42,0.06);  /* labai švelnus šešėlis */
-  }
+  .pozicija-detail-page .btn-ghost-sm, .pozicija-detail-page .btn-link-sm { border:none; background:none; padding:0; font-size:0.8rem; cursor:pointer; text-decoration:underline; color:#225caa; }
+  .pozicija-detail-page .btn-ghost-sm:hover, .pozicija-detail-page .btn-link-sm:hover { color:#163e72; }
 
-  .pozicija-detail-page .poz-card--full {
-    grid-column:1 / -1;
-  }
-
-  /* Top išdėstymas: kairėje 2 kortelės, dešinėje – Brėžiniai */
-  .pozicija-detail-page .poz-card--client {
-    grid-column:1;
-    grid-row:1;
-  }
-
-  .pozicija-detail-page .poz-card--detail {
-    grid-column:1;
-    grid-row:2;
-  }
-
-  .pozicija-detail-page .poz-card--brez {
-    grid-column:2;
-    grid-row:1 / span 2;
-  }
-
-  .pozicija-detail-page .poz-card-title {
-    margin:0 0 8px;
-    font-size:0.95rem;
-    font-weight:600;
-    color:#333;
-  }
-
-  .pozicija-detail-page .poz-fields {
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-
-  .pozicija-detail-page .poz-field-row {
-    display:grid;
-    grid-template-columns:minmax(0,42%) minmax(0,58%);
-    column-gap:8px;
-    align-items:flex-start;
-    font-size:0.9rem;
-    padding:2px 0;
-  }
-
-  .pozicija-detail-page .poz-field-label {
-    color:#777;
-    text-align:left;
-  }
-
-  .pozicija-detail-page .poz-field-value {
-    color:#222;
-    word-wrap:break-word;
-    overflow-wrap:anywhere;
-  }
-
-  /* MIRKSĖJIMAS faktiniam kiekiui rėme */
-  .pozicija-detail-page .poz-field-value--alert {
-    color:#b91c1c;
-    font-weight:600;
-    animation:pozBlink 1s ease-in-out infinite alternate;
-  }
-
-  @keyframes pozBlink {
-    0%   { color:#b91c1c; }
-    100% { color:#f97316; }
-  }
-
-  .pozicija-detail-page .poz-empty {
-    margin:4px 0 0;
-    font-size:0.88rem;
-    color:#999;
-    font-style:italic;
-  }
-
-  /* Pastabos / aprašymai su eilutėmis */
-  .pozicija-detail-page .poz-notes-text {
-    font-size:0.9rem;
-    line-height:1.4;
-    white-space:pre-wrap;
-  }
-
-  /* Kainų lentelė */
-  .pozicija-detail-page .poz-price-table-wrapper {
-    margin-top:8px;
-    overflow-x:auto;
-  }
-
-  .pozicija-detail-page .poz-price-table {
-    width:100%;
-    border-collapse:collapse;
-    font-size:0.88rem;
-  }
-
-  .pozicija-detail-page .poz-price-table th,
-  .pozicija-detail-page .poz-price-table td {
-    border:1px solid #e1e1e1;
-    padding:4px 6px;
-    text-align:left;
-    white-space:nowrap;
-  }
-
-  .pozicija-detail-page .poz-price-table th {
-    background:#eff6ff;
-    font-weight:600;
-  }
-
-  .pozicija-detail-page .poz-price-table tbody tr:nth-child(even) td {
-    background:#f9fafb;
-  }
-
-  .pozicija-detail-page .poz-price-table tbody tr:hover td {
-    background:#e0ecff;
-  }
-
-  .pozicija-detail-page .poz-card-footer {
-    margin-top:8px;
-    display:flex;
-    justify-content:flex-end;
-  }
-
-  /* Brėžinių blokas */
-  .pozicija-detail-page .poz-brez-grid {
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-  }
-
-  .pozicija-detail-page .poz-brez-item {
-    width:130px;
-    border:1px solid #e1e1e1;
-    border-radius:4px;
-    padding:4px;
-    background:#fff;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-
-  .pozicija-detail-page .poz-brez-thumb-wrap {
-    width:100%;
-    aspect-ratio:4/3;
-    border-radius:3px;
-    overflow:hidden;
-    background:#fff;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  .pozicija-detail-page .poz-brez-thumb {
-    max-width:100%;
-    max-height:100%;
-    display:block;
-  }
-
-  .pozicija-detail-page .poz-brez-title {
-    font-size:0.8rem;
-    font-weight:500;
-    color:#333;
-    word-wrap:break-word;
-  }
-
-  .pozicija-detail-page .poz-brez-actions {
-    display:flex;
-    flex-wrap:wrap;
-    gap:4px;
-    align-items:center;
-  }
-
-  .pozicija-detail-page .btn-ghost-sm,
-  .pozicija-detail-page .btn-link-sm {
-    border:none;
-    background:none;
-    padding:0;
-    font-size:0.8rem;
-    cursor:pointer;
-    text-decoration:underline;
-    color:#225caa;
-  }
-
-  .pozicija-detail-page .btn-ghost-sm:hover,
-  .pozicija-detail-page .btn-link-sm:hover {
-    color:#163e72;
-  }
-
-  .pozicija-detail-page .poz-meta {
-    font-size:0.88rem;
-  }
-
-  .pozicija-detail-page .poz-meta-row {
-    display:flex;
-    justify-content:space-between;
-    gap:8px;
-  }
-
-  .pozicija-detail-page .poz-meta-label {
-    color:#777;
-  }
-
-  .pozicija-detail-page .poz-meta-value {
-    color:#222;
-  }
+  .pozicija-detail-page .poz-meta { font-size:0.88rem; }
+  .pozicija-detail-page .poz-meta-row { display:flex; justify-content:space-between; gap:8px; }
+  .pozicija-detail-page .poz-meta-label { color:#777; }
+  .pozicija-detail-page .poz-meta-value { color:#222; }
 
   @media (max-width: 900px) {
-    .pozicija-detail-page .detail-header-bar {
-      flex-direction:column;
-      align-items:flex-start;
-    }
-
-    .pozicija-detail-page .poz-cards-grid {
-      grid-template-columns:1fr;
-    }
-
-    .pozicija-detail-page .poz-card,
-    .pozicija-detail-page .poz-card--full {
-      grid-column:1 / -1;
-      grid-row:auto;
-    }
-
-    .pozicija-detail-page .poz-card--client,
-    .pozicija-detail-page .poz-card--detail,
-    .pozicija-detail-page .poz-card--brez {
-      grid-column:1 / -1;
-      grid-row:auto;
-    }
+    .pozicija-detail-page .detail-header-bar { flex-direction:column; align-items:flex-start; }
+    .pozicija-detail-page .poz-cards-grid { grid-template-columns:1fr; }
+    .pozicija-detail-page .poz-card, .pozicija-detail-page .poz-card--full { grid-column:1 / -1; grid-row:auto; }
+    .pozicija-detail-page .poz-card--client, .pozicija-detail-page .poz-card--detail, .pozicija-detail-page .poz-card--brez { grid-column:1 / -1; grid-row:auto; }
   }
 </style>
 {% endblock %}
@@ -339,53 +94,25 @@
 
   <div class="poz-cards-grid">
 
-    {# 1. Klientas / projektas – KAIRĖ, viršus #}
     <section class="poz-card poz-card--client">
       <h2 class="poz-card-title">Klientas / projektas</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Klientas</span>
-          <span class="poz-field-value">{{ pozicija.klientas|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Projektas</span>
-          <span class="poz-field-value">{{ pozicija.projektas|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Pozicijos kodas</span>
-          <span class="poz-field-value">{{ pozicija.poz_kodas|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Pozicijos pavadinimas</span>
-          <span class="poz-field-value">{{ pozicija.poz_pavad|default:"—" }}</span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Klientas</span><span class="poz-field-value">{{ pozicija.klientas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Projektas</span><span class="poz-field-value">{{ pozicija.projektas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Pozicijos kodas</span><span class="poz-field-value">{{ pozicija.poz_kodas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Pozicijos pavadinimas</span><span class="poz-field-value">{{ pozicija.poz_pavad|default:"—" }}</span></div>
       </div>
     </section>
 
-    {# 2. Detalė – KAIRĖ, po Klientas/projektas #}
     <section class="poz-card poz-card--detail">
       <h2 class="poz-card-title">Detalė</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Metalas</span>
-          <span class="poz-field-value">{{ pozicija.metalas|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Plotas</span>
-          <span class="poz-field-value">
-            {% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}
-          </span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Svoris</span>
-          <span class="poz-field-value">
-            {% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}
-          </span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Metalas</span><span class="poz-field-value">{{ pozicija.metalas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Plotas</span><span class="poz-field-value">{% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Svoris</span><span class="poz-field-value">{% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}</span></div>
       </div>
     </section>
 
-    {# 3. Brėžiniai – DEŠINĖJE, per dvi eilutes #}
     <section class="poz-card poz-card--brez">
       <h2 class="poz-card-title">Brėžiniai</h2>
 
@@ -394,20 +121,17 @@
           {% for brez in breziniai %}
             <div class="poz-brez-item">
 
-              {# Thumbnail link: STP/STEP -> 3D viewer, else -> original file #}
-              {% if brez.is_step %}
-                <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" target="_blank" class="poz-brez-thumb-wrap">
-                  <img src="{% static 'pozicijos/img/icon-3d.png' %}" alt="3D (STP/STEP)" class="poz-brez-thumb">
-                </a>
-              {% else %}
-                <a href="{{ brez.failas.url }}" target="_blank" class="poz-brez-thumb-wrap">
-                  {% if brez.thumb_url %}
-                    <img src="{{ brez.thumb_url }}" alt="{{ brez.pavadinimas|default:'Brėžinys' }}" class="poz-brez-thumb">
-                  {% else %}
-                    <img src="{{ brez.failas.url }}" alt="{{ brez.pavadinimas|default:'Brėžinys' }}" class="poz-brez-thumb">
-                  {% endif %}
-                </a>
-              {% endif %}
+              {% with e=brez.ext|lower %}
+                {% if e == "stp" or e == "step" %}
+                  <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" target="_blank" class="poz-brez-thumb-wrap">
+                    <img src="{% static 'pozicijos/img/icon-3d.png' %}" alt="3D" class="poz-brez-thumb">
+                  </a>
+                {% else %}
+                  <a href="{{ brez.failas.url }}" target="_blank" class="poz-brez-thumb-wrap">
+                    <img src="{{ brez.thumb_url|default:brez.failas.url }}" alt="{{ brez.pavadinimas|default:'Brėžinys' }}" class="poz-brez-thumb">
+                  </a>
+                {% endif %}
+              {% endwith %}
 
               <div class="poz-brez-title">
                 {{ brez.pavadinimas|default:brez.filename }}
@@ -419,7 +143,7 @@
                     <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" target="_blank" class="btn-ghost-sm">3D</a>
                   {% endif %}
                 {% endwith %}
-                <form method="post" action="{% url 'pozicijos:brezinys_delete' pozicija.id brez.id %}" onsubmit="return confirm('Ar tikrai šalinti brėžinį?');">
+                <form method="post"l" action="{% url 'pozicijos:brezinys_delete' pozicija.id brez.id %}" onsubmit="return confirm('Ar tikrai šalinti brėžinį?');">
                   {% csrf_token %}
                   <button type="submit" class="btn-link-sm">Šalinti</button>
                 </form>
@@ -442,24 +166,12 @@
       </div>
     </section>
 
-    {# 4. Kabinimas #}
     <section class="poz-card">
       <h2 class="poz-card-title">Kabinimas</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Kabinimo būdas</span>
-          <span class="poz-field-value">{{ pozicija.kabinimo_budas|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Kabinimas rėme</span>
-          <span class="poz-field-value">{{ pozicija.kabinimas_reme|default:"—" }}</span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Detalių kiekis rėme</span>
-          <span class="poz-field-value">
-            {% if pozicija.detaliu_kiekis_reme %}{{ pozicija.detaliu_kiekis_reme }}{% else %}—{% endif %}
-          </span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.kabinimo_budas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Kabinimas rėme</span><span class="poz-field-value">{{ pozicija.kabinimas_reme|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.detaliu_kiekis_reme %}{{ pozicija.detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
         <div class="poz-field-row">
           <span class="poz-field-label">Faktinis kiekis rėme</span>
           {% with det=pozicija.detaliu_kiekis_reme fak=pozicija.faktinis_kiekis_reme %}
@@ -470,22 +182,16 @@
             {% else %}
               <span class="poz-field-value">
             {% endif %}
-              {% if fak %}
-                {{ fak }}
-              {% else %}
-                —
-              {% endif %}
+              {% if fak %}{{ fak }}{% else %}—{% endif %}
             </span>
           {% endwith %}
         </div>
       </div>
     </section>
 
-    {# 5. Paslauga (paviršius / dažymas) #}
     <section class="poz-card">
       <h2 class="poz-card-title">Paslauga</h2>
       <div class="poz-fields">
-
         <div class="poz-field-row">
           <span class="poz-field-label">Pasirinkta</span>
           <span class="poz-field-value">
@@ -501,60 +207,22 @@
           </span>
         </div>
 
-        <div class="poz-field-row">
-          <span class="poz-field-label">Paruošimas</span>
-          <span class="poz-field-value">{{ pozicija.paruosimas|default:"—" }}</span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Paruošimas</span><span class="poz-field-value">{{ pozicija.paruosimas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Padengimas</span><span class="poz-field-value">{{ pozicija.padengimas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Padengimo standartas</span><span class="poz-field-value">{{ pozicija.padengimo_standartas|default:"—" }}</span></div>
 
-        <div class="poz-field-row">
-          <span class="poz-field-label">Padengimas</span>
-          <span class="poz-field-value">{{ pozicija.padengimas|default:"—" }}</span>
-        </div>
-
-        <div class="poz-field-row">
-          <span class="poz-field-label">Padengimo standartas</span>
-          <span class="poz-field-value">{{ pozicija.padengimo_standartas|default:"—" }}</span>
-        </div>
-
-        {# Spalva rodoma tik jei NE „Miltai“ (nes formoje ją slepi ir išvalai) #}
         {% if not pozicija.paslauga_miltai %}
-          <div class="poz-field-row">
-            <span class="poz-field-label">Spalva</span>
-            <span class="poz-field-value">{{ pozicija.spalva|default:"—" }}</span>
-          </div>
+          <div class="poz-field-row"><span class="poz-field-label">Spalva</span><span class="poz-field-value">{{ pozicija.spalva|default:"—" }}</span></div>
         {% endif %}
 
-        {# Miltų subblokas detail'e – rodom tik jei pasirinkta „Miltai“ #}
         {% if pozicija.paslauga_miltai %}
-          <div class="poz-field-row">
-            <span class="poz-field-label">Miltelių kodas</span>
-            <span class="poz-field-value">{{ pozicija.miltu_kodas|default:"—" }}</span>
-          </div>
-
-          <div class="poz-field-row">
-            <span class="poz-field-label">Miltelių spalva</span>
-            <span class="poz-field-value">{{ pozicija.miltu_spalva|default:"—" }}</span>
-          </div>
-
-          <div class="poz-field-row">
-            <span class="poz-field-label">Miltelių tiekėjas</span>
-            <span class="poz-field-value">{{ pozicija.miltu_tiekejas|default:"—" }}</span>
-          </div>
-
-          <div class="poz-field-row">
-            <span class="poz-field-label">Blizgumas</span>
-            <span class="poz-field-value">{{ pozicija.miltu_blizgumas|default:"—" }}</span>
-          </div>
-
+          <div class="poz-field-row"><span class="poz-field-label">Miltelių kodas</span><span class="poz-field-value">{{ pozicija.miltu_kodas|default:"—" }}</span></div>
+          <div class="poz-field-row"><span class="poz-field-label">Miltelių spalva</span><span class="poz-field-value">{{ pozicija.miltu_spalva|default:"—" }}</span></div>
+          <div class="poz-field-row"><span class="poz-field-label">Miltelių tiekėjas</span><span class="poz-field-value">{{ pozicija.miltu_tiekejas|default:"—" }}</span></div>
+          <div class="poz-field-row"><span class="poz-field-label">Blizgumas</span><span class="poz-field-value">{{ pozicija.miltu_blizgumas|default:"—" }}</span></div>
           <div class="poz-field-row">
             <span class="poz-field-label">Miltelių kaina</span>
-            <span class="poz-field-value">
-              {% if pozicija.miltu_kaina is not None %}
-                {{ pozicija.miltu_kaina }} €
-              {% else %}
-                —
-              {% endif %}
-            </span>
+            <span class="poz-field-value">{% if pozicija.miltu_kaina is not None %}{{ pozicija.miltu_kaina }} €{% else %}—{% endif %}</span>
           </div>
         {% endif %}
 
@@ -568,89 +236,38 @@
             {% endif %}
           </span>
         </div>
-
       </div>
     </section>
 
-    {# 6. Maskavimas #}
     <section class="poz-card">
       <h2 class="poz-card-title">Maskavimas</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Maskavimo tipas</span>
-          <span class="poz-field-value">
-            {{ pozicija.get_maskavimo_tipas_display|default:"—" }}
-          </span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Maskavimo tipas</span><span class="poz-field-value">{{ pozicija.get_maskavimo_tipas_display|default:"—" }}</span></div>
         <div class="poz-field-row">
           <span class="poz-field-label">Maskavimo aprašymas</span>
-          <span class="poz-field-value">
-            {% if pozicija.maskavimas %}
-              <div class="poz-notes-text">
-                {{ pozicija.maskavimas|linebreaksbr }}
-              </div>
-            {% else %}
-              —
-            {% endif %}
-          </span>
+          <span class="poz-field-value">{% if pozicija.maskavimas %}<div class="poz-notes-text">{{ pozicija.maskavimas|linebreaksbr }}</div>{% else %}—{% endif %}</span>
         </div>
       </div>
     </section>
 
-    {# 7. Pakavimas #}
     <section class="poz-card">
       <h2 class="poz-card-title">Pakavimas</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Pakavimas</span>
-          <span class="poz-field-value">
-            {{ pozicija.get_pakavimo_tipas_display|default:"—" }}
-          </span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Aprašymas</span>
-          <span class="poz-field-value">
-            {% if pozicija.pakavimas %}
-              <div class="poz-notes-text">
-                {{ pozicija.pakavimas|linebreaksbr }}
-              </div>
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Pastabos</span>
-          <span class="poz-field-value">
-            {% if pozicija.instrukcija %}
-              <div class="poz-notes-text">
-                {{ pozicija.instrukcija|linebreaksbr }}
-              </div>
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Pakavimas</span><span class="poz-field-value">{{ pozicija.get_pakavimo_tipas_display|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Aprašymas</span><span class="poz-field-value">{% if pozicija.pakavimas %}<div class="poz-notes-text">{{ pozicija.pakavimas|linebreaksbr }}</div>{% else %}—{% endif %}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Pastabos</span><span class="poz-field-value">{% if pozicija.instrukcija %}<div class="poz-notes-text">{{ pozicija.instrukcija|linebreaksbr }}</div>{% else %}—{% endif %}</span></div>
       </div>
     </section>
 
-    {# 8. Papildomos paslaugos (NAUJA) #}
     <section class="poz-card">
       <h2 class="poz-card-title">Papildomos paslaugos</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Papildomos paslaugos</span>
-          <span class="poz-field-value">
-            {{ pozicija.get_papildomos_paslaugos_display|default:"—" }}
-          </span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Papildomos paslaugos</span><span class="poz-field-value">{{ pozicija.get_papildomos_paslaugos_display|default:"—" }}</span></div>
         <div class="poz-field-row">
           <span class="poz-field-label">Aprašymas</span>
           <span class="poz-field-value">
             {% if pozicija.papildomos_paslaugos == "taip" and pozicija.papildomos_paslaugos_aprasymas %}
-              <div class="poz-notes-text">
-                {{ pozicija.papildomos_paslaugos_aprasymas|linebreaksbr }}
-              </div>
+              <div class="poz-notes-text">{{ pozicija.papildomos_paslaugos_aprasymas|linebreaksbr }}</div>
             {% else %}
               —
             {% endif %}
@@ -659,35 +276,23 @@
       </div>
     </section>
 
-    {# 9. Terminai #}
     <section class="poz-card">
       <h2 class="poz-card-title">Terminai</h2>
       <div class="poz-fields">
         <div class="poz-field-row">
           <span class="poz-field-label">Atlikimo terminas</span>
-          <span class="poz-field-value">
-            {% if pozicija.atlikimo_terminas %}
-              {{ pozicija.atlikimo_terminas }} darbo dienos
-            {% else %}
-              —
-            {% endif %}
-          </span>
+          <span class="poz-field-value">{% if pozicija.atlikimo_terminas %}{{ pozicija.atlikimo_terminas }} darbo dienos{% else %}—{% endif %}</span>
         </div>
       </div>
     </section>
 
-    {# 10. Testai / kokybė #}
     <section class="poz-card">
       <h2 class="poz-card-title">Testai / kokybė</h2>
       <div class="poz-fields">
-        <div class="poz-field-row">
-          <span class="poz-field-label">Testai / kokybė</span>
-          <span class="poz-field-value">{{ pozicija.testai_kokybe|default:"—" }}</span>
-        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Testai / kokybė</span><span class="poz-field-value">{{ pozicija.testai_kokybe|default:"—" }}</span></div>
       </div>
     </section>
 
-    {# 11. Kaina – tik rėžinės eilutės (be "bendra kaina") #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Kaina</h2>
 
@@ -695,13 +300,7 @@
         <div class="poz-price-table-wrapper">
           <table class="poz-price-table">
             <thead>
-              <tr>
-                <th>Matas</th>
-                <th>Kiekis</th>
-                <th>Kaina</th>
-                <th>Galioja</th>
-                <th>Pastaba</th>
-              </tr>
+              <tr><th>Matas</th><th>Kiekis</th><th>Kaina</th><th>Galioja</th><th>Pastaba</th></tr>
             </thead>
             <tbody>
               {% for eil in kainos_akt %}
@@ -709,33 +308,19 @@
                   <td>{{ eil.matas|default:"—" }}</td>
                   <td>
                     {% if eil.yra_fiksuota %}
-                      {% if eil.fiksuotas_kiekis %}
-                        {{ eil.fiksuotas_kiekis }} (fiksuotas)
-                      {% else %}
-                        Fiksuotas kiekis
-                      {% endif %}
+                      {% if eil.fiksuotas_kiekis %}{{ eil.fiksuotas_kiekis }} (fiksuotas){% else %}Fiksuotas kiekis{% endif %}
                     {% else %}
                       {% if eil.kiekis_nuo or eil.kiekis_iki %}
-                        {% if eil.kiekis_nuo %}{{ eil.kiekis_nuo }}{% endif %}
-                        ..
-                        {% if eil.kiekis_iki %}{{ eil.kiekis_iki }}{% endif %}
+                        {% if eil.kiekis_nuo %}{{ eil.kiekis_nuo }}{% endif %}..{% if eil.kiekis_iki %}{{ eil.kiekis_iki }}{% endif %}
                       {% else %}
                         —
                       {% endif %}
                     {% endif %}
                   </td>
-                  <td>
-                    {% if eil.kaina %}
-                      {{ eil.kaina }}&nbsp;€
-                    {% else %}
-                      —
-                    {% endif %}
-                  </td>
+                  <td>{% if eil.kaina %}{{ eil.kaina }}&nbsp;€{% else %}—{% endif %}</td>
                   <td>
                     {% if eil.galioja_nuo or eil.galioja_iki %}
-                      {% if eil.galioja_nuo %}{{ eil.galioja_nuo|date:"Y-m-d" }}{% endif %}
-                      –
-                      {% if eil.galioja_iki %}{{ eil.galioja_iki|date:"Y-m-d" }}{% endif %}
+                      {% if eil.galioja_nuo %}{{ eil.galioja_nuo|date:"Y-m-d" }}{% endif %} – {% if eil.galioja_iki %}{{ eil.galioja_iki|date:"Y-m-d" }}{% endif %}
                     {% else %}
                       —
                     {% endif %}
@@ -755,60 +340,19 @@
       </div>
     </section>
 
-    {# 12. Sistemos informacija #}
     <section class="poz-card">
       <h2 class="poz-card-title">Sistemos informacija</h2>
       <div class="poz-meta">
-        <div class="poz-meta-row">
-          <span class="poz-meta-label">Sukurta</span>
-          <span class="poz-meta-value">
-            {% if pozicija.created %}
-              {{ pozicija.created|date:"Y-m-d H:i" }}
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-        <div class="poz-meta-row">
-          <span class="poz-meta-label">Atnaujinta</span>
-          <span class="poz-meta-value">
-            {% if pozicija.updated %}
-              {{ pozicija.updated|date:"Y-m-d H:i" }}
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-        <div class="poz-meta-row">
-          <span class="poz-meta-label">Brėžinių skaičius</span>
-          <span class="poz-meta-value">
-            {% if pozicija.brez_count is not None %}
-              {{ pozicija.brez_count }}
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-        <div class="poz-meta-row">
-          <span class="poz-meta-label">Dokumentų skaičius</span>
-          <span class="poz-meta-value">
-            {% if pozicija.dok_count is not None %}
-              {{ pozicija.dok_count }}
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
+        <div class="poz-meta-row"><span class="poz-meta-label">Sukurta</span><span class="poz-meta-value">{% if pozicija.created %}{{ pozicija.created|date:"Y-m-d H:i" }}{% else %}—{% endif %}</span></div>
+        <div class="poz-meta-row"><span class="poz-meta-label">Atnaujinta</span><span class="poz-meta-value">{% if pozicija.updated %}{{ pozicija.updated|date:"Y-m-d H:i" }}{% else %}—{% endif %}</span></div>
+        <div class="poz-meta-row"><span class="poz-meta-label">Brėžinių skaičius</span><span class="poz-meta-value">{{ breziniai|length }}</span></div>
       </div>
     </section>
 
-    {# 13. Pastabos – pilno pločio kortelė #}
     <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Pastabos</h2>
       {% if pozicija.pastabos %}
-        <div class="poz-notes-text">
-          {{ pozicija.pastabos|linebreaksbr }}
-        </div>
+        <div class="poz-notes-text">{{ pozicija.pastabos|linebreaksbr }}</div>
       {% else %}
         <p class="poz-empty">Nėra pastabų.</p>
       {% endif %}

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, IntegerField, Value
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
@@ -48,26 +48,34 @@ def _get_form_suggestions() -> dict[str, list[str]]:
     return suggestions
 
 
-def _with_virtual_counts(qs):
-    """
-    Prideda virtualius stulpelius, kuriuos rodome sąraše (COLUMNS su type="virtual"):
-    - brez_count: brėžinių kiekis pozicijai
+def _safe_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
 
-    IMPORTANT: be šito `brez_count` šablone neturės ką rodyti.
+
+def _base_list_qs():
     """
-    return qs.annotate(brez_count=Count("breziniai", distinct=True))
+    Centralizuojam: sąrašui anotacijos (brez_count).
+    Dok_count kol kas neturim modelio – paliekam 0, kad stulpelis nelūžtų.
+    """
+    return (
+        Pozicija.objects.all()
+        .annotate(brez_count=Count("breziniai", distinct=True))
+        .annotate(dok_count=Value(0, output_field=IntegerField()))
+    )
 
 
 def pozicijos_list(request):
     visible_cols = visible_cols_from_request(request)
     q = request.GET.get("q", "").strip()
-    page_size = int(request.GET.get("page_size", 25))
+    page_size = _safe_int(request.GET.get("page_size", 25), 25)
 
     current_sort = request.GET.get("sort", "")
     current_dir = request.GET.get("dir", "asc")
 
-    qs = Pozicija.objects.all()
-    qs = _with_virtual_counts(qs)
+    qs = _base_list_qs()
     qs = apply_filters(qs, request)
     qs = apply_sorting(qs, request)[:page_size]
 
@@ -86,13 +94,12 @@ def pozicijos_list(request):
 
 def pozicijos_tbody(request):
     visible_cols = visible_cols_from_request(request)
-    page_size = int(request.GET.get("page_size", 25))
+    page_size = _safe_int(request.GET.get("page_size", 25), 25)
 
     current_sort = request.GET.get("sort", "")
     current_dir = request.GET.get("dir", "asc")
 
-    qs = Pozicija.objects.all()
-    qs = _with_virtual_counts(qs)
+    qs = _base_list_qs()
     qs = apply_filters(qs, request)
     qs = apply_sorting(qs, request)[:page_size]
 
@@ -128,9 +135,7 @@ def pozicijos_stats(request):
 
 
 def pozicija_detail(request, pk):
-    # (bonus) pridedam ir detail'e, kad "Sistemos informacija -> Brėžinių skaičius" irgi būtų teisingas
-    poz = get_object_or_404(_with_virtual_counts(Pozicija.objects.all()), pk=pk)
-
+    poz = get_object_or_404(Pozicija, pk=pk)
     breziniai = PozicijosBrezinys.objects.filter(pozicija=poz).order_by("id")
     kainos_akt = poz.aktualios_kainos()
 
@@ -144,10 +149,6 @@ def pozicija_detail(request, pk):
 
 
 def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
-    """
-    Sąrašo stulpeliui: atnaujinam pozicija.kaina_eur iš aktualios kainos eilutės.
-    (Kadangi pas tave kaina susideda iš eilučių, čia laikom "headline" = pirmą aktualią.)
-    """
     akt = poz.aktualios_kainos().first()
     poz.kaina_eur = akt.kaina if akt else None
     poz.save(update_fields=["kaina_eur", "updated"])
@@ -242,29 +243,25 @@ def pozicija_edit(request, pk):
 @require_POST
 def brezinys_upload(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
-
     if request.FILES.get("failas"):
         f = request.FILES["failas"]
         title = request.POST.get("pavadinimas", "").strip()
         br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
 
-        if br.is_step:
-            messages.success(request, "Įkelta. STP/STEP miniatiūrai rodoma 3D ikona.")
+        # STEP/STP – preview sąmoningai nenaudojam
+        if not br.is_step:
+            res = regenerate_missing_preview(br)
+            if res.ok:
+                messages.success(request, "Įkelta. Miniatiūra paruošta.")
+            else:
+                messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {res.message}")
         else:
-            try:
-                res = regenerate_missing_preview(br)
-                if res.ok:
-                    messages.success(request, "Įkelta. Miniatiūra paruošta.")
-                else:
-                    messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {res.message}")
-            except Exception as e:
-                messages.info(request, f"Įkelta. Miniatiūros sugeneruoti nepavyko: {e}")
-    else:
-        messages.error(request, "Pasirink failą.")
+            messages.success(request, "Įkelta. STEP/STP miniatiūra nenaudojama (rodoma 3D ikona).")
 
     return redirect("pozicijos:detail", pk=poz.pk)
 
 
+@require_POST
 def brezinys_delete(request, pk, bid):
     poz = get_object_or_404(Pozicija, pk=pk)
     br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)

@@ -4,163 +4,390 @@
 <head>
   <meta charset="utf-8">
   <title>3D peržiūra – {{ brezinys.pavadinimas|default:brezinys.filename }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-
-  {# Online3DViewer website CSS – iš tavo bundle #}
-  <link rel="stylesheet" type="text/css"
-        href="{% static 'pozicijos/o3dv_website/o3dv.website.min.css' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    background: #111827;
-  }
-  body {
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
-                 "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
-    color: #e5e7eb;
-  }
-  .ov_header_title {
-    font-size: 15px;
-    font-weight: 600;
-  }
-  .ov_header_subtitle {
-    font-size: 12px;
-    opacity: .8;
-  }
-  .intro_content h1,
-  .intro_content h2,
-  .intro_content p,
-  .intro_content ul {
-    margin: 0 0 .6rem;
-    padding: 0;
-  }
-  .intro_content ul {
-    list-style: none;
-    font-size: 13px;
-    opacity: .9;
-  }
+    html, body { height: 100%; margin: 0; background: #0b1220; color: #e5e7eb; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif; }
 
-  /* 🔹 Viewer’į ištempiam be rėmelių, be „langas lange“ efekto */
-  #main {
-    display: flex;
-    height: calc(100vh - 56px); /* jei header aukštis kitas – gali pakoreguot */
-    margin: 0;
-    padding: 0;
-  }
-  #main_viewer {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-  #main_viewer * {
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
+    .topbar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      background: #111827;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      box-sizing: border-box;
+      gap: 12px;
+    }
 
-  /* 🔹 Intro overlay nebedengia viewer'io */
-  #intro {
-    display: none;
-  }
-</style>
+    .topbar .left, .topbar .right { display:flex; gap:10px; align-items:center; }
+    .topbar .title { min-width: 0; text-align: center; flex: 1; }
+    .topbar .title .main { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topbar .title .sub  { font-size: 12px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    .ui-btn, .ui-link {
+      color: #93c5fd;
+      text-decoration: none;
+      font-size: 13px;
+      border: 1px solid rgba(147,197,253,.35);
+      padding: 6px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      background: transparent;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ui-btn:hover, .ui-link:hover { background: rgba(147,197,253,.08); }
+    .ui-btn.is-on {
+      background: rgba(147,197,253,.10);
+      border-color: rgba(147,197,253,.60);
+    }
 
-  {# ENGINE iš tavo static: static/pozicijos/js/o3dv.min.js #}
-  <script type="text/javascript"
-          src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
+    #viewer {
+      height: calc(100vh - 52px);
+      width: 100%;
+    }
 
+    /* Status box */
+    #status {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.14);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      max-width: min(720px, calc(100vw - 24px));
+      display: none;
+      white-space: pre-wrap;
+      z-index: 9999;
+    }
+
+    /* Measure overlay (markers + line) */
+    #measureOverlay {
+      position: fixed;
+      left: 0;
+      top: 52px;
+      width: 100vw;
+      height: calc(100vh - 52px);
+      pointer-events: none;
+      display: none;
+      z-index: 9000;
+    }
+
+    .mpt {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(147,197,253,.85);
+      border: 2px solid rgba(255,255,255,.75);
+      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+      transform: translate(-9999px, -9999px);
+    }
+
+    #measureSvg {
+      position:absolute;
+      left:0; top:0;
+      width:100%;
+      height:100%;
+    }
+  </style>
+
+  <script src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
   <script>
-    // STEP failo URL iš Django (tas pats, kurį matai "Atidaryti" mygtuke)
     const STEP_MODEL_URL = "{{ brezinys.failas.url|escapejs }}";
 
+    // Jei vienetai “ne tie” – koreguok čia:
+    // Pvz. jei modelio vienetai yra mm, palik 1.0 ir "mm".
+    // Jei nori metrais iš mm: scale = 0.001, unit = "m".
+    const MEASURE_SCALE = 1.0;
+    const MEASURE_UNIT  = "mm";
+
+    function setStatus(msg, show = true) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.style.display = show ? 'block' : 'none';
+    }
+
+    function fmt(n, d=3) {
+      if (typeof n !== 'number' || !isFinite(n)) return String(n);
+      return n.toFixed(d);
+    }
+
+    function dist3(a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dz = b.z - a.z;
+      return Math.sqrt(dx*dx + dy*dy + dz*dz);
+    }
+
     window.addEventListener('load', () => {
-      if (!window.OV) {
-        console.error('OV objektas nerastas – nepasileido o3dv.min.js (patikrink static kelią).');
+      const OVNS = window.OV || (typeof OV !== 'undefined' ? OV : null);
+      if (!OVNS) {
+        setStatus("O3DV nepasiekiamas: nerastas global OV.\nPatikrink, ar /static/pozicijos/js/o3dv.min.js tikrai užsikrauna be JS klaidų.");
+        return;
+      }
+      if (!OVNS.EmbeddedViewer) {
+        setStatus("O3DV įkeltas, bet nerastas OV.EmbeddedViewer.\nTai reiškia, kad o3dv.min.js build'as ne tas, kurio tikisi šitas šablonas.");
+        return;
+      }
+      if (!STEP_MODEL_URL) {
+        setStatus("Tuščias STEP_MODEL_URL (brezinys.failas.url). Patikrink, ar brėžiniui priskirtas failas.");
         return;
       }
 
-      const parent = document.getElementById('main_viewer');
-      if (!parent) {
-        console.error('Nerastas #main_viewer elementas 3D peržiūrai.');
-        return;
+      const parent = document.getElementById('viewer');
+      const overlay = document.getElementById('measureOverlay');
+      const p1el = document.getElementById('mpt1');
+      const p2el = document.getElementById('mpt2');
+      const line = document.getElementById('mline');
+
+      let isLoaded = false;
+
+      // Measure state
+      let measureOn = false;
+      let P1 = null, P2 = null;          // 3D points {x,y,z}
+      let S1 = null, S2 = null;          // screen points {x,y} (local canvas coords)
+      let innerViewer = null;
+      let navigation = null;
+
+      function showOverlay(on) {
+        overlay.style.display = on ? 'block' : 'none';
+      }
+
+      function setMarker(el, s) {
+        if (!s) {
+          el.style.transform = 'translate(-9999px, -9999px)';
+          return;
+        }
+        el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-5px, -5px)`;
+      }
+
+      function setLine(a, b) {
+        if (!a || !b) {
+          line.setAttribute('x1', '-9999');
+          line.setAttribute('y1', '-9999');
+          line.setAttribute('x2', '-9999');
+          line.setAttribute('y2', '-9999');
+          return;
+        }
+        line.setAttribute('x1', String(a.x));
+        line.setAttribute('y1', String(a.y));
+        line.setAttribute('x2', String(b.x));
+        line.setAttribute('y2', String(b.y));
+      }
+
+      function clearMeasure(keepMode=false) {
+        P1 = null; P2 = null;
+        S1 = null; S2 = null;
+        setMarker(p1el, null);
+        setMarker(p2el, null);
+        setLine(null, null);
+
+        const btnClear = document.getElementById('btnClear');
+        btnClear.style.display = (measureOn ? 'inline-block' : 'none');
+
+        if (keepMode && measureOn) {
+          setStatus("Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\nESC – išjungti. \"Išvalyti\" – nuvalyti.");
+        } else if (!measureOn) {
+          setStatus("", false);
+        }
+      }
+
+      function setMeasureMode(on) {
+        measureOn = on;
+
+        const btn = document.getElementById('btnMeasure');
+        const btnClear = document.getElementById('btnClear');
+
+        btn.classList.toggle('is-on', measureOn);
+        btnClear.style.display = measureOn ? 'inline-block' : 'none';
+
+        if (measureOn) {
+          showOverlay(true);
+          clearMeasure(true);
+        } else {
+          showOverlay(false);
+          clearMeasure(false);
+        }
+      }
+
+      function onMeasureClick(button, mouseCoords) {
+        // mouseCoords yra local canvas coords (Coord2D su x/y)
+        if (!measureOn) {
+          // jei ateityje turėsi kažkokį click handlerį – čia galima būtų jį kviesti
+          return;
+        }
+
+        // tik kairys pelės mygtukas
+        if (button !== 1) {
+          return;
+        }
+
+        if (!isLoaded || !innerViewer) {
+          setStatus("Modelis dar kraunasi… palauk, kol užsikraus.");
+          return;
+        }
+
+        // Paimam sankirtą su modeliu (mesh + line)
+        let isect = null;
+        try {
+          // Viewer klasė turi GetMeshIntersectionUnderMouse
+          isect = innerViewer.GetMeshIntersectionUnderMouse(OVNS.IntersectionMode.MeshAndLine, mouseCoords);
+        } catch (e) {
+          setStatus("Nepavyko atlikti picking (GetMeshIntersectionUnderMouse).\n" + (e && e.message ? e.message : String(e)));
+          return;
+        }
+
+        if (!isect || !isect.point) {
+          setStatus("Nepataikei ant modelio. Bandyk spustelėti ant geometrijos (ne fone).");
+          return;
+        }
+
+        // 3D taškas (THREE.Vector3) -> plain object
+        const pt = { x: isect.point.x, y: isect.point.y, z: isect.point.z };
+
+        // Ekrano koordinatės overlay’ui: naudojam mouseCoords (local coords)
+        const sc = { x: mouseCoords.x, y: mouseCoords.y };
+
+        if (!P1) {
+          P1 = pt; S1 = sc;
+          setMarker(p1el, S1);
+          setStatus(
+            "Matavimas: pasirinktas 1 taškas.\n" +
+            `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
+            "Dabar spausk 2 tašką."
+          );
+          return;
+        }
+
+        if (!P2) {
+          P2 = pt; S2 = sc;
+          setMarker(p2el, S2);
+          setLine(S1, S2);
+
+          const d = dist3(P1, P2);
+          const dScaled = d * MEASURE_SCALE;
+
+          setStatus(
+            "Matavimas: parinkti 2 taškai.\n" +
+            `Atstumas: ${fmt(dScaled, 2)} ${MEASURE_UNIT} (raw: ${fmt(d, 6)})\n\n` +
+            `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
+            `P2: X=${fmt(P2.x)} Y=${fmt(P2.y)} Z=${fmt(P2.z)}\n\n` +
+            "\"Išvalyti\" – naujam matavimui. ESC – išjungti matavimą."
+          );
+          return;
+        }
+
+        // Jei jau turim 2 taškus – trečias click pradeda iš naujo (patogu)
+        clearMeasure(true);
+        P1 = pt; S1 = sc;
+        setMarker(p1el, S1);
+        setStatus(
+          "Matavimas: pasirinktas 1 taškas.\n" +
+          `P1: X=${fmt(P1.x)} Y=${fmt(P1.y)} Z=${fmt(P1.z)}\n` +
+          "Dabar spausk 2 tašką."
+        );
       }
 
       try {
-        // Inicijuojam viewer’į embedded režimu
-        const viewer = new OV.EmbeddedViewer(parent, {
-          backgroundColor : new OV.RGBAColor(17, 24, 39, 255),
-          defaultColor    : new OV.RGBColor(200, 200, 200)
+        const embedded = new OVNS.EmbeddedViewer(parent, {
+          backgroundColor : new OVNS.RGBAColor(11, 18, 32, 255),
+          defaultColor    : new OVNS.RGBColor(200, 200, 200),
+          onModelLoaded: () => {
+            isLoaded = true;
+            if (measureOn) {
+              setStatus("Matavimas: spausk 1 tašką ant modelio, tada 2 tašką.\nESC – išjungti. \"Išvalyti\" – nuvalyti.");
+            } else {
+              setStatus("", false);
+            }
+          },
+          onModelLoadFailed: () => {
+            setStatus("Nepavyko užkrauti modelio.\nPatikrink /static/pozicijos/o3dv/ext/occt-import-js/ (worker/wasm) ir ar STEP failas pasiekiamas.");
+          }
         });
 
-        // Užkraunam STEP failą iš tavo Django
-        viewer.LoadModelFromUrlList([STEP_MODEL_URL]);
+        // Užkrovimas
+        embedded.LoadModelFromUrlList([STEP_MODEL_URL]);
+
+        // Prieigos taškai
+        innerViewer = embedded.GetViewer();      // Viewer
+        navigation = innerViewer.navigation;     // Navigation
+
+        // Įstatom click handlerį per Navigation (naudojam jų click detector)
+        const prevClick = navigation.onMouseClick;
+        navigation.SetMouseClickHandler((button, mouseCoords) => {
+          // jei matavimas išjungtas – atiduodam ankstesniam handleriui (jei buvo)
+          if (!measureOn) {
+            if (typeof prevClick === 'function') prevClick(button, mouseCoords);
+            return;
+          }
+          onMeasureClick(button, mouseCoords);
+        });
+
+        // Resize
+        window.addEventListener('resize', () => {
+          try { embedded.Resize(); } catch (e) {}
+        });
+
+        // UI mygtukai
+        document.getElementById('btnMeasure').addEventListener('click', () => {
+          setMeasureMode(!measureOn);
+        });
+        document.getElementById('btnClear').addEventListener('click', () => {
+          clearMeasure(true);
+        });
+
+        // ESC – išjungti matavimą
+        window.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Escape' && measureOn) {
+            setMeasureMode(false);
+          }
+        });
+
+        // Start state
+        setMeasureMode(false);
       } catch (e) {
-        console.error('Klaida inicijuojant 3D peržiūrą:', e);
+        setStatus("Klaida inicijuojant 3D peržiūrą:\n" + (e && e.message ? e.message : String(e)));
       }
     });
   </script>
 </head>
 
 <body>
-  {# Šito nenaudojam tiesiogiai, bet to reikalauja Online3DViewer UI #}
-  <input type="file" id="open_file" style="display:none;" multiple>
+  <div class="topbar">
+    <div class="left">
+      <a class="ui-link" href="{% url 'pozicijos:detail' pozicija.id %}">Atgal</a>
+    </div>
 
-  <div class="header" id="header">
     <div class="title">
-      <div class="title_left">
-        <span class="logo_text">
-          3D peržiūra
-        </span>
-        <span class="logo_separator">|</span>
-        <span class="ov_header_title">
-          {{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad }}
-        </span>
-        <span class="ov_header_subtitle only_full_width">
-          {{ brezinys.pavadinimas|default:brezinys.filename }}
-        </span>
-      </div>
-      <div class="title_right" id="header_buttons"></div>
-      <div class="main_file_name only_full_width" id="main_file_name"></div>
+      <div class="main">{{ pozicija.poz_kodas }} – {{ pozicija.poz_pavad|default:"Be pavadinimo" }}</div>
+      <div class="sub">{{ brezinys.pavadinimas|default:brezinys.filename }}</div>
     </div>
-    <div class="toolbar" id="toolbar"></div>
-  </div>
 
-  <div class="main" id="main">
-    <div class="main_left_container only_full_width" id="main_left_container">
-      <div class="main_navigator ov_panel_set_container" id="main_navigator"></div>
-      <div class="main_splitter" id="main_navigator_splitter"></div>
-    </div>
-    <div class="main_viewer" id="main_viewer"></div>
-    <div class="main_right_container only_full_width" id="main_right_container">
-      <div class="main_splitter" id="main_sidebar_splitter"></div>
-      <div class="main_sidebar ov_panel_set_right_container" id="main_sidebar"></div>
+    <div class="right">
+      <button id="btnClear" class="ui-btn" type="button" style="display:none;">Išvalyti</button>
+      <button id="btnMeasure" class="ui-btn" type="button">Matuoti</button>
+      <a class="ui-link" href="{{ brezinys.failas.url }}" target="_blank" rel="noopener">Atsisiųsti</a>
     </div>
   </div>
 
-  <div class="intro ov_thin_scrollbar" id="intro">
-    <div class="intro_centered ov_common_form ov_thin_scrollbar" id="intro_center">
-      <div class="intro_logo"></div>
-      <div class="intro_content" id="intro_content">
-        <h1>3D modelio įkėlimas…</h1>
-        <p>Modelis: <strong>{{ brezinys.pavadinimas|default:brezinys.filename }}</strong></p>
-        <ul>
-          <li>• Sukimas: kairys pelės mygtukas + vilkimas.</li>
-          <li>• Priartinimas / atitolinimas: pelės ratukas.</li>
-          <li>• Pan: vidurinis / dešinys pelės mygtukas.</li>
-          <li>• Matavimai: naudok matavimo įrankį viršutinėje juostoje.</li>
-        </ul>
-      </div>
-    </div>
+  <div id="viewer"></div>
+
+  <!-- Overlay: markeriai + linija -->
+  <div id="measureOverlay">
+    <svg id="measureSvg" xmlns="http://www.w3.org/2000/svg">
+      <line id="mline" x1="-9999" y1="-9999" x2="-9999" y2="-9999"
+            stroke="rgba(147,197,253,.95)" stroke-width="2" />
+    </svg>
+    <div id="mpt1" class="mpt"></div>
+    <div id="mpt2" class="mpt"></div>
   </div>
+
+  <div id="status"></div>
 </body>
 </html>

@@ -136,12 +136,6 @@ class Pozicija(models.Model):
     # ---- Matmenys XYZ (suvestinė) ----
     @staticmethod
     def _fmt_dim(val: Decimal | None) -> str:
-        """
-        Gražinam reikšmę kaip tekstą:
-        - None -> "—"
-        - 12.00 -> "12"
-        - 12.50 -> "12.5"
-        """
         if val is None:
             return "—"
         s = format(val, "f")
@@ -151,11 +145,6 @@ class Pozicija(models.Model):
 
     @property
     def matmenys_xyz(self) -> str:
-        """
-        Suvestinis formatas: X×Y×Z mm
-        - Jei visi trys tušti -> "—"
-        - Jei dalis trūksta -> trūkstamos rodomos kaip "—" (pvz. 120×80×— mm)
-        """
         if self.x_mm is None and self.y_mm is None and self.z_mm is None:
             return "—"
         x = self._fmt_dim(self.x_mm)
@@ -247,25 +236,24 @@ class PozicijosBrezinys(models.Model):
 
     def _preview_relpath(self) -> str:
         """
-        Media-relative kelias, kur saugom PNG miniatiūrą.
-
-        Pastaba:
-        - naudojam pozicija_id + brez_id, kad nesikirstų pavadinimai
-        - slugify, kad būtų saugūs failų vardai
+        Naujas stabilus preview kelias (media relative):
+        pozicijos/breziniai/previews/<slug>-<id>.png
         """
-        pid = self.pozicija_id or "poz"
-        bid = self.pk or "x"
-        base = os.path.splitext(self.filename or "")[0] or f"brezinys-{bid}"
-        safe = slugify(base) or f"brezinys-{bid}"
-        safe = safe[:80]
-        return f"pozicijos/breziniai/previews/{pid}-{bid}-{safe}.png"
+        base = os.path.splitext(self.filename)[0]
+        slug = slugify(base)[:80] or "brezinys"
+        pk = self.pk or "tmp"
+        return f"pozicijos/breziniai/previews/{slug}-{pk}.png"
 
     def _legacy_preview_relpath(self) -> str:
         """
-        Jei anksčiau buvo naudotas kitoks kelias (legacy) – čia laikom fallback valymui.
-        Jei neturi legacy – grąžinam tuščią string.
+        Legacy variantas (jei kada nors buvo laikoma šalia originalo):
+        pozicijos/breziniai/YYYY/MM/<original>.png
         """
-        return ""
+        name = getattr(self.failas, "name", "") or ""
+        if not name:
+            return ""
+        root, _ = os.path.splitext(name)
+        return f"{root}.png"
 
     @property
     def thumb_url(self) -> str:

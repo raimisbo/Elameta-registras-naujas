@@ -1,10 +1,10 @@
+# pozicijos/services/listing.py
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List
 
 from django.db.models import Q, QuerySet
-from django.utils.dateparse import parse_date
 
 from ..schemas.columns import COLUMNS
 
@@ -20,7 +20,7 @@ SORTABLE_FIELDS: Dict[str, str] = {
 
 def build_numeric_range_q(field_name: str, expr: str) -> Q:
     """
-    Decimal tipo filtro interpretacija.
+    Decimal tipo (plotas/svoris) filtro interpretacija.
 
     Palaikoma:
       "10..20"   -> >=10 ir <=20
@@ -95,7 +95,7 @@ def build_numeric_range_q(field_name: str, expr: str) -> Q:
 
 def build_int_range_q(field_name: str, expr: str) -> Q:
     """
-    Integer tipo filtro interpretacija.
+    Integer tipo (pvz. atlikimo_terminas darbo dienomis) filtro interpretacija.
 
     Palaikoma:
       "10..20", ">5", ">=5", "<12", "<=12", "15", "=15"
@@ -163,23 +163,28 @@ def visible_cols_from_request(request) -> List[str]:
     """
     Atkuria, kurie stulpeliai turi būti rodomi.
 
-    Logika:
-    - Jei ?cols=... yra pateiktas (pvz. iš localStorage/JS), laikom, kad tai vartotojo pasirinktas
-      stulpelių rinkinys, BET:
-        * išvalom nežinomus raktus (kad nelūžtų po refactor)
-        * pridedam naujus default=True stulpelius, kurių tame rinkinyje dar nėra
-    - Jei ?cols nėra – imami visi COLUMNS, kuriuose default=True.
+    Taisyklės (SVARBU dėl sinchronizacijos su JS):
+    - Jei request'e NĖRA 'cols' parametro: naudojam schema default=True (serverinis fallback).
+    - Jei request'e YRA 'cols' parametras: laikom jį autoritetingu ir GRĄŽINAM TIK TĄ SĄRAŠĄ
+      (išvalę nežinomus key + dedupe), NIEKO papildomai nepridedam.
+
+    Taip išvengiam situacijos, kai:
+    - frontas rodo 6 "Numatytuosius" stulpelius,
+    - o backas į tbody prideda papildomų default=True stulpelių,
+    - ir tada "Kaina" pradeda rodyti ne tą stulpelį.
     """
     known_keys = [c["key"] for c in COLUMNS]
     known_set = set(known_keys)
     default_keys = [c["key"] for c in COLUMNS if c.get("default")]
 
-    cols_param = request.GET.get("cols")
-
-    if not cols_param:
+    # kritinis skirtumas: tikrinam parametrų buvimą, ne reikšmės "truthiness"
+    if "cols" not in request.GET:
         return default_keys
 
-    raw_list = [c for c in cols_param.split(",") if c]
+    cols_param = request.GET.get("cols", "")
+
+    # Parse + dedupe (išlaikom eiliškumą)
+    raw_list = [c for c in (cols_param or "").split(",") if c]
     seen = set()
     cols: List[str] = []
     for k in raw_list:
@@ -187,31 +192,13 @@ def visible_cols_from_request(request) -> List[str]:
             cols.append(k)
             seen.add(k)
 
-    if not cols:
-        return default_keys
-
-    for k in default_keys:
-        if k not in seen:
-            cols.append(k)
-            seen.add(k)
-
+    # jei buvo pateikta, bet po valymo nieko neliko – grąžinam tuščią (kad nesusiveltų stulpeliai)
     return cols
 
 
 # =============================================================================
 #  Filtrai
 # =============================================================================
-
-# Aiškiai atskiriam int „range“ laukus (kad ">5" veiktų kaip int).
-INT_RANGE_FIELDS = {
-    "atlikimo_terminas",
-    "detaliu_kiekis_reme",
-    "faktinis_kiekis_reme",
-}
-
-# created/updated – DateTime, filtruojam pagal __date (YYYY-MM-DD iš input type=date)
-DATE_FIELDS_USE_DATE_LOOKUP = {"created", "updated"}
-
 
 def apply_filters(qs: QuerySet, request) -> QuerySet:
     """
@@ -222,7 +209,6 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
 
     Per-stulpeliniai:
       ?f[field]=...
-      remiamės COLUMNS schema: text/range/date
     """
     q_global = request.GET.get("q", "").strip()
     if q_global:
@@ -233,10 +219,8 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
             | Q(poz_pavad__icontains=q_global)
         )
 
-    schema_by_key = {c["key"]: c for c in COLUMNS}
-
     for key, value in request.GET.items():
-        if not key.startswith("f[") or not key.endswith("]"):
+        if not key.startswith("f["):
             continue
 
         field = key[2:-1]  # f[field] -> field
@@ -244,37 +228,24 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
         if not value:
             continue
 
-        col = schema_by_key.get(field)
-        if not col:
-            continue
-
-        # virtualių nefiltruojam
-        if col.get("type") == "virtual" or col.get("filter") is None:
-            continue
-
-        ftype = col.get("filter")
-
-        if ftype == "text":
+        # tekstiniai filtrai – icontains
+        if field in [
+            "klientas", "projektas", "poz_kodas", "poz_pavad",
+            "metalas", "padengimas", "spalva",
+            "pakavimas", "maskavimas", "testai_kokybe",
+        ]:
             qs = qs.filter(**{f"{field}__icontains": value})
 
-        elif ftype == "range":
-            # int arba decimal pagal lauką
-            if field in INT_RANGE_FIELDS:
-                qs = qs.filter(build_int_range_q(field, value))
-            else:
-                qs = qs.filter(build_numeric_range_q(field, value))
+        # Decimal range
+        elif field in ["plotas", "svoris"]:
+            qs = qs.filter(build_numeric_range_q(field, value))
 
-        elif ftype == "date":
-            d = parse_date(value)
-            if not d:
-                continue
-            if field in DATE_FIELDS_USE_DATE_LOOKUP:
-                qs = qs.filter(**{f"{field}__date": d})
-            else:
-                qs = qs.filter(**{field: d})
+        # Integer range (darbo dienos)
+        elif field in ["atlikimo_terminas"]:
+            qs = qs.filter(build_int_range_q(field, value))
 
+        # visi kiti – tikslus atitikimas
         else:
-            # fallback: exact
             qs = qs.filter(**{field: value})
 
     return qs

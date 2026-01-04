@@ -7,7 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- Security ---
-SECRET_KEY = 'django-insecure-x30nv(zk%f6zbytg#%bi$=nq@81c3t#04d!r10ldr5g1^h&t$='  # rekomenduotina perkelti į .env
+SECRET_KEY = 'django-insecure-x30nv(zk%f6zbytg#%bi$=nq@81c3t#04d!r10ldr5g1^h&t$='
 DEBUG = True
 ALLOWED_HOSTS = []
 
@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'django_extensions',
 
     # local
-    # 'detaliu_registras',  # ARCHYVAS: laikom repozitorijoje, bet runtime nenaudojam
     'pozicijos.apps.PozicijosConfig',
 ]
 
@@ -47,7 +46,7 @@ ROOT_URLCONF = 'registras.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],   # <— projektinis templates katalogas
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -90,8 +89,16 @@ DATE_INPUT_FORMATS = ['%Y-%m-%d']
 
 # --- Static & Media ---
 STATIC_URL = '/static/'
-# STATICFILES_DIRS = [BASE_DIR / "static"]       # papildomi projektiniai statiniai
-STATIC_ROOT = BASE_DIR / "staticfiles"         # gamybos collectstatic
+
+# Projektinis static katalogas (pasirinktinai).
+# Jei katalogo nėra – jo neįtraukiam, kad nebūtų W004 warning.
+STATICFILES_DIRS = []
+PROJECT_STATIC_DIR = BASE_DIR / "static"
+if PROJECT_STATIC_DIR.exists():
+    STATICFILES_DIRS.append(PROJECT_STATIC_DIR)
+
+# Collectstatic output (NEdėti į STATICFILES_DIRS, kitaip bus E002)
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -100,8 +107,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ===================== Pasiūlymo (offer) nustatymai =====================
-
-# Naudojama PDF pasiūlymo header'yje (proposal_pdf)
 OFFER_COMPANY_NAME = "UAB Elameta"
 OFFER_COMPANY_LINE1 = "Adresas, LT-00000, Miestas"
 OFFER_COMPANY_LINE2 = "Tel. +370 000 00000, el. paštas info@elameta.lt"
