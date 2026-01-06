@@ -8,7 +8,8 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -36,11 +37,11 @@ LANG_LABELS = {
         "offer_title": "PASIŪLYMAS",
         "date_label": "Data",
         "section_main": "Pagrindinė informacija",
-        "section_prices": "Kainos (pasirinktos eilutės)",
+        "section_prices": "Kainos (aktualios eilutės)",
         "section_drawings": "Brėžinių miniatiūros",
         "section_notes": "Pastabos / sąlygos",
         "no_data": "Nėra duomenų.",
-        "no_prices": "Pasirinktų (ar aktyvių) kainų eilučių šiai pozicijai nėra.",
+        "no_prices": "Aktualių kainų eilučių šiai pozicijai nėra.",
         "no_drawings": "Brėžinių nėra.",
         "col_price": "Kaina €",
         "col_unit": "Matas",
@@ -48,17 +49,16 @@ LANG_LABELS = {
         "col_qty_to": "Kiekis iki",
         "col_valid_from": "Galioja nuo",
         "col_valid_to": "Galioja iki",
-        "preview_hint": "HTML peržiūra – galutinis PDF gali šiek tiek skirtis.",
     },
     "en": {
         "offer_title": "OFFER",
         "date_label": "Date",
         "section_main": "Main information",
-        "section_prices": "Prices (selected lines)",
+        "section_prices": "Prices (active lines)",
         "section_drawings": "Drawing thumbnails",
         "section_notes": "Notes / terms",
         "no_data": "No data.",
-        "no_prices": "There are no selected (or active) price lines for this position.",
+        "no_prices": "There are no active price lines for this position.",
         "no_drawings": "No drawings.",
         "col_price": "Price €",
         "col_unit": "Unit",
@@ -66,7 +66,6 @@ LANG_LABELS = {
         "col_qty_to": "Qty to",
         "col_valid_from": "Valid from",
         "col_valid_to": "Valid until",
-        "preview_hint": "HTML preview – final PDF may differ slightly.",
     },
 }
 
@@ -219,38 +218,9 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
     return rows
 
 
-def _get_selected_kaina_ids(request) -> list[int]:
-    """
-    Skaitom pasirinktų kainų ID iš querystring:
-      ?kaina_id=12&kaina_id=15
-    """
-    raw = request.GET.getlist("kaina_id")
-    ids: list[int] = []
-    for r in raw:
-        try:
-            ids.append(int(r))
-        except Exception:
-            continue
-    # unikalumas, bet išlaikom eiliškumą
-    seen = set()
-    out: list[int] = []
-    for i in ids:
-        if i not in seen:
-            out.append(i)
-            seen.add(i)
-    return out
-
-
-def _get_kainos_for_pdf(pozicija: Pozicija, selected_ids: list[int] | None = None):
-    """
-    Naudojam tik 'aktuali' KainosEilute eilutes.
-    Jei selected_ids pateikta – imam tik jas (tik tos pozicijos ribose).
-    """
+def _get_kainos_for_pdf(pozicija: Pozicija):
+    """Naudojam tik 'aktuali' KainosEilute eilutes."""
     qs = pozicija.kainos_eilutes.filter(busena="aktuali")
-
-    if selected_ids:
-        qs = qs.filter(pk__in=selected_ids)
-
     return qs.order_by(
         "matas",
         "kiekis_nuo",
@@ -319,103 +289,46 @@ def _draw_wrapped_text(
 
 
 def proposal_prepare(request, pk: int):
-    """UI puslapis – pasirinkimai + kainų eilučių checkbox'ai."""
-    pozicija = get_object_or_404(Pozicija, pk=pk)
+    """
+    Nebenaudojam tarpinio paruošimo UI.
+    /proposal/ paliekam dėl suderinamumo – nukreipiam tiesiai į PDF.
+    """
     lang = _get_lang(request)
-
-    show_prices = bool(request.GET.get("show_prices"))
-    show_drawings = bool(request.GET.get("show_drawings"))
-    notes = request.GET.get("notes", "")
-
-    # Kainų pasirinkimas
-    selected_ids = _get_selected_kaina_ids(request)
-    available_kainos = list(_get_kainos_for_pdf(pozicija, selected_ids=None))  # visos aktualios
-
-    # Jei vartotojas įjungė "rodyti kainas", bet nieko nepasirinko -> default: visos aktualios
-    if show_prices and not selected_ids:
-        selected_ids = [k.id for k in available_kainos]
+    notes = (request.GET.get("notes", "") or "").strip()
 
     params: list[tuple[str, str]] = []
-    if show_prices:
-        params.append(("show_prices", "1"))
-    if show_drawings:
-        params.append(("show_drawings", "1"))
-    if notes:
-        params.append(("notes", notes))
     if lang:
         params.append(("lang", lang))
-    # į qs įdedam pasirinktus kainų ID (kad preview puslapyje PDF mygtukas turėtų tą patį rinkinį)
-    for kid in selected_ids:
-        params.append(("kaina_id", str(kid)))
+    if notes:
+        params.append(("notes", notes))
 
-    qs = urlencode(params)
-
-    context = {
-        "pozicija": pozicija,
-        "show_prices": show_prices,
-        "show_drawings": show_drawings,
-        "notes": notes,
-        "qs": qs,
-        "lang": lang,
-        "available_kainos": available_kainos,
-        "selected_kaina_ids": set(selected_ids),
-    }
-    return render(request, "pozicijos/proposal_prepare.html", context)
+    url = reverse("pozicijos:pdf", args=[pk])
+    if params:
+        url += "?" + urlencode(params)
+    return redirect(url)
 
 
 def proposal_pdf(request, pk: int):
     """
-    Jei ?preview=1 – HTML peržiūra (su CSS).
-    Kitu atveju – PDF per ReportLab.
+    Visada generuojam PDF per ReportLab (HTML preview nebelieka).
+    Visada rodom: kainas + brėžinių miniatiūras.
+    Kalba pasirenkama per ?lang=lt|en.
     """
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
     lang = _get_lang(request)
     labels = LANG_LABELS.get(lang, LANG_LABELS["lt"])
 
-    show_prices = bool(request.GET.get("show_prices"))
-    show_drawings = bool(request.GET.get("show_drawings"))
-    notes = request.GET.get("notes", "").strip()
-    preview = bool(request.GET.get("preview"))
+    # visada rodom viską
+    show_prices = True
+    show_drawings = True
 
-    selected_ids = _get_selected_kaina_ids(request)
-
-    # jei show_prices=1 ir nieko nenurodyta -> default: visos aktualios
-    if show_prices and not selected_ids:
-        selected_ids = [k.id for k in _get_kainos_for_pdf(pozicija, selected_ids=None)]
-
-    params: list[tuple[str, str]] = []
-    if show_prices:
-        params.append(("show_prices", "1"))
-    if show_drawings:
-        params.append(("show_drawings", "1"))
-    if notes:
-        params.append(("notes", notes))
-    if lang:
-        params.append(("lang", lang))
-    for kid in selected_ids:
-        params.append(("kaina_id", str(kid)))
-    qs = urlencode(params)
+    notes = (request.GET.get("notes", "") or "").strip()
 
     field_rows = _build_field_rows(pozicija, lang)
-    kainos = list(_get_kainos_for_pdf(pozicija, selected_ids if show_prices else []))
+    kainos = list(_get_kainos_for_pdf(pozicija))
     brez = list(pozicija.breziniai.all())
     poz_pastabos = (pozicija.pastabos or "").strip()
-
-    if preview:
-        ctx = {
-            "pozicija": pozicija,
-            "field_rows": field_rows,
-            "kainos": kainos,
-            "brez": brez,
-            "show_prices": show_prices,
-            "show_drawings": show_drawings,
-            "notes": notes,
-            "qs": qs,
-            "lang": lang,
-            "labels": labels,
-        }
-        return render(request, "pozicijos/proposal_pdf.html", ctx)
 
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)

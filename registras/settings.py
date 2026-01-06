@@ -107,6 +107,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ===================== Pasiūlymo (offer) nustatymai =====================
-OFFER_COMPANY_NAME = "UAB Elameta"
-OFFER_COMPANY_LINE1 = "Adresas, LT-00000, Miestas"
+OFFER_COMPANY_NAME = "ELAMETA UAB"
+OFFER_COMPANY_LINE1 = "J. Basanavičiaus g. 114N, LT-28214, Utena"
 OFFER_COMPANY_LINE2 = "Tel. +370 000 00000, el. paštas info@elameta.lt"

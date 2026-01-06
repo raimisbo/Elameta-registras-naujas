@@ -111,11 +111,50 @@
       transform: translate(-9999px, -9999px);
       white-space: nowrap;
     }
+
+    /* Back hint overlay (kai negalim grįžti be dublio) */
+    #backHint {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+    #backHint .panel {
+      width: min(620px, 100%);
+      background: #0b1220;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 12px;
+      padding: 14px 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    #backHint .panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+    #backHint .panel p {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      opacity: .9;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    #backHint .panel .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
   </style>
 
   <script src="{% static 'pozicijos/js/o3dv.min.js' %}"></script>
   <script>
     const STEP_MODEL_URL = "{{ brezinys.failas.url|escapejs }}";
+    const BACK_URL = "{% url 'pozicijos:detail' pozicija.id %}";
 
     // Jei reikia vienetų konversijos:
     // mm -> m: 0.001 ir "m"
@@ -123,7 +162,6 @@
     const MEASURE_UNIT  = "mm";
 
     // Snap slenksčiai (px overlay koordinatėse).
-    // Didesnis -> agresyvesnis snap.
     const SNAP_VERTEX_PX = 14;
     const SNAP_EDGE_PX   = 10;
 
@@ -149,7 +187,77 @@
       return Math.sqrt(dx*dx + dy*dy);
     }
 
+    function showBackHint(text) {
+      const wrap = document.getElementById('backHint');
+      const msg = document.getElementById('backHintMsg');
+      msg.textContent = text;
+      wrap.style.display = 'flex';
+    }
+
+    function hideBackHint() {
+      const wrap = document.getElementById('backHint');
+      wrap.style.display = 'none';
+    }
+
+    function smartBack() {
+      // Jei 3D yra iframe – eiti į top (tas pats tab'as)
+      try {
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = BACK_URL;
+          return;
+        }
+      } catch (e) {}
+
+      // Jei turim opener (t.y. 3D atidaryta taip, kad leidžia grįžti į originalų tab'ą)
+      try {
+        if (window.opener && !window.opener.closed) {
+          // nukreipiam opener į detail ir fokusuojam
+          try { window.opener.location.href = BACK_URL; } catch (e) {}
+          try { window.opener.focus(); } catch (e) {}
+
+          // bandom uždaryti šitą tab'ą
+          try { window.close(); } catch (e) {}
+
+          // Jei uždaryti neleidžia – NEkraunam detail šiame tab'e, kad nesidubliuotų.
+          // Parodom aiškų pranešimą, kad šį tab'ą reikia uždaryti rankiniu būdu.
+          setTimeout(() => {
+            // Jei vis dar esam čia, vadinasi close nepavyko
+            showBackHint(
+              "Ši 3D peržiūra buvo atidaryta atskirame tab'e.\n" +
+              "Naršyklė neleido automatiškai uždaryti tab'o.\n\n" +
+              "Uždarykite šį tab'ą (Cmd+W / Ctrl+W), o pozicijos kortelė yra originaliame tab'e."
+            );
+          }, 120);
+
+          return;
+        }
+      } catch (e) {}
+
+      // Jei nėra opener: tai dažniausiai reiškia, kad 3D atidaryta su rel=\"noopener\"
+      // Tokiu atveju grįžimas į detail šiame tab'e sukurs dublį, todėl to nedarom.
+      // Jei istorija turi prieš tai buvusį įrašą – grįžtam back (be dublio).
+      if (window.history && window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+
+      // Kitu atveju – pranešam (neperadresuojam į detail, kad nedubliuotų tab'ų).
+      showBackHint(
+        "Šis tab'as atidarytas be ryšio su pradiniu (window.opener nėra).\n" +
+        "Jei atidarote 3D peržiūrą su target=\"_blank\" ir rel=\"noopener\", naršyklė atjungia pradinį tab'ą.\n\n" +
+        "Sprendimas: atidarykite 3D tame pačiame tab'e (be target=_blank) arba atidarykite naują tab'ą be noopener.\n" +
+        "Dabar – tiesiog uždarykite šį 3D tab'ą (Cmd+W / Ctrl+W)."
+      );
+    }
+
     window.addEventListener('load', () => {
+      // Back mygtukas veikia net jei viewer nepasileistų
+      const backBtn = document.getElementById('btnBack');
+      if (backBtn) backBtn.addEventListener('click', smartBack);
+
+      const backHintClose = document.getElementById('backHintClose');
+      if (backHintClose) backHintClose.addEventListener('click', hideBackHint);
+
       const OVNS = window.OV || (typeof OV !== 'undefined' ? OV : null);
       if (!OVNS) { setStatus("O3DV nepasiekiamas: nerastas global OV."); return; }
       if (!OVNS.EmbeddedViewer) { setStatus("O3DV įkeltas, bet nerastas OV.EmbeddedViewer."); return; }
@@ -175,7 +283,7 @@
       let P1snap = null; // 'V' | 'E' | 'F'
       let P2snap = null; // 'V' | 'E' | 'F'
 
-      // fallback screen coords (kad NIEKADA nedingtų, net jei camera nerandam)
+      // fallback screen coords
       let S1f = null; // {x,y,visible}
       let S2f = null;
 
@@ -197,7 +305,6 @@
           el.style.transform = 'translate(-9999px, -9999px)';
           return;
         }
-        // čia el yra 10x10 (ar 12x12 preview), perkeliam į centrą
         const sz = el.classList.contains('preview') ? 6 : 5;
         el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-${sz}px, -${sz}px)`;
       }
@@ -275,9 +382,7 @@
         if (!innerViewer) return null;
 
         const cands = [];
-        try {
-          if (typeof innerViewer.GetCamera === "function") cands.push(innerViewer.GetCamera());
-        } catch (e) {}
+        try { if (typeof innerViewer.GetCamera === "function") cands.push(innerViewer.GetCamera()); } catch (e) {}
         cands.push(innerViewer.camera);
         cands.push(innerViewer.renderer && innerViewer.renderer.camera);
         cands.push(innerViewer.renderer && innerViewer.renderer.threeCamera);
@@ -308,7 +413,7 @@
 
         if (typeof vec3.clone !== "function" || typeof vec3.project !== "function") return null;
 
-        const v = vec3.clone().project(cam); // NDC
+        const v = vec3.clone().project(cam);
         const x = (v.x * 0.5 + 0.5) * w;
         const y = (-v.y * 0.5 + 0.5) * h;
 
@@ -324,8 +429,6 @@
         if (!measureOn) return;
 
         const cam = getThreeCam();
-
-        // jei cam nerandam – rodom fallback (iš click coords)
         const s1 = (cam && P1v) ? projectToOverlay(P1v, cam) : S1f;
         const s2 = (cam && P2v) ? projectToOverlay(P2v, cam) : S2f;
 
@@ -333,7 +436,6 @@
         setMarker(p2el, s2);
         setLine(s1, s2);
 
-        // preview (tik kai renkam taškus)
         if (preview && (!P1v || !P2v)) {
           setMarker(pprev, preview.s);
         } else {
@@ -372,17 +474,11 @@
         rafId = null;
       }
 
-      // --------- SNAP: intersection normalizavimas ir triange/edge logika ---------
-
       function normalizeIntersection(rawHit) {
         if (!rawHit) return null;
-
-        // dažniausi wrapper'iai
         let cand = rawHit.intersection || rawHit.hit || rawHit.result || rawHit;
-
         if (!cand || !cand.point) return null;
 
-        // Jei cand yra rawHit.intersection, bet object/face yra rawHit lygyje – pamėginam sulieti.
         if (cand === rawHit.intersection) {
           const merged = Object.assign({}, cand);
           if (!merged.object && rawHit.object) merged.object = rawHit.object;
@@ -391,7 +487,6 @@
           if (!merged.point && rawHit.point) merged.point = rawHit.point;
           return merged;
         }
-
         return cand;
       }
 
@@ -403,7 +498,6 @@
       }
 
       function getTriangleWorldVerts(inter) {
-        // Reikia: inter.object + geometry.position + (face arba faceIndex)
         if (!inter || !inter.object || !inter.object.geometry) return null;
 
         const obj = inter.object;
@@ -418,16 +512,12 @@
         let ia = null, ib = null, ic = null;
 
         if (inter.face && typeof inter.face.a === 'number') {
-          ia = inter.face.a;
-          ib = inter.face.b;
-          ic = inter.face.c;
+          ia = inter.face.a; ib = inter.face.b; ic = inter.face.c;
         } else if (typeof inter.faceIndex === 'number') {
           if (geom.index && geom.index.array) {
             const idx = geom.index.array;
             const i = inter.faceIndex * 3;
-            ia = idx[i];
-            ib = idx[i+1];
-            ic = idx[i+2];
+            ia = idx[i]; ib = idx[i+1]; ic = idx[i+2];
           } else {
             const i = inter.faceIndex * 3;
             ia = i; ib = i+1; ic = i+2;
@@ -447,7 +537,6 @@
       }
 
       function closestPointOnSegment(p, a, b) {
-        // p,a,b - Vector3
         if (!p || !a || !b || typeof p.clone !== 'function') return null;
 
         const ab = b.clone().sub(a);
@@ -468,7 +557,6 @@
         const cam = getThreeCam();
         const mouse = { x: mouseCoords.x, y: mouseCoords.y };
 
-        // Jei nėra kameros arba nėra tri info – grąžinam free
         if (!cam) {
           const pt = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
           return { pt, snap: 'F', screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
@@ -481,7 +569,6 @@
           return { pt, snap: 'F', screen: s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
         }
 
-        // 1) Vertex snap (arčiausias iš 3)
         const vList = [tri.vA, tri.vB, tri.vC];
         let bestV = null;
 
@@ -493,16 +580,10 @@
         }
 
         if (bestV && bestV.d <= SNAP_VERTEX_PX) {
-          return {
-            pt: bestV.v.clone(),
-            snap: 'V',
-            screen: bestV.s,
-            screenFallback: { x: mouse.x, y: mouse.y, visible: true }
-          };
+          return { pt: bestV.v.clone(), snap: 'V', screen: bestV.s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
         }
 
-        // 2) Edge snap (AB, BC, CA) – artimiausias taškas ant segmento (3D), tada patikrinam px atstumą
-        const p = inter.point.clone ? inter.point.clone() : inter.point;
+        const p = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
         const edges = [
           { a: tri.vA, b: tri.vB },
           { a: tri.vB, b: tri.vC },
@@ -520,21 +601,13 @@
         }
 
         if (bestE && bestE.d <= SNAP_EDGE_PX) {
-          return {
-            pt: bestE.cp.clone ? bestE.cp.clone() : bestE.cp,
-            snap: 'E',
-            screen: bestE.s,
-            screenFallback: { x: mouse.x, y: mouse.y, visible: true }
-          };
+          return { pt: (typeof bestE.cp.clone === 'function') ? bestE.cp.clone() : bestE.cp, snap: 'E', screen: bestE.s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
         }
 
-        // 3) Free
         const pt = (typeof inter.point.clone === 'function') ? inter.point.clone() : inter.point;
         const s = projectToOverlay(pt, cam);
         return { pt, snap: 'F', screen: s, screenFallback: { x: mouse.x, y: mouse.y, visible: true } };
       }
-
-      // --------- Preview (mousemove) ---------
 
       function hidePreview() {
         preview = null;
@@ -544,13 +617,12 @@
       function onHostMouseMove(ev) {
         if (!measureOn) return;
         if (!isLoaded || !innerViewer) return;
-        if (P1v && P2v) return; // baigta – preview nebūtinas
+        if (P1v && P2v) return;
 
         const rect = overlay.getBoundingClientRect();
         const x = ev.clientX - rect.left;
         const y = ev.clientY - rect.top;
 
-        // už ribų – slėpti
         if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > rect.width || y > rect.height) {
           hidePreview();
           return;
@@ -582,16 +654,11 @@
             return;
           }
 
-          // Preview ekraninė pozicija:
-          // - jei turim projektuotą 'screen' – naudojam ją
-          // - jei ne – fallback į mouse coords
           const s = snap.screen || snap.screenFallback;
           preview = { snap: snap.snap, s };
           updateOverlay();
         });
       }
-
-      // --------- Click handler (naudoja snap) ---------
 
       function onMeasureClick(button, mouseCoords) {
         if (!measureOn) return;
@@ -616,25 +683,14 @@
         }
 
         const snap = computeSnap(hit, mouseCoords);
-        if (!snap || !snap.pt) {
-          setStatus("Nepavyko apskaičiuoti snap (trūksta geometrijos/faceIndex). Bus naudojamas Free.");
-        }
-
         const pt = (snap && snap.pt) ? snap.pt : (typeof hit.point.clone === "function" ? hit.point.clone() : hit.point);
         const st = (snap && snap.snap) ? snap.snap : 'F';
-
-        // Screen coords:
-        // - jei turim projektuotą 'screen' – naudojam ją (tiksliau, ypač vertex/edge)
-        // - fallback: mouseCoords (visada veikia)
         const sc = (snap && (snap.screen || snap.screenFallback)) ? (snap.screen || snap.screenFallback) : { x: mouseCoords.x, y: mouseCoords.y, visible: true };
 
         if (!P1v) {
-          P1v = pt;
-          P1snap = st;
-          S1f = sc;
+          P1v = pt; P1snap = st; S1f = sc;
           hidePreview();
           updateOverlay();
-
           setStatus(
             "Matavimas: pasirinktas 1 taškas.\n" +
             `P1[${P1snap}]: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
@@ -644,9 +700,7 @@
         }
 
         if (!P2v) {
-          P2v = pt;
-          P2snap = st;
-          S2f = sc;
+          P2v = pt; P2snap = st; S2f = sc;
           hidePreview();
           updateOverlay();
 
@@ -663,14 +717,10 @@
           return;
         }
 
-        // 3-ias click -> pradėti iš naujo
         clearMeasure(true);
-        P1v = pt;
-        P1snap = st;
-        S1f = sc;
+        P1v = pt; P1snap = st; S1f = sc;
         hidePreview();
         updateOverlay();
-
         setStatus(
           "Matavimas: pasirinktas 1 taškas.\n" +
           `P1[${P1snap}]: X=${fmt(P1v.x)} Y=${fmt(P1v.y)} Z=${fmt(P1v.z)}\n` +
@@ -704,7 +754,6 @@
         innerViewer = embedded.GetViewer();
         navigation = innerViewer.navigation;
 
-        // išsaugom buvusį click handlerį (jei yra)
         const prevClick = navigation.onMouseClick;
 
         navigation.SetMouseClickHandler((button, mouseCoords) => {
@@ -715,7 +764,6 @@
           onMeasureClick(button, mouseCoords);
         });
 
-        // Preview mousemove: klausom ant host (nes overlay pointer-events: none)
         host.addEventListener('mousemove', onHostMouseMove, { passive: true });
         host.addEventListener('mouseleave', () => { hidePreview(); }, { passive: true });
 
@@ -748,7 +796,7 @@
 <body>
   <div class="topbar">
     <div class="left">
-      <a class="ui-link" href="{% url 'pozicijos:detail' pozicija.id %}">Atgal</a>
+      <button id="btnBack" class="ui-btn" type="button">Atgal</button>
     </div>
 
     <div class="title">
@@ -759,7 +807,7 @@
     <div class="right">
       <button id="btnClear" class="ui-btn" type="button" style="display:none;">Išvalyti</button>
       <button id="btnMeasure" class="ui-btn" type="button">Matuoti</button>
-      <a class="ui-link" href="{{ brezinys.failas.url }}" target="_blank" rel="noopener">Atsisiųsti</a>
+      {# "Atsisiųsti" pašalintas #}
     </div>
   </div>
 
@@ -781,5 +829,16 @@
   </div>
 
   <div id="status"></div>
+
+  <!-- Back hint (kai negalim grįžti be dublio) -->
+  <div id="backHint">
+    <div class="panel">
+      <h3>Grįžimas</h3>
+      <p id="backHintMsg"></p>
+      <div class="actions">
+        <button id="backHintClose" class="ui-btn" type="button">Gerai</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
