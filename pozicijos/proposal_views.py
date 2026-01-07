@@ -21,7 +21,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
 
-from .models import Pozicija, KainosEilute
+from .models import Pozicija
 
 
 def _get_lang(request) -> str:
@@ -36,17 +36,14 @@ LANG_LABELS = {
     "lt": {
         "offer_title": "PASIŪLYMAS",
         "date_label": "Data",
-
         "section_main": "Pagrindinė informacija",
         "section_prices": "Kainos (aktualios eilutės)",
         "section_drawings": "Brėžinių miniatiūros",
         "section_notes": "Pastabos / sąlygos",
-
         "preview_hint": "Sugeneruojamas PDF.",
         "no_data": "Nėra duomenų.",
         "no_prices": "Nėra aktyvių kainų eilučių šiai pozicijai.",
         "no_drawings": "Nėra brėžinių.",
-
         "col_price": "Kaina",
         "col_unit": "Matas",
         "col_qty_from": "Kiekis nuo",
@@ -57,17 +54,14 @@ LANG_LABELS = {
     "en": {
         "offer_title": "OFFER",
         "date_label": "Date",
-
         "section_main": "Main information",
         "section_prices": "Prices (active lines)",
         "section_drawings": "Drawing thumbnails",
         "section_notes": "Notes / terms",
-
         "preview_hint": "PDF will be generated.",
         "no_data": "No data.",
         "no_prices": "There are no active price lines for this position.",
         "no_drawings": "No drawings.",
-
         "col_price": "Price",
         "col_unit": "Unit",
         "col_qty_from": "Qty from",
@@ -82,62 +76,48 @@ FIELD_LABELS = {
     "lt": {
         "klientas": "Klientas",
         "projektas": "Projektas",
-
         "poz_kodas": "Brėžinio kodas",
         "poz_pavad": "Detalės pavadinimas",
-
         "metalas": "Metalo tipas",
         "plotas": "Plotas (m²)",
         "svoris": "Svoris (kg)",
-
         "kabinimo_budas": "Kabinimo būdas",
         "kabinimas_reme": "Kabinimas rėme",
         "detaliu_kiekis_reme": "Detalių kiekis rėme",
         "faktinis_kiekis_reme": "Faktinis kiekis rėme",
-
         "paruosimas": "Paruošimas",
         "padengimas": "Padengimas",
         "padengimo_standartas": "Padengimo standartas",
         "spalva": "Spalva",
-
         "paslauga_ktl": "Papildoma paslauga: KTL",
         "paslauga_miltai": "Papildoma paslauga: Miltai",
         "paslauga_paruosimas": "Papildoma paslauga: Paruošimas",
-
         "miltu_kodas": "Miltų kodas",
         "miltu_serija": "Miltų serija",
-
         "pakavimas": "Pakavimas",
         "pastabos": "Pastabos",
     },
     "en": {
         "klientas": "Customer",
         "projektas": "Project",
-
         "poz_kodas": "Drawing code",
         "poz_pavad": "Part name",
-
         "metalas": "Metal type",
         "plotas": "Area (m²)",
         "svoris": "Weight (kg)",
-
         "kabinimo_budas": "Hanging method",
         "kabinimas_reme": "Hanging on frame",
         "detaliu_kiekis_reme": "Parts per frame",
         "faktinis_kiekis_reme": "Actual qty per frame",
-
         "paruosimas": "Preparation",
         "padengimas": "Coating",
         "padengimo_standartas": "Coating standard",
         "spalva": "Color",
-
         "paslauga_ktl": "Extra service: KTL",
         "paslauga_miltai": "Extra service: Powder",
         "paslauga_paruosimas": "Extra service: Preparation",
-
         "miltu_kodas": "Powder code",
         "miltu_serija": "Powder series",
-
         "pakavimas": "Packaging",
         "pastabos": "Notes",
     },
@@ -146,7 +126,7 @@ FIELD_LABELS = {
 
 def proposal_prepare(request, pk: int):
     """
-    Suderinamumo endpointas: nukreipiam tiesiai į PDF.
+    Suderinamumo endpointas: nukreipiam į PDF (HTML preview nebelieka).
     """
     lang = _get_lang(request)
     notes = (request.GET.get("notes", "") or "").strip()
@@ -170,40 +150,38 @@ def _register_fonts() -> tuple[str, str]:
     """
     fonts_dir = os.path.join(settings.MEDIA_ROOT, "fonts")
 
-    regular_files = [
+    candidates_regular = [
         os.path.join(fonts_dir, "HelveticaLT.ttf"),
         os.path.join(fonts_dir, "Arial.ttf"),
         os.path.join(fonts_dir, "DejaVuSans.ttf"),
     ]
-    bold_files = [
+    candidates_bold = [
         os.path.join(fonts_dir, "HelveticaLT-Bold.ttf"),
         os.path.join(fonts_dir, "Arial-Bold.ttf"),
         os.path.join(fonts_dir, "DejaVuSans-Bold.ttf"),
     ]
 
-    reg_alias = "LT-Regular"
-    bold_alias = "LT-Bold"
-
-    reg_ok = next((p for p in regular_files if os.path.exists(p)), None)
-    bold_ok = next((p for p in bold_files if os.path.exists(p)), None)
-
-    if reg_ok:
+    def register_font(alias: str, path: str) -> str | None:
         try:
-            pdfmetrics.registerFont(TTFont(reg_alias, reg_ok))
+            pdfmetrics.registerFont(TTFont(alias, path))
+            return alias
         except Exception:
-            reg_alias = "Helvetica"
-    else:
-        reg_alias = "Helvetica"
+            return None
 
-    if bold_ok:
-        try:
-            pdfmetrics.registerFont(TTFont(bold_alias, bold_ok))
-        except Exception:
-            bold_alias = "Helvetica-Bold" if reg_alias == "Helvetica" else reg_alias
-    else:
-        bold_alias = "Helvetica-Bold" if reg_alias == "Helvetica" else reg_alias
+    regular = "Helvetica"
+    bold = "Helvetica-Bold"
 
-    return reg_alias, bold_alias
+    reg_path = next((p for p in candidates_regular if os.path.exists(p)), None)
+    bold_path = next((p for p in candidates_bold if os.path.exists(p)), None)
+
+    if reg_path:
+        regular = register_font("LT-Regular", reg_path) or regular
+    if bold_path:
+        bold = register_font("LT-Bold", bold_path) or bold
+    else:
+        bold = bold if bold != "Helvetica-Bold" else (regular if regular != "Helvetica" else bold)
+
+    return regular, bold
 
 
 def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
@@ -255,7 +233,7 @@ def _build_field_rows(pozicija: Pozicija, lang: str) -> list[tuple[str, str]]:
 
 def _get_kainos_for_pdf(pozicija: Pozicija):
     """Naudojam tik 'aktuali' KainosEilute eilutes."""
-    qs = KainosEilute.objects.filter(pozicija=pozicija, busena="aktuali")
+    qs = pozicija.kainos_eilutes.filter(busena="aktuali")
     return qs.order_by(
         "matas",
         "kiekis_nuo",
@@ -266,48 +244,57 @@ def _get_kainos_for_pdf(pozicija: Pozicija):
     )
 
 
-def _wrap_lines(text: str) -> list[str]:
-    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+def _normalize_multiline(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _draw_wrapped(
+def _draw_wrapped_text(
     c: canvas.Canvas,
     text: str,
     x: float,
     y: float,
-    max_w: float,
+    max_width: float,
     font_name: str,
     font_size: int,
-    leading: float,
-    bottom: float,
-    page_h: float,
+    page_height: float,
+    bottom_margin: float,
+    leading: float = 12,
 ) -> float:
     c.setFont(font_name, font_size)
+    text = _normalize_multiline(text).strip()
+    if not text:
+        return y
 
-    for para in _wrap_lines(text):
+    paragraphs = text.split("\n")
+
+    for para in paragraphs:
         words = para.split()
         if not words:
+            if y - leading < bottom_margin:
+                c.showPage()
+                c.setFont(font_name, font_size)
+                y = page_height - 30 * mm
             y -= leading
             continue
 
         line = words[0]
         for w in words[1:]:
-            test = f"{line} {w}"
-            if stringWidth(test, font_name, font_size) <= max_w:
-                line = test
+            test_line = f"{line} {w}"
+            if stringWidth(test_line, font_name, font_size) <= max_width:
+                line = test_line
             else:
-                if y - leading < bottom:
+                if y - leading < bottom_margin:
                     c.showPage()
                     c.setFont(font_name, font_size)
-                    y = page_h - 30 * mm
+                    y = page_height - 30 * mm
                 c.drawString(x, y, line)
                 y -= leading
                 line = w
 
-        if y - leading < bottom:
+        if y - leading < bottom_margin:
             c.showPage()
             c.setFont(font_name, font_size)
-            y = page_h - 30 * mm
+            y = page_height - 30 * mm
         c.drawString(x, y, line)
         y -= leading
 
@@ -316,49 +303,155 @@ def _draw_wrapped(
 
 def proposal_pdf(request, pk: int):
     """
-    Visada generuojam PDF per ReportLab.
+    Visada generuojam PDF per ReportLab (HTML preview nebelieka).
+    Visada rodom: kainas + brėžinių miniatiūras.
+    Kalba pasirenkama per ?lang=lt|en.
     """
     pozicija = get_object_or_404(Pozicija, pk=pk)
 
     lang = _get_lang(request)
     labels = LANG_LABELS.get(lang, LANG_LABELS["lt"])
-    notes = (request.GET.get("notes", "") or "").strip()
 
+    # visada rodom viską
     show_prices = True
     show_drawings = True
+
+    notes = (request.GET.get("notes", "") or "").strip()
 
     field_rows = _build_field_rows(pozicija, lang)
     kainos = list(_get_kainos_for_pdf(pozicija))
     brez = list(pozicija.breziniai.all())
+    poz_pastabos = (pozicija.pastabos or "").strip()
+
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
 
     font_regular, font_bold = _register_fonts()
 
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    page_w, page_h = A4
+    margin_left = 18 * mm
+    margin_right = 18 * mm
+    bottom_margin = 20 * mm
 
-    left = 14 * mm
-    right = 14 * mm
-    top = 14 * mm
-    bottom = 14 * mm
+    def new_page_y() -> float:
+        c.showPage()
+        return height - 30 * mm
 
-    # Header bar
-    bar_h = 18 * mm
+    # ===== Top bar =====
+    top_bar_h = 18 * mm
     c.setFillColor(colors.HexColor("#f3f4f6"))
-    c.rect(0, page_h - bar_h, page_w, bar_h, stroke=0, fill=1)
+    c.rect(0, height - top_bar_h, width, top_bar_h, stroke=0, fill=1)
+
+    # Logo (optional)
+    logo_path = os.path.join(settings.MEDIA_ROOT, "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            logo_w = 28 * mm
+            logo_h = 11 * mm
+            y_logo = height - top_bar_h + (top_bar_h - logo_h) / 2
+            c.drawImage(
+                img,
+                margin_left,
+                y_logo,
+                width=logo_w,
+                height=logo_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+        except Exception:
+            pass
+
+    # Company block (right)
+    company_name = getattr(settings, "OFFER_COMPANY_NAME", "") or "UAB Elameta"
+    line1 = getattr(settings, "OFFER_COMPANY_LINE1", "Adresas, LT-00000, Miestas")
+    line2 = getattr(settings, "OFFER_COMPANY_LINE2", "Tel. +370 000 00000, el. paštas info@elameta.lt")
+    right_x = width - margin_right
+
+    c.setFont(font_bold, 10)
+    c.setFillColor(colors.HexColor("#111827"))
+    c.drawRightString(right_x, height - 6 * mm, company_name)
+
+    c.setFont(font_regular, 8)
+    y_company = height - 10 * mm
+    if line1:
+        c.drawRightString(right_x, y_company, line1)
+        y_company -= 3.5 * mm
+    if line2:
+        c.drawRightString(right_x, y_company, line2)
+
+    # ===== Header (title + preview right) =====
+    header_top = height - top_bar_h - 6 * mm
+    header_h = 46 * mm
+    header_bottom = header_top - header_h
+
+    # Right preview box (first drawing)
+    preview_w = 62 * mm
+    preview_h = header_h
+    preview_x = width - margin_right - preview_w
+    preview_y = header_bottom
+
+    # Pick hero drawing
+    hero = brez[0] if brez else None
+    hero_img_path = None
+    if hero is not None:
+        try:
+            if getattr(hero, "preview", None) and getattr(hero.preview, "path", None):
+                p = hero.preview.path
+                if p and os.path.exists(p):
+                    hero_img_path = p
+        except Exception:
+            hero_img_path = None
+
+    # Draw preview frame
+    c.setStrokeColor(colors.HexColor("#e5e7eb"))
+    c.setFillColor(colors.HexColor("#f9fafb"))
+    c.rect(preview_x, preview_y, preview_w, preview_h, stroke=1, fill=1)
+
+    if hero_img_path:
+        try:
+            c.drawImage(
+                ImageReader(hero_img_path),
+                preview_x + 2,
+                preview_y + 2,
+                width=preview_w - 4,
+                height=preview_h - 4,
+                preserveAspectRatio=True,
+                anchor="c",
+                mask="auto",
+            )
+        except Exception:
+            hero_img_path = None
+
+    if not hero_img_path:
+        ext = (getattr(hero, "ext", "") or "").lower() if hero is not None else ""
+        mark = "3D" if ext in {"stp", "step"} else "N/A"
+        c.setFont(font_bold, 14)
+        c.setFillColor(colors.HexColor("#6b7280"))
+        c.drawCentredString(preview_x + preview_w / 2, preview_y + preview_h / 2, mark)
+
+    # Left header text area
+    x_left = margin_left
 
     c.setFillColor(colors.HexColor("#111827"))
-    c.setFont(font_bold, 13)
-    title = f'{labels["offer_title"]} – {pozicija.poz_kodas or pozicija.pk}'
-    c.drawString(left, page_h - 11 * mm, title)
+    c.setFont(font_bold, 16)
+    c.drawString(x_left, header_top - 6 * mm, labels["offer_title"])
 
     c.setFont(font_regular, 9)
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    c.drawRightString(page_w - right, page_h - 11 * mm, f'{labels["date_label"]}: {date_str}')
+    c.setFillColor(colors.HexColor("#111827"))
+    c.drawString(
+        x_left,
+        header_top - 12.5 * mm,
+        f"Pozicija: {pozicija.poz_kodas or pozicija.pk}",
+    )
+    c.setFillColor(colors.HexColor("#6b7280"))
+    c.drawString(
+        x_left,
+        header_top - 17 * mm,
+        datetime.now().strftime(f"{labels['date_label']}: %Y-%m-%d"),
+    )
 
-    y = page_h - bar_h - 8 * mm
-
-    # Sub line
+    # Client / project line (if any)
     sub_parts = []
     if pozicija.klientas:
         sub_parts.append(str(pozicija.klientas))
@@ -366,25 +459,42 @@ def proposal_pdf(request, pk: int):
         sub_parts.append(str(pozicija.projektas))
     sub_line = " • ".join(sub_parts)
     if sub_line:
-        c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
-        c.drawString(left, y, sub_line)
-        y -= 7 * mm
+        c.setFont(font_regular, 9)
+        c.drawString(x_left, header_top - 22 * mm, sub_line)
 
-    # MAIN
-    c.setFillColor(colors.HexColor("#111827"))
-    c.setFont(font_bold, 10)
-    c.drawString(left, y, labels["section_main"])
-    y -= 5 * mm
+    # Divider under header
+    y = header_bottom - 8
+    c.setStrokeColor(colors.HexColor("#e5e7eb"))
+    c.setLineWidth(0.6)
+    c.line(margin_left, y, width - margin_right, y)
+    y -= 18
+
+    def draw_section_title(title: str) -> None:
+        nonlocal y
+        if y < bottom_margin + 20 * mm:
+            y = new_page_y()
+
+        c.setFont(font_bold, 12)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(margin_left, y, title)
+        y -= 5
+        c.setStrokeColor(colors.HexColor("#e5e7eb"))
+        c.setLineWidth(0.6)
+        c.line(margin_left, y, width - margin_right, y)
+        y -= 8
+
+    # ===== Main info =====
+    draw_section_title(labels["section_main"])
 
     if field_rows:
-        table_w = page_w - left - right
-        label_w = 70 * mm
-        value_w = table_w - label_w
+        table_width = width - margin_left - margin_right
+        label_col_width = 70 * mm
+        value_col_width = table_width - label_col_width
 
-        data = [[lbl, val] for (lbl, val) in field_rows]
+        data = [[lbl, val] for lbl, val in field_rows]
 
-        tbl = Table(data, colWidths=[label_w, value_w])
+        tbl = Table(data, colWidths=[label_col_width, value_col_width])
         tbl.setStyle(
             TableStyle(
                 [
@@ -402,47 +512,54 @@ def proposal_pdf(request, pk: int):
             )
         )
 
-        w, h = tbl.wrapOn(c, table_w, y)
-        if y - h < bottom:
-            c.showPage()
-            y = page_h - top
-        tbl.drawOn(c, left, y - h)
-        y -= h + 8 * mm
+        tw, th = tbl.wrap(table_width, 0)
+        if y - th < bottom_margin:
+            y = new_page_y()
+        tbl.drawOn(c, margin_left, y - th)
+        y = y - th - 14
     else:
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
-        c.drawString(left, y, labels["no_data"])
-        y -= 10 * mm
+        c.drawString(margin_left, y, labels["no_data"])
+        y -= 12
 
-    # PRICES
+    # ===== Prices =====
     if show_prices:
-        c.setFillColor(colors.HexColor("#111827"))
-        c.setFont(font_bold, 10)
-        c.drawString(left, y, labels["section_prices"])
-        y -= 5 * mm
+        draw_section_title(labels["section_prices"])
 
         if kainos:
-            cols = [40 * mm, 25 * mm, 22 * mm, 22 * mm, 28 * mm, 28 * mm]
-            data = [[
+            table_width = width - margin_left - margin_right
+            col_widths = [
+                40 * mm,
+                25 * mm,
+                22 * mm,
+                22 * mm,
+                28 * mm,
+                28 * mm,
+            ]
+
+            header = [
                 labels["col_price"],
                 labels["col_unit"],
                 labels["col_qty_from"],
                 labels["col_qty_to"],
                 labels["col_valid_from"],
                 labels["col_valid_to"],
-            ]]
+            ]
+            rows = [header]
 
             for k in kainos:
-                data.append([
-                    (str(k.kaina) if k.kaina is not None else ""),
-                    (k.matas or ""),
-                    ("—" if k.kiekis_nuo is None else str(k.kiekis_nuo)),
-                    ("—" if k.kiekis_iki is None else str(k.kiekis_iki)),
-                    (k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—"),
-                    (k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—"),
-                ])
+                row = [
+                    "" if k.kaina is None else str(k.kaina),
+                    str(k.matas or ""),
+                    "—" if k.kiekis_nuo is None else str(k.kiekis_nuo),
+                    "—" if k.kiekis_iki is None else str(k.kiekis_iki),
+                    k.galioja_nuo.strftime("%Y-%m-%d") if k.galioja_nuo else "—",
+                    k.galioja_iki.strftime("%Y-%m-%d") if k.galioja_iki else "—",
+                ]
+                rows.append(row)
 
-            tbl = Table(data, colWidths=cols)
+            tbl = Table(rows, colWidths=col_widths, repeatRows=1)
             tbl.setStyle(
                 TableStyle(
                     [
@@ -450,8 +567,8 @@ def proposal_pdf(request, pk: int):
                         ("FONTSIZE", (0, 0), (-1, -1), 9),
                         ("FONTNAME", (0, 0), (-1, 0), font_bold),
                         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f9fafb")),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e5e7eb")),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
                         ("LEFTPADDING", (0, 0), (-1, -1), 6),
                         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                         ("TOPPADDING", (0, 0), (-1, -1), 4),
@@ -460,110 +577,129 @@ def proposal_pdf(request, pk: int):
                 )
             )
 
-            table_w = page_w - left - right
-            w, h = tbl.wrapOn(c, table_w, y)
-            if y - h < bottom:
-                c.showPage()
-                y = page_h - top
-            tbl.drawOn(c, left, y - h)
-            y -= h + 8 * mm
+            tw, th = tbl.wrap(table_width, 0)
+            if y - th < bottom_margin:
+                y = new_page_y()
+            tbl.drawOn(c, margin_left, y - th)
+            y = y - th - 14
         else:
             c.setFont(font_regular, 9)
             c.setFillColor(colors.HexColor("#6b7280"))
-            c.drawString(left, y, labels["no_prices"])
-            y -= 10 * mm
+            c.drawString(margin_left, y, labels["no_prices"])
+            y -= 12
 
-    # DRAWINGS (miniatiūros iki 3)
+    # ===== Drawings =====
     if show_drawings:
-        c.setFillColor(colors.HexColor("#111827"))
-        c.setFont(font_bold, 10)
-        c.drawString(left, y, labels["section_drawings"])
-        y -= 5 * mm
+        # Pirmą brėžinį rodome header'io dešinėje (per b.preview); čia rodome tik likusius (iki 2 vnt.)
+        hero_in_header = bool(brez)
+        drawings = brez[1:3] if hero_in_header else brez[:3]
 
-        thumbs = brez[:3]
-        if not thumbs:
-            c.setFont(font_regular, 9)
-            c.setFillColor(colors.HexColor("#6b7280"))
-            c.drawString(left, y, labels["no_drawings"])
-            y -= 10 * mm
+        if hero_in_header and not drawings:
+            # nėra papildomų brėžinių – atskiro bloko nerodom
+            pass
         else:
-            thumb_w = (page_w - left - right - 2 * 6 * mm) / 3.0
-            thumb_h = 32 * mm
-            x = left
+            draw_section_title(labels["section_drawings"])
 
-            for b in thumbs:
-                c.setStrokeColor(colors.HexColor("#e5e7eb"))
-                c.setFillColor(colors.HexColor("#f9fafb"))
-                c.rect(x, y - thumb_h, thumb_w, thumb_h, stroke=1, fill=1)
+            if not drawings:
+                c.setFont(font_regular, 9)
+                c.setFillColor(colors.HexColor("#6b7280"))
+                c.drawString(margin_left, y, labels["no_drawings"])
+                y -= 12
+            else:
+                available = width - margin_left - margin_right
+                gap = 6 * mm
+                thumb_w = (available - gap * 2) / 3
+                thumb_h = thumb_w * 0.75
+                label_h = 5 * mm
 
-                if getattr(b, "preview", None) and getattr(b.preview, "path", None) and os.path.exists(b.preview.path):
+                needed_h = thumb_h + label_h + 6
+                if y - needed_h < bottom_margin:
+                    y = new_page_y()
+
+                top_y = y
+                for i, b in enumerate(drawings):
+                    x = margin_left + i * (thumb_w + gap)
+
+                    c.setStrokeColor(colors.HexColor("#e5e7eb"))
+                    c.setLineWidth(0.6)
+                    c.rect(x, top_y - thumb_h, thumb_w, thumb_h, stroke=1, fill=0)
+
+                    img_path = None
                     try:
-                        img = ImageReader(b.preview.path)
-                        c.drawImage(
-                            img,
-                            x + 2 * mm,
-                            y - thumb_h + 2 * mm,
-                            width=thumb_w - 4 * mm,
-                            height=thumb_h - 4 * mm,
-                            preserveAspectRatio=True,
-                            anchor="c",
-                            mask="auto",
-                        )
+                        if getattr(b, "preview", None) and getattr(b.preview, "path", None):
+                            p = b.preview.path
+                            if p and os.path.exists(p):
+                                img_path = p
                     except Exception:
-                        pass
-                else:
-                    ext = (getattr(b, "ext", "") or "").lower()
-                    mark = "3D" if ext in ("stp", "step") else "N/A"
-                    c.setFont(font_bold, 12)
-                    c.setFillColor(colors.HexColor("#6b7280"))
-                    c.drawCentredString(x + thumb_w / 2, y - thumb_h / 2, mark)
+                        img_path = None
 
-                cap = (getattr(b, "pavadinimas", None) or getattr(b, "filename", None) or "").strip()
-                if cap:
-                    c.setFont(font_regular, 8)
+                    if img_path:
+                        try:
+                            c.drawImage(
+                                ImageReader(img_path),
+                                x + 1,
+                                top_y - thumb_h + 1,
+                                width=thumb_w - 2,
+                                height=thumb_h - 2,
+                                preserveAspectRatio=True,
+                                anchor="c",
+                                mask="auto",
+                            )
+                        except Exception:
+                            c.setFont(font_bold, 10)
+                            c.setFillColor(colors.HexColor("#6b7280"))
+                            c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, "N/A")
+                    else:
+                        ext = (getattr(b, "ext", "") or "").lower()
+                        label = "3D" if ext in {"stp", "step"} else "N/A"
+                        c.setFont(font_bold, 12)
+                        c.setFillColor(colors.HexColor("#6b7280"))
+                        c.drawCentredString(x + thumb_w / 2, top_y - thumb_h / 2, label)
+
+                    c.setFont(font_regular, 7.5)
                     c.setFillColor(colors.HexColor("#111827"))
-                    c.drawString(x + 2 * mm, y - thumb_h - 4 * mm, cap[:60])
+                    name = (getattr(b, "pavadinimas", "") or "").strip() or getattr(b, "filename", "")
+                    if len(name) > 36:
+                        name = name[:33] + "..."
+                    c.drawCentredString(x + thumb_w / 2, top_y - thumb_h - 4, name)
 
-                x += thumb_w + 6 * mm
+                y = top_y - needed_h - 6
 
-            y -= thumb_h + 12 * mm
-
-    # NOTES
-    combined_notes = ""
-    if getattr(pozicija, "pastabos", None):
-        combined_notes += (pozicija.pastabos or "").strip()
+    # ===== Notes =====
+    combined_notes = []
+    if poz_pastabos:
+        combined_notes.append(poz_pastabos)
     if notes:
-        if combined_notes:
-            combined_notes += "\n\n"
-        combined_notes += notes.strip()
+        combined_notes.append(notes)
 
     if combined_notes:
-        c.setFillColor(colors.HexColor("#111827"))
-        c.setFont(font_bold, 10)
-        c.drawString(left, y, labels["section_notes"])
-        y -= 5 * mm
-
+        draw_section_title(labels["section_notes"])
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#111827"))
-        y = _draw_wrapped(
+        y = _draw_wrapped_text(
             c=c,
-            text=combined_notes,
-            x=left,
+            text="\n\n".join(combined_notes),
+            x=margin_left,
             y=y,
-            max_w=(page_w - left - right),
+            max_width=width - margin_left - margin_right,
             font_name=font_regular,
             font_size=9,
-            leading=12,
-            bottom=bottom,
-            page_h=page_h,
+            page_height=height,
+            bottom_margin=bottom_margin,
         )
+        y -= 6
 
-    c.showPage()
+    # ===== Footer =====
+    c.setFont(font_regular, 8)
+    c.setFillColor(colors.HexColor("#6b7280"))
+    c.drawRightString(width - margin_right, 15 * mm, datetime.now().strftime("%Y-%m-%d %H:%M"))
+
     c.save()
 
-    pdf = buf.getvalue()
-    buf.close()
+    pdf = buffer.getvalue()
+    buffer.close()
 
-    resp = HttpResponse(pdf, content_type="application/pdf")
-    resp["Content-Disposition"] = f'inline; filename="pasiulymas_{pozicija.pk}.pdf"'
-    return resp
+    response = HttpResponse(pdf, content_type="application/pdf")
+    filename = f"pasiulymas_{pozicija.poz_kodas or pozicija.pk}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
