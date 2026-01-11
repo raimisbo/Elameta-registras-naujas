@@ -83,6 +83,7 @@ class Pozicija(models.Model):
         default="nera",
         blank=False,
     )
+    # Legacy/optional: senas laukas paliekamas suderinamumui
     maskavimas = models.TextField("Maskavimo aprašymas", max_length=200, blank=True, default="")
 
     # --- Terminai ---
@@ -198,6 +199,29 @@ class Pozicija(models.Model):
             if k is not None:
                 return k
         return None
+
+
+class MaskavimoEilute(models.Model):
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="maskavimo_eilutes")
+
+    maskuote = models.CharField("Maskuotė", max_length=255, blank=True, default="")
+    vietu_kiekis = models.PositiveIntegerField("Maskavimo vietų kiekis", null=True, blank=True)
+
+    created = models.DateTimeField("Sukurta", auto_now_add=True)
+    updated = models.DateTimeField("Atnaujinta", auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        txt = (self.maskuote or "").strip()
+        if txt and self.vietu_kiekis is not None:
+            return f"{txt} ({self.vietu_kiekis})"
+        if txt:
+            return txt
+        if self.vietu_kiekis is not None:
+            return str(self.vietu_kiekis)
+        return f"Maskavimas #{self.pk or 'new'}"
 
 
 class PozicijosBrezinys(models.Model):

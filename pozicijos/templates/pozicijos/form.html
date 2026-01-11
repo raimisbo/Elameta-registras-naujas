@@ -65,7 +65,6 @@
 
   .subblock{ margin-top:8px; padding:8px 10px; border:1px dashed #d1d5db; border-radius:6px; background:#fff; }
 
-  /* Maskavimo aprašymas: tik vertikaliai auga */
   textarea { resize: vertical; }
 </style>
 {% endblock %}
@@ -274,7 +273,6 @@
           </div>
         </div>
 
-
         <div class="field-row" id="row-spalva-top">
           <div class="field-label">{{ form.spalva.label }}</div>
           <div class="field-control">
@@ -339,19 +337,72 @@
 
         <div class="field-row">
           <div class="field-label">{{ form.maskavimo_tipas.label }}</div>
-          <div class="field-control">
+          <div class="field-control" style="display:flex; gap:10px; align-items:center;">
             {{ form.maskavimo_tipas }}
-            {% if form.maskavimo_tipas.errors %}<div class="field-errors">{{ form.maskavimo_tipas.errors|striptags }}</div>{% endif %}
+            <button type="button" class="btn btn-secondary" id="maskavimas-add">Pridėti</button>
           </div>
         </div>
 
-        <div class="field-row" id="maskavimas-row" style="display:none;">
-          <div class="field-label">{{ form.maskavimas.label }}</div>
-          <div class="field-control">
-            {{ form.maskavimas }}
-            {% if form.maskavimas.errors %}<div class="field-errors">{{ form.maskavimas.errors|striptags }}</div>{% endif %}
-          </div>
+        {% if form.maskavimo_tipas.errors %}
+          <div class="field-errors">{{ form.maskavimo_tipas.errors|striptags }}</div>
+        {% endif %}
+
+        {{ maskavimo_formset.management_form }}
+
+        <div id="maskavimas-items" class="subblock" style="display:none;">
+          {% for f in maskavimo_formset %}
+            <div class="maskavimas-item" style="border-bottom:1px solid #f3f4f6; padding:8px 0;">
+              {{ f.id }}
+              <div style="display:none;">{{ f.DELETE }}</div>
+
+              <div class="field-row">
+                <div class="field-label">{{ f.maskuote.label }}</div>
+                <div class="field-control">
+                  {{ f.maskuote }}
+                  {% if f.maskuote.errors %}<div class="field-errors">{{ f.maskuote.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">{{ f.vietu_kiekis.label }}</div>
+                <div class="field-control">
+                  {{ f.vietu_kiekis }}
+                  {% if f.vietu_kiekis.errors %}<div class="field-errors">{{ f.vietu_kiekis.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary maskavimas-remove">Pašalinti</button>
+              </div>
+            </div>
+          {% endfor %}
         </div>
+
+        <template id="maskavimas-empty-form">
+          <div class="maskavimas-item" style="border-bottom:1px solid #f3f4f6; padding:8px 0;">
+            {{ maskavimo_formset.empty_form.id }}
+            <div style="display:none;">{{ maskavimo_formset.empty_form.DELETE }}</div>
+              <div style="display:none;">{{ maskavimo_formset.empty_form.DELETE }}</div>
+
+            <div class="field-row">
+              <div class="field-label">{{ maskavimo_formset.empty_form.maskuote.label }}</div>
+              <div class="field-control">
+                {{ maskavimo_formset.empty_form.maskuote }}
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field-label">{{ maskavimo_formset.empty_form.vietu_kiekis.label }}</div>
+              <div class="field-control">
+                {{ maskavimo_formset.empty_form.vietu_kiekis }}
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+              <button type="button" class="btn btn-secondary maskavimas-remove">Pašalinti</button>
+            </div>
+          </div>
+        </template>
       </section>
 
       <section class="poz-card">
@@ -425,7 +476,6 @@
         </div>
       </section>
 
-
       <section class="poz-card poz-card--full">
         <h2 class="poz-card-title">Kainos</h2>
         {% if pozicija and pozicija.pk %}
@@ -472,24 +522,105 @@ document.addEventListener('DOMContentLoaded', function () {
     el.addEventListener('input', function(){ autoGrow(el); });
   });
 
-  // --- Maskavimas: Yra / Nėra ---
+  // --- Maskavimas: Yra / Nėra + formset ---
   var masTipas = document.getElementById('id_maskavimo_tipas');
-  var masRow   = document.getElementById('maskavimas-row');
-  var masTxt   = document.getElementById('id_maskavimas');
+  var masItems = document.getElementById('maskavimas-items');
+  var masAddBtn = document.getElementById('maskavimas-add');
+  var masTpl = document.getElementById('maskavimas-empty-form');
 
-  function syncMaskavimasUI() {
-    if (!masTipas || !masRow) return;
-    var val = (masTipas.value || '').toLowerCase();
-    var show = (val === 'yra');
-    masRow.style.display = show ? '' : 'none';
-    if (!show && masTxt) {
-      masTxt.value = '';
-      autoGrow(masTxt);
-    }
-    if (show && masTxt) autoGrow(masTxt);
+  function getTotalFormsEl() {
+    return document.getElementById('id_maskavimas-TOTAL_FORMS');
   }
 
-  if (masTipas) masTipas.addEventListener('change', syncMaskavimasUI);
+  function anyVisibleMaskItem() {
+    if (!masItems) return false;
+    var items = masItems.querySelectorAll('.maskavimas-item');
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].style.display !== 'none') return true;
+    }
+    return false;
+  }
+
+  function markAllForDelete() {
+    if (!masItems) return;
+    masItems.querySelectorAll('.maskavimas-item').forEach(function (item) {
+      var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
+      if (del) del.checked = true;
+      item.style.display = 'none';
+    });
+  }
+
+  function syncMaskavimasUI() {
+    if (!masTipas || !masItems) return;
+    var val = (masTipas.value || '').toLowerCase();
+
+    if (val === 'yra') {
+      masItems.style.display = '';
+    } else {
+      masItems.style.display = 'none';
+    }
+
+    // jei jau yra eilučių (edit) – priverstinai laikom "yra"
+    if (anyVisibleMaskItem() && val !== 'yra') {
+      masTipas.value = 'yra';
+      masItems.style.display = '';
+    }
+  }
+
+  function addMaskRow() {
+    if (!masTpl || !masItems) return;
+    var totalEl = getTotalFormsEl();
+    if (!totalEl) return;
+
+    var idx = parseInt(totalEl.value || '0', 10);
+
+    var html = (masTpl.innerHTML || '').replace(/__prefix__/g, String(idx));
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html.trim();
+    var node = wrap.firstElementChild;
+    if (!node) return;
+
+    masItems.appendChild(node);
+    totalEl.value = String(idx + 1);
+
+    // auto-perjungiam į "Yra"
+    if (masTipas) masTipas.value = 'yra';
+    masItems.style.display = '';
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.maskavimas-remove');
+    if (!btn) return;
+
+    var item = btn.closest('.maskavimas-item');
+    if (!item) return;
+
+    var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
+    if (del) del.checked = true;
+    item.style.display = 'none';
+
+    if (!anyVisibleMaskItem() && masTipas) {
+      masTipas.value = 'nera';
+      masItems.style.display = 'none';
+    }
+  });
+
+  if (masTipas) {
+    masTipas.addEventListener('change', function () {
+      var val = (masTipas.value || '').toLowerCase();
+      if (val === 'nera') {
+        markAllForDelete();
+      }
+      syncMaskavimasUI();
+    });
+  }
+
+  if (masAddBtn) {
+    masAddBtn.addEventListener('click', function () {
+      addMaskRow();
+      syncMaskavimasUI();
+    });
+  }
 
   // --- Paslauga: KTL / Miltai / Paruošimas ---
   var chkKTL = document.getElementById('id_paslauga_ktl');
@@ -515,7 +646,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var ktl = !!chkKTL.checked;
     var miltai = !!chkMiltai.checked;
 
-    // KTL ir Miltai kartu – UI lygmenyje paliekam paskutinį pasirinkimą
     if (ktl && miltai) {
       if (changedEl === chkKTL) {
         chkMiltai.checked = false;
@@ -526,29 +656,24 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Jei KTL arba Miltai – Paruošimas prisideda automatiškai
     if (ktl || miltai) {
       chkPar.checked = true;
     }
 
-    // Tik Paruošimas -> default Gardobond 24T (tik jei tuščia)
     var parOnly = !!chkPar.checked && !ktl && !miltai;
     if (parOnly && inpPar && !((inpPar.value || '').trim())) {
       setVal(inpPar, 'Gardobond 24T');
     }
 
-    // KTL -> automatinės reikšmės
     if (ktl) {
       if (inpPad) setVal(inpPad, 'KTL BASF CG 570');
       if (inpStd) setVal(inpStd, '');
       if (inpSpalva) setVal(inpSpalva, 'Juoda RAL 9005');
     }
 
-    // Miltai UI: rodom subbloką, slepiam spalvą viršuje
     if (miltaiBox) miltaiBox.style.display = miltai ? '' : 'none';
     if (rowSpalvaTop) rowSpalvaTop.style.display = miltai ? 'none' : '';
 
-    // Miltai atveju – išvalom viršutinę spalvą, kad neliktų "paslėpta"
     if (miltai && inpSpalva) setVal(inpSpalva, '');
   }
 

@@ -246,14 +246,52 @@
       </div>
     </section>
 
+    {# --- UPDATED: Maskavimas per MaskavimoEilute --- #}
     <section class="poz-card">
       <h2 class="poz-card-title">Maskavimas</h2>
       <div class="poz-fields">
-        <div class="poz-field-row"><span class="poz-field-label">Maskavimo tipas</span><span class="poz-field-value">{{ pozicija.get_maskavimo_tipas_display|default:"—" }}</span></div>
         <div class="poz-field-row">
-          <span class="poz-field-label">Maskavimo aprašymas</span>
-          <span class="poz-field-value">{% if pozicija.maskavimas %}<div class="poz-notes-text">{{ pozicija.maskavimas|linebreaksbr }}</div>{% else %}—{% endif %}</span>
+          <span class="poz-field-label">Maskavimo tipas</span>
+          <span class="poz-field-value">{{ pozicija.get_maskavimo_tipas_display|default:"—" }}</span>
         </div>
+
+        {% with lines=pozicija.maskavimo_eilutes.all %}
+          {% if pozicija.maskavimo_tipas == "yra" %}
+            {% if lines %}
+              <div class="poz-field-row">
+                <span class="poz-field-label">Maskuotės</span>
+                <span class="poz-field-value">
+                  {% for m in lines %}
+                    <div style="padding:6px 0; {% if not forloop.first %}border-top:1px solid #e5e7eb;{% endif %}">
+                      <div><strong>Maskuotė:</strong> {{ m.maskuote|default:"—" }}</div>
+                      <div><strong>Vietų kiekis:</strong> {% if m.vietu_kiekis is not None %}{{ m.vietu_kiekis }}{% else %}—{% endif %}</div>
+                    </div>
+                  {% endfor %}
+                </span>
+              </div>
+            {% else %}
+              {# "Yra", bet eilučių nėra (teoriškai neturėtų būti, bet saugiklis UI) #}
+              <div class="poz-field-row">
+                <span class="poz-field-label">Maskuotės</span>
+                <span class="poz-field-value">—</span>
+              </div>
+            {% endif %}
+          {% else %}
+            {# Maskavimas = Nėra -> nerodom nieko papildomai #}
+            <div class="poz-field-row">
+              <span class="poz-field-label">Maskuotės</span>
+              <span class="poz-field-value">—</span>
+            </div>
+          {% endif %}
+
+          {# Legacy laukas rodomas tik jei nėra naujų eilučių ir tekstas egzistuoja #}
+          {% if not lines and pozicija.maskavimas %}
+            <div class="poz-field-row">
+              <span class="poz-field-label">Maskavimo aprašymas (legacy)</span>
+              <span class="poz-field-value"><div class="poz-notes-text">{{ pozicija.maskavimas|linebreaksbr }}</div></span>
+            </div>
+          {% endif %}
+        {% endwith %}
       </div>
     </section>
 

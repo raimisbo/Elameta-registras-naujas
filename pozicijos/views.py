@@ -3,15 +3,15 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, IntegerField, Value
+from django.db.models import Count, IntegerField, Value, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .services.import_csv import import_pozicijos_from_csv
-from .models import Pozicija, PozicijosBrezinys, KainosEilute
-from .forms import PozicijaForm, PozicijosBrezinysForm
+from .models import Pozicija, PozicijosBrezinys, KainosEilute, MaskavimoEilute
+from .forms import PozicijaForm, PozicijosBrezinysForm, MaskavimoFormSet
 from .forms_kainos import KainaFormSet
 from .schemas.columns import COLUMNS
 from .services.previews import regenerate_missing_preview
@@ -144,6 +144,7 @@ def pozicija_detail(request, pk):
         "columns_schema": COLUMNS,
         "breziniai": breziniai,
         "kainos_akt": kainos_akt,
+        "maskavimo_eilutes": poz.maskavimo_eilutes.all().order_by("id"),
     }
     return render(request, "pozicijos/detail.html", context)
 
@@ -154,17 +155,45 @@ def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
     poz.save(update_fields=["kaina_eur", "updated"])
 
 
+def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
+    """
+    Server-side saugiklis:
+    - jei yra bent viena maskavimo eilutė su reikšme -> tipas "yra"
+    - jei nėra -> tipas "nera"
+    - jei "nera" -> legacy laukas maskavimas išvalomas
+    """
+    qs = MaskavimoEilute.objects.filter(pozicija=poz)
+    has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False)).exists()
+
+    new_tipas = "yra" if has_any else "nera"
+    update_fields: list[str] = []
+
+    if (poz.maskavimo_tipas or "").lower() != new_tipas:
+        poz.maskavimo_tipas = new_tipas
+        update_fields.append("maskavimo_tipas")
+
+    if new_tipas == "nera" and (poz.maskavimas or "") != "":
+        poz.maskavimas = ""
+        update_fields.append("maskavimas")
+
+    if update_fields:
+        update_fields.append("updated")
+        poz.save(update_fields=update_fields)
+
+
 def pozicija_create(request):
     pozicija = None
 
     if request.method == "POST":
         form = PozicijaForm(request.POST, request.FILES)
         formset = KainaFormSet(request.POST, prefix="kainos", queryset=KainosEilute.objects.none())
+        mask_formset = MaskavimoFormSet(request.POST, prefix="maskavimas", queryset=MaskavimoEilute.objects.none())
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid() and formset.is_valid() and mask_formset.is_valid():
             with transaction.atomic():
                 pozicija = form.save()
 
+                # --- Kainos ---
                 formset.instance = pozicija
                 instances = formset.save(commit=False)
                 for inst in instances:
@@ -174,6 +203,25 @@ def pozicija_create(request):
                     if f.instance.pk:
                         f.instance.delete()
 
+                # --- Maskavimo eilutės ---
+                m_instances = mask_formset.save(commit=False)
+                for inst in m_instances:
+                    txt = (getattr(inst, "maskuote", "") or "").strip()
+                    qty = getattr(inst, "vietu_kiekis", None)
+                    if not txt and qty is None:
+                        continue  # ignoruojam pilnai tuščią porą
+                    inst.pozicija = pozicija
+                    inst.save()
+
+                for f in mask_formset.deleted_forms:
+                    if f.instance.pk:
+                        f.instance.delete()
+
+                # Jei vartotojas pasirinko "Nėra" – užtikrinam, kad eilutės neliks
+                if (pozicija.maskavimo_tipas or "").lower() == "nera":
+                    MaskavimoEilute.objects.filter(pozicija=pozicija).delete()
+
+                _sync_maskavimo_tipas_from_lines(pozicija)
                 _sync_kaina_eur_from_lines(pozicija)
 
             messages.success(request, "Pozicija sukurta.")
@@ -183,12 +231,14 @@ def pozicija_create(request):
     else:
         form = PozicijaForm()
         formset = KainaFormSet(prefix="kainos", queryset=KainosEilute.objects.none())
+        mask_formset = MaskavimoFormSet(prefix="maskavimas", queryset=MaskavimoEilute.objects.none())
 
     context = {
         "form": form,
         "pozicija": pozicija,
         "suggestions": _get_form_suggestions(),
         "kainos_formset": formset,
+        "maskavimo_formset": mask_formset,
     }
     return render(request, "pozicijos/form.html", context)
 
@@ -205,14 +255,18 @@ def pozicija_edit(request, pk):
         "-created",
     )
 
+    m_qs = MaskavimoEilute.objects.filter(pozicija=pozicija).order_by("id")
+
     if request.method == "POST":
         form = PozicijaForm(request.POST, request.FILES, instance=pozicija)
         formset = KainaFormSet(request.POST, prefix="kainos", instance=pozicija, queryset=qs)
+        mask_formset = MaskavimoFormSet(request.POST, prefix="maskavimas", queryset=m_qs)
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid() and formset.is_valid() and mask_formset.is_valid():
             with transaction.atomic():
                 form.save()
 
+                # --- Kainos ---
                 instances = formset.save(commit=False)
                 for inst in instances:
                     inst.pozicija = pozicija
@@ -221,6 +275,27 @@ def pozicija_edit(request, pk):
                     if f.instance.pk:
                         f.instance.delete()
 
+                # --- Maskavimo eilutės ---
+                m_instances = mask_formset.save(commit=False)
+                for inst in m_instances:
+                    txt = (getattr(inst, "maskuote", "") or "").strip()
+                    qty = getattr(inst, "vietu_kiekis", None)
+                    if not txt and qty is None:
+                        # jei egzistuojantis įrašas tapo tuščias – ištrinam
+                        if getattr(inst, "pk", None):
+                            inst.delete()
+                        continue
+                    inst.pozicija = pozicija
+                    inst.save()
+
+                for f in mask_formset.deleted_forms:
+                    if f.instance.pk:
+                        f.instance.delete()
+
+                if (pozicija.maskavimo_tipas or "").lower() == "nera":
+                    MaskavimoEilute.objects.filter(pozicija=pozicija).delete()
+
+                _sync_maskavimo_tipas_from_lines(pozicija)
                 _sync_kaina_eur_from_lines(pozicija)
 
             messages.success(request, "Pozicija atnaujinta.")
@@ -230,12 +305,14 @@ def pozicija_edit(request, pk):
     else:
         form = PozicijaForm(instance=pozicija)
         formset = KainaFormSet(prefix="kainos", instance=pozicija, queryset=qs)
+        mask_formset = MaskavimoFormSet(prefix="maskavimas", queryset=m_qs)
 
     context = {
         "form": form,
         "pozicija": pozicija,
         "suggestions": _get_form_suggestions(),
         "kainos_formset": formset,
+        "maskavimo_formset": mask_formset,
     }
     return render(request, "pozicijos/form.html", context)
 

@@ -5,7 +5,7 @@
   {{ formset.management_form }}
 
   {% if formset.non_form_errors %}
-    <div class="errorlist nonform" style="margin-bottom:8px;color:#b91c1c;">
+    <div style="margin-bottom:8px;color:#b91c1c;">
       {% for err in formset.non_form_errors %}
         <div>{{ err }}</div>
       {% endfor %}
@@ -14,11 +14,11 @@
 
   <div class="kainos-head">
     <div class="kainos-head__text">Kainų eilutės sudaro galutinę kainą.</div>
-    <button type="button" class="btn btn-secondary" id="kainos-add-row-{{ formset.prefix }}">+ Pridėti eilutę</button>
+    <button type="button" class="btn-action btn-secondary" id="kainos-add-row-{{ formset.prefix }}">+ Pridėti eilutę</button>
   </div>
 
-  <div class="kainos-table-wrap">
-    <table class="table zebra kainos-table">
+  <div class="poz-price-table-wrapper">
+    <table class="poz-price-table kainos-table">
       <thead>
         <tr>
           <th class="col-kaina">Kaina €</th>
@@ -29,7 +29,9 @@
           <th class="col-bus">Būsena</th>
           <th class="col-past">Pastabos</th>
           <th class="col-hist">Ist.</th>
-          <th class="col-del">Šal.</th>
+          {% if kainos_can_delete %}
+            <th class="col-del">Šal.</th>
+          {% endif %}
         </tr>
       </thead>
 
@@ -83,14 +85,18 @@
               {% endif %}
             </td>
 
-            <td class="cell-del" style="text-align:center;">
-              {{ form.DELETE }}
-            </td>
+            {% if kainos_can_delete %}
+              <td class="cell-del" style="text-align:center;">
+                {{ form.DELETE }}
+              </td>
+            {% endif %}
           </tr>
           {% endwith %}
         {% empty %}
           <tr data-empty-row="1">
-            <td colspan="9" style="text-align:center;color:#6b7280;">Nėra kainų eilučių.</td>
+            <td colspan="{% if kainos_can_delete %}9{% else %}8{% endif %}" style="text-align:center;color:#6b7280;">
+              Nėra kainų eilučių.
+            </td>
           </tr>
         {% endfor %}
       </tbody>
@@ -100,65 +106,30 @@
 </div>
 
 <style>
-  .kainos-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-bottom:8px;
-  }
-  .kainos-head__text{ font-size:14px; color:#4b5563; }
+  /* Header kaip pozicijos kortelėje */
+  .poz-price-table-wrapper { margin-top:8px; overflow-x:auto; }
+  .poz-price-table { width:100%; border-collapse:collapse; font-size:0.88rem; table-layout:fixed; min-width:1040px; }
+  .poz-price-table th, .poz-price-table td { border:1px solid #e1e1e1; padding:4px 6px; text-align:left; white-space:nowrap; vertical-align:top; }
+  .poz-price-table th { background:#eff6ff; font-weight:600; }
+  .poz-price-table tbody tr:nth-child(even) td { background:#f9fafb; }
+  .poz-price-table tbody tr:hover td { background:#e0ecff; }
 
-  .kainos-table-wrap{
-    overflow:auto;
-    max-width:100%;
-  }
+  /* „aktuali“ švelniai žalia, „neaktuali“ pilkiau – bet ne griaunant bendro sprendimo */
+  .kaina-row--aktuali td { background:#ecfdf5; }
+  .kaina-row--neaktuali td { background:#f9fafb; color:#6b7280; }
 
-  .kainos-table{
-    width:100%;
-    min-width:1040px; /* + vienas stulpelis */
-    table-layout:fixed;
-  }
-
-  /* sticky paskutinis stulpelis (Šal.) */
-  .kainos-table th:last-child,
-  .kainos-table td:last-child{
-    position: sticky;
-    right: 0;
-    z-index: 2;
-    background: inherit;
-    border-left: 1px solid #e5e7eb;
-    vertical-align:top;
-    white-space:normal;
-    word-break:break-word;
-  }
-  .kainos-table thead th:last-child{ z-index: 3; }
-
-  /* plotis: suveržiam kitus, Pastabos pasiima likutį */
-  .col-kaina{ width:90px; }
-  .col-matas{ width:120px; }
-  .col-qty{ width:80px; }
-  .col-gal{ width:140px; }
-  .col-bus{ width:110px; }
-  .col-hist{ width:60px; }
-  .col-del{ width:55px; }
+  .kainos-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .kainos-head__text{ font-size:0.9rem; color:#666; }
 
   .date-stack{ display:flex; flex-direction:column; gap:4px; }
 
-  .kainos-table input,
-  .kainos-table select,
-  .kainos-table textarea{
-    width:100%;
-    box-sizing:border-box;
-  }
+  /* Input’ai tvarkingai į lentelę */
+  .poz-price-table input,
+  .poz-price-table select,
+  .poz-price-table textarea{ width:100%; box-sizing:border-box; }
 
-  /* Pastabos: auga pagal tekstą */
-  .kainos-table td textarea{
-    min-height:34px;
-    resize:none;
-    overflow:hidden;
-  }
+  /* Pastabos: auga */
+  .poz-price-table td textarea{ min-height:34px; resize:none; overflow:hidden; }
 
   .hist-link{
     display:inline-flex;
@@ -174,8 +145,14 @@
   }
   .hist-link:hover{ filter:brightness(0.98); }
 
-  .kaina-row--aktuali td{ background:#ecfdf5; }
-  .kaina-row--neaktuali td{ background:#f9fafb; color:#6b7280; }
+  /* Plotis */
+  .col-kaina{ width:90px; }
+  .col-matas{ width:120px; }
+  .col-qty{ width:80px; }
+  .col-gal{ width:140px; }
+  .col-bus{ width:110px; }
+  .col-hist{ width:60px; }
+  .col-del{ width:55px; }
 </style>
 
 <script>
@@ -243,7 +220,6 @@
 })();
 </script>
 
-{# empty form template turi būti apačioje, kad JS galėtų pridėti eilutę #}
 <template id="kainos-empty-template-{{ formset.prefix }}">
   {% with f=formset.empty_form %}
   <tr class="kaina-row kaina-row--neaktuali">
@@ -255,7 +231,9 @@
     <td class="cell-bus">{{ f.busena_ui }}</td>
     <td class="cell-past">{{ f.pastaba }}</td>
     <td class="cell-hist" style="text-align:center;">—</td>
-    <td class="cell-del" style="text-align:center;">{{ f.DELETE }}</td>
+    {% if kainos_can_delete %}
+      <td class="cell-del" style="text-align:center;">{{ f.DELETE }}</td>
+    {% endif %}
   </tr>
   {% endwith %}
 </template>

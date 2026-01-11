@@ -216,3 +216,11 @@ KainaFormSet = inlineformset_factory(
     extra=0,
     can_delete=True,
 )
+
+KainaFormSetNoDelete = inlineformset_factory(
+    Pozicija,
+    KainosEilute,
+    form=KainosEiluteForm,
+    extra=0,
+    can_delete=False,
+)

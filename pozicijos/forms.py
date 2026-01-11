@@ -1,8 +1,10 @@
+# pozicijos/forms.py
 from __future__ import annotations
 
 from django import forms
+from django.forms import modelformset_factory
 
-from .models import Pozicija, PozicijosBrezinys
+from .models import Pozicija, PozicijosBrezinys, MaskavimoEilute
 
 
 class PozicijaForm(forms.ModelForm):
@@ -41,7 +43,7 @@ class PozicijaForm(forms.ModelForm):
             "miltu_kaina",
             "paslaugu_pastabos",
             "maskavimo_tipas",
-            "maskavimas",
+            "maskavimas",  # legacy / optional (nebenaudojam kaip privalomo)
             "atlikimo_terminas",
             "testai_kokybe",
             "pakavimo_tipas",
@@ -51,6 +53,12 @@ class PozicijaForm(forms.ModelForm):
             "papildomos_paslaugos_aprasymas",
             "pastabos",
         ]
+
+        labels = {
+            "pakavimas": "Aprašymas",
+            "instrukcija": "Pastabos",
+        }
+
         widgets = {
             "atlikimo_terminas": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
             "padengimo_storis_um": forms.NumberInput(attrs={
@@ -96,11 +104,12 @@ class PozicijaForm(forms.ModelForm):
 
         cleaned["maskavimo_tipas"] = tipas
 
+        # Legacy laukas: nebėra privalomas.
+        # Jei "nera" – išvalom; jei "yra" – paliekam optional tekstą.
         if tipas == "nera":
             cleaned["maskavimas"] = ""
         else:
-            if not apr:
-                self.add_error("maskavimas", "Kai „Maskavimas = Yra“, aprašymas yra privalomas.")
+            cleaned["maskavimas"] = apr
 
         # --- Paslaugos logika: KTL / Miltai / Paruošimas ---
         ktl = bool(cleaned.get("paslauga_ktl"))
@@ -151,3 +160,23 @@ class PozicijosBrezinysForm(forms.ModelForm):
         widgets = {
             "pavadinimas": forms.TextInput(attrs={"placeholder": "Pavadinimas"}),
         }
+
+
+# --- Maskavimo eilutės (formset) ---
+
+class MaskavimoEiluteForm(forms.ModelForm):
+    class Meta:
+        model = MaskavimoEilute
+        fields = ["maskuote", "vietu_kiekis"]
+        widgets = {
+            "maskuote": forms.TextInput(attrs={"placeholder": "Maskuotė"}),
+            "vietu_kiekis": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric", "placeholder": "Kiekis"}),
+        }
+
+
+MaskavimoFormSet = modelformset_factory(
+    MaskavimoEilute,
+    form=MaskavimoEiluteForm,
+    extra=0,
+    can_delete=True,
+)

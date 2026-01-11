@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import Pozicija, KainosEilute
-from .forms_kainos import KainaFormSet
+from .forms_kainos import KainaFormSet, KainaFormSetNoDelete
 from .services.kainos import set_aktuali
 
 
@@ -42,6 +42,12 @@ def _redirect_with_filters(pozicija_id: int, busena: str, matas: str) -> HttpRes
     if params:
         return redirect(base + "?" + urlencode(params))
     return redirect(base)
+
+
+def _can_delete_kainos(request: HttpRequest) -> bool:
+    # Trinimas tik admin (staff). Jei nori griežčiau – pakeisk į is_superuser.
+    u = getattr(request, "user", None)
+    return bool(getattr(u, "is_staff", False))
 
 
 @require_http_methods(["GET", "POST"])
@@ -76,14 +82,38 @@ def kainos_list(request: HttpRequest, pk: int) -> HttpResponse:
     # Naudojam vienodą prefix, kaip kitur (pozicija_create/edit) – mažiau painiavos
     prefix = "kainos"
 
+    can_delete = _can_delete_kainos(request)
+    FormSetClass = KainaFormSet if can_delete else KainaFormSetNoDelete
+
     if request.method == "POST":
-        formset = KainaFormSet(request.POST, instance=pozicija, queryset=qs, prefix=prefix)
+        # Priminiui: fiksuojam, ar buvo keista busena_ui (tik tom eilutėm, kurios šitam filtruotam qs)
+        old_busena = {k.pk: (k.busena or "") for k in qs}
+
+        formset = FormSetClass(request.POST, instance=pozicija, queryset=qs, prefix=prefix)
         if formset.is_valid():
+            busena_changed = False
+            for f in formset.forms:
+                if not hasattr(f, "cleaned_data"):
+                    continue
+                if f.cleaned_data.get("DELETE"):
+                    continue
+                if "busena_ui" in getattr(f, "changed_data", []):
+                    busena_changed = True
+                    break
+                # atsarginis palyginimas (jei kada nors keisis formos laukai)
+                pk0 = getattr(f.instance, "pk", None)
+                if pk0 and pk0 in old_busena:
+                    new_db_busena = f.cleaned_data.get("busena") or ""
+                    if new_db_busena and new_db_busena != old_busena[pk0]:
+                        busena_changed = True
+                        break
+
             with transaction.atomic():
-                # Trinimai
-                for form in formset.deleted_forms:
-                    if form.instance.pk:
-                        form.instance.delete()
+                # Trinimai – tik admin
+                if can_delete:
+                    for form in getattr(formset, "deleted_forms", []):
+                        if form.instance.pk:
+                            form.instance.delete()
 
                 # Save / create
                 instances = formset.save(commit=False)
@@ -97,18 +127,25 @@ def kainos_list(request: HttpRequest, pk: int) -> HttpResponse:
                         # inst jau išsaugotas; set_aktuali tvarko senas ir atnaujina pozicija.kaina_eur
                         set_aktuali(inst, save=False)
 
+            if busena_changed:
+                messages.warning(
+                    request,
+                    "Pakeitei kainos būseną (-as). Primename sutikrinti būsenas, kad neliktų netyčinių neatitikimų."
+                )
+
             messages.success(request, "Kainos išsaugotos.")
             return _redirect_with_filters(pozicija.pk, busena, matas)
 
         messages.error(request, "Patikrinkite formos klaidas.")
     else:
-        formset = KainaFormSet(instance=pozicija, queryset=qs, prefix=prefix)
+        formset = FormSetClass(instance=pozicija, queryset=qs, prefix=prefix)
 
     context = {
         "pozicija": pozicija,
         "formset": formset,
         "busena": busena,
         "matas": matas,
+        "kainos_can_delete": can_delete,
     }
     return render(request, "pozicijos/kainos_list.html", context)
 
@@ -134,6 +171,11 @@ def kaina_set_aktuali(request: HttpRequest, id: int) -> HttpResponse:
 def kaina_delete(request: HttpRequest, id: int) -> HttpResponse:
     k = get_object_or_404(KainosEilute, pk=id)
     poz_id = k.pozicija_id
+
+    if not _can_delete_kainos(request):
+        messages.error(request, "Kainų eilučių trynimas leidžiamas tik administratoriui.")
+        return redirect("pozicijos:kainos_list", pk=poz_id)
+
     k.delete()
     messages.success(request, "Kainos eilutė ištrinta.")
     return redirect("pozicijos:kainos_list", pk=poz_id)
