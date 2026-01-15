@@ -106,7 +106,6 @@
 </div>
 
 <style>
-  /* Header kaip pozicijos kortelėje */
   .poz-price-table-wrapper { margin-top:8px; overflow-x:auto; }
   .poz-price-table { width:100%; border-collapse:collapse; font-size:0.88rem; table-layout:fixed; min-width:1040px; }
   .poz-price-table th, .poz-price-table td { border:1px solid #e1e1e1; padding:4px 6px; text-align:left; white-space:nowrap; vertical-align:top; }
@@ -114,7 +113,6 @@
   .poz-price-table tbody tr:nth-child(even) td { background:#f9fafb; }
   .poz-price-table tbody tr:hover td { background:#e0ecff; }
 
-  /* „aktuali“ švelniai žalia, „neaktuali“ pilkiau – bet ne griaunant bendro sprendimo */
   .kaina-row--aktuali td { background:#ecfdf5; }
   .kaina-row--neaktuali td { background:#f9fafb; color:#6b7280; }
 
@@ -123,12 +121,10 @@
 
   .date-stack{ display:flex; flex-direction:column; gap:4px; }
 
-  /* Input’ai tvarkingai į lentelę */
   .poz-price-table input,
   .poz-price-table select,
   .poz-price-table textarea{ width:100%; box-sizing:border-box; }
 
-  /* Pastabos: auga */
   .poz-price-table td textarea{ min-height:34px; resize:none; overflow:hidden; }
 
   .hist-link{
@@ -145,7 +141,6 @@
   }
   .hist-link:hover{ filter:brightness(0.98); }
 
-  /* Plotis */
   .col-kaina{ width:90px; }
   .col-matas{ width:120px; }
   .col-qty{ width:80px; }
@@ -165,15 +160,16 @@
 
   function bootOne(root) {
     const prefix = root.dataset.prefix;
-    const body = document.getElementById('kainu-formset-body-' + prefix);
-    const addBtn = document.getElementById('kainos-add-row-' + prefix);
+
+    const formEl = root.closest('form');
+    const body = root.querySelector('#kainu-formset-body-' + prefix);
+    const addBtn = root.querySelector('#kainos-add-row-' + prefix);
     const tmpl = document.getElementById('kainos-empty-template-' + prefix);
 
-    const totalInput =
-      root.querySelector('#id_' + prefix + '-TOTAL_FORMS') ||
-      root.querySelector('input[name="' + prefix + '-TOTAL_FORMS"]');
+    // Management form – imame iš to paties <form>, kad nesusimaišytų su kitais formset'ais
+    const totalInput = formEl ? formEl.querySelector('input[name="' + prefix + '-TOTAL_FORMS"]') : null;
 
-    if (!body || !addBtn || !totalInput || !tmpl) return;
+    if (!formEl || !body || !addBtn || !totalInput || !tmpl) return;
 
     function initRow(row) {
       const ta = row.querySelector('textarea[data-autoresize="1"]');
@@ -190,7 +186,10 @@
 
     body.querySelectorAll('tr.kaina-row').forEach(initRow);
 
-    addBtn.addEventListener('click', function () {
+    addBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+
       removeEmptyRowIfPresent();
 
       const i = parseInt(totalInput.value || '0', 10) || 0;
@@ -203,7 +202,12 @@
       if (!row) return;
 
       body.appendChild(row);
-      totalInput.value = String(i + 1);
+
+      const newTotal = i + 1;
+      totalInput.value = String(newTotal);
+      // papildomai atnaujinam ir atributą – praktikoje išsprendžia kai kuriuos edge atvejus
+      totalInput.setAttribute('value', String(newTotal));
+
       initRow(row);
     });
   }

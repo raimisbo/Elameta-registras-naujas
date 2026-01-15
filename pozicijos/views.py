@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, IntegerField, Value, Q
+from django.db.models import Count, IntegerField, Value, Q, Min, Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
@@ -57,14 +57,19 @@ def _safe_int(value, default: int) -> int:
 
 def _base_list_qs():
     """
-    Centralizuojam: sąrašui anotacijos (brez_count).
+    Centralizuojam: sąrašui anotacijos (brez_count + kainų min/max).
     Dok_count kol kas neturim modelio – paliekam 0, kad stulpelis nelūžtų.
     """
     return (
         Pozicija.objects.all()
         .annotate(brez_count=Count("breziniai", distinct=True))
         .annotate(dok_count=Value(0, output_field=IntegerField()))
+        .annotate(
+            kaina_min=Min("kainos_eilutes__kaina", filter=Q(kainos_eilutes__busena="aktuali")),
+            kaina_max=Max("kainos_eilutes__kaina", filter=Q(kainos_eilutes__busena="aktuali")),
+        )
     )
+
 
 
 def pozicijos_list(request):

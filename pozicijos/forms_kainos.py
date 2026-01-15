@@ -1,4 +1,3 @@
-# pozicijos/forms_kainos.py
 from __future__ import annotations
 
 from django import forms
@@ -88,7 +87,6 @@ class KainosEiluteForm(forms.ModelForm):
                 w.attrs.setdefault("placeholder", "")
 
         # Leisti tuščias naujas eilutes (validuosim patys clean'e, kai "pildoma")
-        # (Svarbu: kitaip tuščia nauja eilutė gali užkristi ant privalomumo dar prieš clean())
         for n in ("kaina", "kiekis_nuo", "kiekis_iki", "galioja_nuo", "galioja_iki", "pastaba"):
             if n in self.fields:
                 self.fields[n].required = False
@@ -126,20 +124,6 @@ class KainosEiluteForm(forms.ModelForm):
                 # date/decimal/int ir pan.
                 return False
         return True
-
-    def has_changed(self) -> bool:
-        """
-        Kritinis stabdys: jei nauja eilutė "efektyviai tuščia", laikom, kad ji nepasikeitė,
-        kad formset jos neišsaugotų kaip naujo objekto.
-        """
-        base = super().has_changed()
-        if not base:
-            return False
-
-        if self._is_new() and hasattr(self, "cleaned_data"):
-            if self._is_effectively_empty(self.cleaned_data):
-                return False
-        return base
 
     def clean(self):
         cleaned = super().clean()

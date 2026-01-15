@@ -1,3 +1,4 @@
+{# pozicijos/templates/pozicijos/_tbody.html #}
 {% load attr %}
 
 {% for it in items %}
@@ -5,6 +6,8 @@
   {% for c in columns_schema %}
     {% if c.key in visible_cols %}
       <td data-key="{{ c.key }}">
+        {# Specialūs atvaizdavimai pasirinkimams (choices) ir virtualiems laukams #}
+
         {% if c.key == "maskavimo_tipas" %}
           {{ it.get_maskavimo_tipas_display|default:"—" }}
 
@@ -18,14 +21,20 @@
             —
           {% endif %}
 
-        {% elif c.key == "brez_count" %}
-          {{ it.brez_count|default:"0" }}
-
-        {% elif c.key == "dok_count" %}
-          {{ it.dok_count|default:"0" }}
-
         {% elif c.key == "matmenys_xyz" %}
           {{ it.matmenys_xyz|default:"—" }}
+
+        {% elif c.key == "kaina_eur" %}
+          {# Sąraše rodome rėžį iš aktualių kainų eilučių (kaina_min/kaina_max), jei yra #}
+          {% if it.kaina_min is not None and it.kaina_max is not None %}
+            {% if it.kaina_min == it.kaina_max %}
+              {{ it.kaina_min|floatformat:2 }}
+            {% else %}
+              {{ it.kaina_min|floatformat:2 }}–{{ it.kaina_max|floatformat:2 }}
+            {% endif %}
+          {% else %}
+            {{ it.kaina_eur|default:"—" }}
+          {% endif %}
 
         {% else %}
           {{ it|attr:c.key|default:"—" }}
@@ -35,5 +44,7 @@
   {% endfor %}
 </tr>
 {% empty %}
-<tr><td colspan="{{ visible_cols|length }}">Nėra įrašų.</td></tr>
+<tr>
+  <td colspan="{{ visible_cols|length }}">Nėra įrašų.</td>
+</tr>
 {% endfor %}

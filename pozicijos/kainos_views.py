@@ -1,4 +1,3 @@
-# pozicijos/kainos_views.py
 from __future__ import annotations
 
 from urllib.parse import urlencode
@@ -13,6 +12,21 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import Pozicija, KainosEilute
 from .forms_kainos import KainaFormSet, KainaFormSetNoDelete
 from .services.kainos import set_aktuali
+
+
+def _sync_pozicija_kaina_eur(pozicija: Pozicija) -> None:
+    """
+    Pozicija.kaina_eur laikom kaip "pagrindinę" kainą pagal aktualią eilutę.
+    Jei aktualių eilučių nėra – paliekam None/0 pagal tavo modelio logiką.
+    """
+    akt = (
+        KainosEilute.objects
+        .filter(pozicija=pozicija, busena="aktuali")
+        .order_by("prioritetas", "-created")
+        .first()
+    )
+    pozicija.kaina_eur = akt.kaina if akt else None
+    pozicija.save(update_fields=["kaina_eur"])
 
 
 def _get_filters(request: HttpRequest) -> tuple[str, str]:
@@ -91,6 +105,12 @@ def kainos_list(request: HttpRequest, pk: int) -> HttpResponse:
 
         formset = FormSetClass(request.POST, instance=pozicija, queryset=qs, prefix=prefix)
         if formset.is_valid():
+            # Jei formset nepateikė realių pakeitimų (pvz. mygtukas nesubindino formos / TOTAL_FORMS nepadidėjo),
+            # nesakom „išsaugota“, kad neliktų klaidinančių success žinučių.
+            if (not formset.has_changed()) and (not getattr(formset, "deleted_forms", [])):
+                messages.info(request, "Nėra pakeitimų – nieko neišsaugota.")
+                return _redirect_with_filters(pozicija.pk, busena, matas)
+
             busena_changed = False
             for f in formset.forms:
                 if not hasattr(f, "cleaned_data"):
@@ -124,8 +144,11 @@ def kainos_list(request: HttpRequest, pk: int) -> HttpResponse:
                 # Konfliktų tvarkymas „aktuali“ logikai
                 for inst in instances:
                     if inst.busena == "aktuali":
-                        # inst jau išsaugotas; set_aktuali tvarko senas ir atnaujina pozicija.kaina_eur
-                        set_aktuali(inst, save=False)
+                        # set_aktuali tvarko senas ir atnaujina pozicija.kaina_eur
+                        set_aktuali(inst)
+
+                # Visada perskaičiuojam pozicija.kaina_eur pagal aktualią eilutę
+                _sync_pozicija_kaina_eur(pozicija)
 
             if busena_changed:
                 messages.warning(
