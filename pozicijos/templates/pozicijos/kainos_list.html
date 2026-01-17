@@ -1,70 +1,119 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}Valdyti kainas{% endblock %}
+{% block title %}Kainos – {{ pozicija.poz_kodas|default:pozicija.id }}{% endblock %}
+{% block body_class %}pozicija-detail-page{% endblock %}
+
+{% block page_css %}
+<style>
+  /* Perimame pozicijos kortelės (detail) spalvinį sprendimą */
+  .pozicija-detail-page { background:#f3f3f3; }
+  .pozicija-detail-page .kainos-container { max-width:1200px; margin:0 auto; padding:16px 20px 32px; }
+
+  .pozicija-detail-page .detail-header-bar { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .pozicija-detail-page .detail-header-main { min-width:0; }
+  .pozicija-detail-page .detail-header-title { margin:0 0 4px; font-size:1.35rem; font-weight:600; }
+  .pozicija-detail-page .detail-header-sub { margin:0; font-size:0.9rem; color:#666; }
+
+  .pozicija-detail-page .detail-header-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+  .pozicija-detail-page .btn-action { display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; font-size:0.85rem; border-radius:4px; border:1px solid #ccc; background:#fff; color:#333; text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .pozicija-detail-page .btn-action:hover { background:#f0f0f0; }
+  .pozicija-detail-page .btn-action.btn-secondary { background:#e7f0ff; border-color:#b6c9f0; }
+  .pozicija-detail-page .btn-action.btn-secondary:hover { background:#d7e4ff; }
+
+  .pozicija-detail-page .poz-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px 14px 10px; box-shadow:0 1px 3px rgba(15,23,42,0.06); }
+  .pozicija-detail-page .poz-card-title { margin:0 0 8px; font-size:0.95rem; font-weight:600; color:#333; }
+
+  .pozicija-detail-page .filters { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+  .pozicija-detail-page .filters label { display:flex; flex-direction:column; gap:4px; font-size:0.9rem; color:#374151; }
+  .pozicija-detail-page .filters select {
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    padding:6px 8px;
+    font-size:0.9rem;
+    min-width:160px;
+    background:#fff;
+  }
+
+  .pozicija-detail-page .note { margin-top:8px; color:#6b7280; font-size:0.88rem; line-height:1.35; }
+  .pozicija-detail-page .note code { background:#eef2ff; padding:1px 4px; border-radius:4px; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="detail-wrap">
+<div class="kainos-container">
 
-  <div class="detail-header">
-    <div class="detail-header-left">
-      <a class="btn-action btn-secondary" href="{% url 'pozicijos:detail' pozicija.pk %}">← Atgal</a>
-      <div class="detail-title">
-        Valdyti kainas: {{ pozicija.poz_kodas|default:pozicija.id }}
-      </div>
+  <div class="detail-header-bar">
+    <div class="detail-header-main">
+      <h1 class="detail-header-title">Kainos – {{ pozicija.poz_kodas|default:pozicija.id }}</h1>
+      <p class="detail-header-sub">
+        {% if pozicija.poz_pavad %}{{ pozicija.poz_pavad }}{% endif %}
+        {% if pozicija.klientas %}{% if pozicija.poz_pavad %} · {% endif %}{{ pozicija.klientas }}{% endif %}
+        {% if pozicija.projektas %} · {{ pozicija.projektas }}{% endif %}
+      </p>
     </div>
 
     <div class="detail-header-actions">
-      {# SVARBU: mygtukas nebesubmitina "per form=..." – Safari čia mėgsta iškrėsti fokusų #}
+      <a class="btn-action" href="{% url 'pozicijos:detail' pozicija.pk %}">← Atgal į poziciją</a>
+
+      {# Viršutinis mygtukas: type=button + requestSubmit (Safari saugiklis) #}
       <button class="btn-action btn-secondary" type="button" id="kainos-submit-top">Išsaugoti</button>
     </div>
   </div>
 
-  <section class="poz-card" style="margin-top:12px;">
+  <section class="poz-card" style="margin-bottom:12px;">
     <h2 class="poz-card-title">Filtrai</h2>
 
-    <form id="kainos-filters" method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-      <div class="form-field">
-        <label for="id_busena">Būsena</label>
-        <select name="busena" id="id_busena">
+    <form method="get" action="" class="filters" id="kainos-filters">
+      <label>
+        Būsena
+        <select name="busena" onchange="this.form.submit()">
           <option value="" {% if not busena %}selected{% endif %}>Visos</option>
           <option value="aktuali" {% if busena == "aktuali" %}selected{% endif %}>Aktuali</option>
           <option value="sena" {% if busena == "sena" %}selected{% endif %}>Neaktuali</option>
         </select>
-      </div>
+      </label>
 
-      <div class="form-field">
-        <label for="id_matas">Matas</label>
-        <select name="matas" id="id_matas">
+      <label>
+        Matas
+        {# SVARBU: value turi sutapti su DB (MATAS_CHOICES): "Vnt." / "kg" / "komplektas" #}
+        <select name="matas" onchange="this.form.submit()">
           <option value="" {% if not matas %}selected{% endif %}>Visi</option>
-          <option value="vnt" {% if matas == "vnt" %}selected{% endif %}>Vnt.</option>
+          <option value="Vnt." {% if matas == "Vnt." %}selected{% endif %}>Vnt.</option>
           <option value="kg" {% if matas == "kg" %}selected{% endif %}>kg</option>
-          <option value="komplektas" {% if matas == "komplektas" %}selected{% endif %}>Komplektas</option>
+          <option value="komplektas" {% if matas == "komplektas" %}selected{% endif %}>komplektas</option>
         </select>
-      </div>
+      </label>
 
-      <div class="form-field">
-        <button class="btn-action btn-secondary" type="submit">Taikyti</button>
-        <a class="btn-action btn-secondary" href="{% url 'pozicijos:kainos_list' pozicija.pk %}">Išvalyti</a>
-      </div>
+      <noscript>
+        <button class="btn-action" type="submit">Filtruoti</button>
+      </noscript>
     </form>
+
+    <div class="note">
+      Pastaba: „Būsena = Visos“ ir „Matas = Visi“ rodo visą kainų istoriją.
+      {% if not kainos_can_delete %}
+        Trinti kainų eilučių šiame lange negalima (tik administratoriui).
+      {% endif %}
+    </div>
   </section>
 
-  <form method="post" id="kainos-form" action="{% url 'pozicijos:kainos_list' pozicija.pk %}{% if busena or matas %}?{% if busena %}busena={{ busena }}{% endif %}{% if busena and matas %}&{% endif %}{% if matas %}matas={{ matas }}{% endif %}{% endif %}">
-    {% csrf_token %}
+  <section class="poz-card">
+    <h2 class="poz-card-title">Kainos</h2>
 
-    {# Realus submit mygtukas pačios formos viduje – kad submit visada pasiimtų formset duomenis #}
-    <button type="submit" id="kainos-submit-real" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">Išsaugoti</button>
+    <form method="post"
+          id="kainos-form"
+          action="{% url 'pozicijos:kainos_list' pozicija.pk %}{% if busena or matas %}?{% if busena %}busena={{ busena|urlencode }}{% endif %}{% if busena and matas %}&{% endif %}{% if matas %}matas={{ matas|urlencode }}{% endif %}{% endif %}">
+      {% csrf_token %}
 
-    <input type="hidden" name="_busena" value="{{ busena }}">
-    <input type="hidden" name="_matas" value="{{ matas }}">
+      {# realus submit formos viduje #}
+      <button type="submit" id="kainos-submit-real" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">Išsaugoti</button>
 
-    <section class="poz-card" style="margin-top:12px;">
-      <h2 class="poz-card-title">Kainos</h2>
+      <input type="hidden" name="_busena" value="{{ busena }}">
+      <input type="hidden" name="_matas" value="{{ matas }}">
 
       {% include "pozicijos/components/kainos_formset.html" with formset=formset kainos_can_delete=kainos_can_delete %}
-    </section>
-  </form>
+    </form>
+  </section>
 
 </div>
 
