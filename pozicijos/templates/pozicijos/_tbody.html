@@ -31,12 +31,12 @@
           {# Rėžis iš anotacijų: kaina_min/kaina_max (jei jų nėra – fallback į kaina_eur) #}
           {% if it.kaina_min is not None and it.kaina_max is not None %}
             {% if it.kaina_min == it.kaina_max %}
-              {{ it.kaina_min|floatformat:-2 }}
+              {{ it.kaina_min|floatformat:4 }}
             {% else %}
-              {{ it.kaina_min|floatformat:-2 }}–{{ it.kaina_max|floatformat:-2 }}
+              {{ it.kaina_min|floatformat:4 }}–{{ it.kaina_max|floatformat:4 }}
             {% endif %}
           {% elif it.kaina_eur is not None %}
-            {{ it.kaina_eur|floatformat:-2 }}
+            {{ it.kaina_eur|floatformat:4 }}
           {% else %}
             —
           {% endif %}

@@ -362,7 +362,7 @@
                       {% endif %}
                     {% endif %}
                   </td>
-                  <td>{% if eil.kaina %}{{ eil.kaina }}&nbsp;€{% else %}—{% endif %}</td>
+                  <td>{% if eil.kaina %}{{ eil.kaina|floatformat:4 }}&nbsp;€{% else %}—{% endif %}</td>
                   <td>
                     {% if eil.galioja_nuo or eil.galioja_iki %}
                       {% if eil.galioja_nuo %}{{ eil.galioja_nuo|date:"Y-m-d" }}{% endif %} – {% if eil.galioja_iki %}{{ eil.galioja_iki|date:"Y-m-d" }}{% endif %}

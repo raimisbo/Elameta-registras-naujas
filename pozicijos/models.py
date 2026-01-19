@@ -119,7 +119,7 @@ class Pozicija(models.Model):
     )
 
     # Kaina (sinchronizuojama iš kainų eilučių)
-    kaina_eur = models.DecimalField("Kaina (EUR)", max_digits=12, decimal_places=2, null=True, blank=True)
+    kaina_eur = models.DecimalField("Kaina (EUR)", max_digits=12, decimal_places=4, null=True, blank=True)
 
     pastabos = models.TextField("Pastabos", blank=True, default="")
 
@@ -292,7 +292,7 @@ class PozicijosBrezinys(models.Model):
 class KainosEilute(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos_eilutes")
 
-    kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=2, null=True, blank=True)
+    kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=4, null=True, blank=True)
     matas = models.CharField("Matas", max_length=50, blank=True, default="")
 
     yra_fiksuota = models.BooleanField("Fiksuota", default=False)

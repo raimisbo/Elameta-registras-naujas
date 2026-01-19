@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django import forms
+from decimal import Decimal
 from django.forms import inlineformset_factory
 
 from .models import Pozicija, KainosEilute
@@ -47,8 +48,8 @@ class KainosEiluteForm(forms.ModelForm):
             "pastaba",
         ]
         widgets = {
-            "galioja_nuo": forms.DateInput(attrs={"type": "date"}),
-            "galioja_iki": forms.DateInput(attrs={"type": "date"}),
+            "galioja_nuo": forms.DateInput(attrs={"type": "date", "class": "js-date"}),
+            "galioja_iki": forms.DateInput(attrs={"type": "date", "class": "js-date"}),
             "pastaba": forms.Textarea(attrs={"rows": 1, "data-autoresize": "1"}),
         }
 
@@ -77,7 +78,18 @@ class KainosEiluteForm(forms.ModelForm):
             w = self.fields["kaina"].widget
             w.input_type = "text"
             w.attrs.setdefault("inputmode", "decimal")
-            w.attrs.setdefault("placeholder", "0")
+            # UI reikalavimas: 4 skaitmenys po kablelio
+            w.attrs.setdefault("placeholder", "0.0000")
+            w.attrs.setdefault("data-decimals", "4")
+            w.attrs.setdefault("autocomplete", "off")
+
+            # Jei instance turi reikšmę – suformatuojam į 4 skaitmenis, kad UI rodytų 0.0000
+            try:
+                inst_val = getattr(self.instance, "kaina", None)
+                if inst_val is not None and self.initial.get("kaina") in (None, ""):
+                    self.initial["kaina"] = f"{Decimal(inst_val):.4f}"
+            except Exception:
+                pass
 
         for n in ("kiekis_nuo", "kiekis_iki"):
             if n in self.fields:
