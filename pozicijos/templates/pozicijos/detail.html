@@ -88,7 +88,6 @@
     <div class="detail-header-actions">
       <a href="{% url 'pozicijos:edit' pozicija.id %}" class="btn-action">Redaguoti</a>
 
-      {# PDF naujame tab'e + kalbos pasirinkimas #}
       <a href="{% url 'pozicijos:pdf' pozicija.id %}?lang=lt" target="_blank" rel="noopener" class="btn-action btn-secondary">Pasiūlymas (LT)</a>
       <a href="{% url 'pozicijos:pdf' pozicija.id %}?lang=en" target="_blank" rel="noopener" class="btn-action btn-secondary">Pasiūlymas (EN)</a>
 
@@ -114,6 +113,24 @@
         <div class="poz-field-row"><span class="poz-field-label">Metalas</span><span class="poz-field-value">{{ pozicija.metalas|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Plotas</span><span class="poz-field-value">{% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Svoris</span><span class="poz-field-value">{% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}</span></div>
+
+        {# --- PRIDĖTA: Matmenys X/Y/Z + suvestinė --- #}
+        <div class="poz-field-row">
+          <span class="poz-field-label">X (mm)</span>
+          <span class="poz-field-value">{% if pozicija.x_mm is not None %}{{ pozicija.x_mm }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Y (mm)</span>
+          <span class="poz-field-value">{% if pozicija.y_mm is not None %}{{ pozicija.y_mm }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Z (mm)</span>
+          <span class="poz-field-value">{% if pozicija.z_mm is not None %}{{ pozicija.z_mm }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Matmenys (xyz)</span>
+          <span class="poz-field-value">{% if pozicija.matmenys_xyz %}{{ pozicija.matmenys_xyz }}{% else %}—{% endif %}</span>
+        </div>
       </div>
     </section>
 
@@ -127,7 +144,6 @@
 
               {% with e=brez.ext|lower %}
                 {% if e == "stp" or e == "step" %}
-                  {# 3D atidarome tame pačiame tab'e (be target=_blank), kad nesidubliuotų tab'ai #}
                   <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" class="poz-brez-thumb-wrap">
                     <img src="{% static 'pozicijos/img/icon-3d.png' %}" alt="3D" class="poz-brez-thumb">
                   </a>
@@ -145,7 +161,6 @@
               <div class="poz-brez-actions">
                 {% with e=brez.ext|lower %}
                   {% if e == "stp" or e == "step" %}
-                    {# 3D atidarome tame pačiame tab'e #}
                     <a href="{% url 'pozicijos:brezinys_3d' pozicija.id brez.id %}" class="btn-ghost-sm">3D</a>
                   {% endif %}
                 {% endwith %}
@@ -218,6 +233,9 @@
         <div class="poz-field-row"><span class="poz-field-label">Padengimas</span><span class="poz-field-value">{{ pozicija.padengimas|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Padengimo standartas</span><span class="poz-field-value">{{ pozicija.padengimo_standartas|default:"—" }}</span></div>
 
+        {# --- PRIDĖTA: Padengimo storis --- #}
+        <div class="poz-field-row"><span class="poz-field-label">Padengimo storis (µm)</span><span class="poz-field-value">{{ pozicija.padengimo_storis_um|default:"—" }}</span></div>
+
         {% if not pozicija.paslauga_miltai %}
           <div class="poz-field-row"><span class="poz-field-label">Spalva</span><span class="poz-field-value">{{ pozicija.spalva|default:"—" }}</span></div>
         {% endif %}
@@ -270,21 +288,18 @@
                 </span>
               </div>
             {% else %}
-              {# "Yra", bet eilučių nėra (teoriškai neturėtų būti, bet saugiklis UI) #}
               <div class="poz-field-row">
                 <span class="poz-field-label">Maskuotės</span>
                 <span class="poz-field-value">—</span>
               </div>
             {% endif %}
           {% else %}
-            {# Maskavimas = Nėra -> nerodom nieko papildomai #}
             <div class="poz-field-row">
               <span class="poz-field-label">Maskuotės</span>
               <span class="poz-field-value">—</span>
             </div>
           {% endif %}
 
-          {# Legacy laukas rodomas tik jei nėra naujų eilučių ir tekstas egzistuoja #}
           {% if not lines and pozicija.maskavimas %}
             <div class="poz-field-row">
               <span class="poz-field-label">Maskavimo aprašymas (legacy)</span>
@@ -359,18 +374,18 @@
                         {% if eil.kiekis_nuo %}{{ eil.kiekis_nuo }}{% endif %}..{% if eil.kiekis_iki %}{{ eil.kiekis_iki }}{% endif %}
                       {% else %}
                         —
+
                       {% endif %}
                     {% endif %}
                   </td>
-                  <td>{% if eil.kaina %}{{ eil.kaina|floatformat:4 }}&nbsp;€{% else %}—{% endif %}</td>
+                  <td>{% if eil.kaina %}{{ eil.kaina }}&nbsp;€{% else %}—{% endif %}</td>
                   <td>
-                    {% if eil.kaina is not None %}
-                      {{ eil.kaina|floatformat:4 }}&nbsp;€
+                    {% if eil.galioja_nuo or eil.galioja_iki %}
+                      {% if eil.galioja_nuo %}{{ eil.galioja_nuo|date:"Y-m-d" }}{% endif %} – {% if eil.galioja_iki %}{{ eil.galioja_iki|date:"Y-m-d" }}{% endif %}
                     {% else %}
                       —
                     {% endif %}
                   </td>
-
                   <td>{{ eil.pastaba|default:"—" }}</td>
                 </tr>
               {% endfor %}
