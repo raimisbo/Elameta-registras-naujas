@@ -1,10 +1,45 @@
 # pozicijos/forms.py
 from __future__ import annotations
 
+import re
 from django import forms
 from django.forms import modelformset_factory
 
 from .models import Pozicija, PozicijosBrezinys, MaskavimoEilute
+
+
+_RE_NUM = re.compile(r"^\d+(?:[.,]\d+)?$")
+_RE_RANGE = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:-|\.\.)\s*\d+(?:[.,]\d+)?$")
+_RE_CMP = re.compile(r"^(>=|<=|>|<)\s*\d+(?:[.,]\d+)?$")
+
+
+def _norm_thickness(value: str) -> str:
+    s = (value or "").strip()
+    if not s:
+        return ""
+
+    # brūkšniai -> '-'
+    s = s.replace("–", "-").replace("—", "-")
+    # '..' -> '-'
+    s = re.sub(r"\.\.\s*", "-", s)
+
+    # tarpai
+    s = re.sub(r"\s+", " ", s).strip()
+
+    # kablelis -> taškas
+    s = s.replace(",", ".")
+
+    # tarpai aplink '-'
+    s = re.sub(r"\s*-\s*", "-", s)
+
+    # tarpai po operatorių (>=, <=, >, <)
+    s = re.sub(r"^(>=|<=|>|<)\s*", r"\1", s)
+
+    return s
+
+
+def _parse_num(s: str) -> float:
+    return float((s or "").replace(",", "."))
 
 
 class PozicijaForm(forms.ModelForm):
@@ -61,12 +96,13 @@ class PozicijaForm(forms.ModelForm):
 
         widgets = {
             "atlikimo_terminas": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
-            "padengimo_storis_um": forms.NumberInput(attrs={
-                "min": 0,
-                "step": "0.01",
+
+            # SVARBU: TextInput (ne number), kad leistų 60-80, >60, >=60 ir pan.
+            "padengimo_storis_um": forms.TextInput(attrs={
                 "inputmode": "decimal",
-                "placeholder": "pvz. 80",
+                "placeholder": "pvz. 80, 60-120, >60, >=60",
             }),
+
             "maskavimas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "instrukcija": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "paslaugu_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
@@ -87,6 +123,31 @@ class PozicijaForm(forms.ModelForm):
                 self.fields["maskavimo_tipas"].initial = "nera"
             if "papildomos_paslaugos" in self.fields:
                 self.fields["papildomos_paslaugos"].initial = "ne"
+
+    def clean_padengimo_storis_um(self):
+        raw = self.cleaned_data.get("padengimo_storis_um", "")
+        s = _norm_thickness(raw)
+        if not s:
+            return ""
+
+        if _RE_NUM.match(s):
+            return s
+
+        if _RE_CMP.match(s):
+            return s
+
+        if _RE_RANGE.match(s):
+            a, b = s.split("-", 1)
+            try:
+                fa = _parse_num(a)
+                fb = _parse_num(b)
+            except ValueError:
+                raise forms.ValidationError("Neteisingas formatas. Pvz.: 70, 60-80, >60, >=60.")
+            if fa > fb:
+                raise forms.ValidationError("Rėžyje „nuo“ turi būti mažiau arba lygu „iki“.")
+            return f"{a}-{b}"
+
+        raise forms.ValidationError("Neteisingas formatas. Pvz.: 70, 60-80, >60, >=60, <80, <=80.")
 
     def clean(self):
         cleaned = super().clean()

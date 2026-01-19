@@ -28,7 +28,6 @@
           {{ it.matmenys_xyz|default:"—" }}
 
         {% elif c.key == "kaina_eur" %}
-          {# Rėžis iš anotacijų: kaina_min/kaina_max (jei jų nėra – fallback į kaina_eur) #}
           {% if it.kaina_min is not None and it.kaina_max is not None %}
             {% if it.kaina_min == it.kaina_max %}
               {{ it.kaina_min|floatformat:4 }}

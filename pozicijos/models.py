@@ -54,12 +54,13 @@ class Pozicija(models.Model):
     padengimas = models.CharField("Padengimas", max_length=200, blank=True, default="")
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, blank=True, default="")
     spalva = models.CharField("Spalva", max_length=120, blank=True, default="")
-    padengimo_storis_um = models.DecimalField(
+
+    # SVARBU: po 0029 tai TEKSTINIS laukas (leidžia 70, 60-80, >60 ir t.t.)
+    padengimo_storis_um = models.CharField(
         "Padengimo storis (µm)",
-        max_digits=7,
-        decimal_places=2,
-        null=True,
+        max_length=32,
         blank=True,
+        default="",
     )
 
     # Paslaugos logika: KTL / Miltai / Paruošimas
@@ -118,7 +119,7 @@ class Pozicija(models.Model):
         default="",
     )
 
-    # Kaina (sinchronizuojama iš kainų eilučių)
+    # Kaina (sinchronizuojama iš kainų eilučių) — po 0028: 4 skaitmenys po kablelio
     kaina_eur = models.DecimalField("Kaina (EUR)", max_digits=12, decimal_places=4, null=True, blank=True)
 
     pastabos = models.TextField("Pastabos", blank=True, default="")
@@ -292,6 +293,7 @@ class PozicijosBrezinys(models.Model):
 class KainosEilute(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos_eilutes")
 
+    # po 0028: 4 skaitmenys po kablelio
     kaina = models.DecimalField("Kaina", max_digits=12, decimal_places=4, null=True, blank=True)
     matas = models.CharField("Matas", max_length=50, blank=True, default="")
 
