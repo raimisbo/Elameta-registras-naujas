@@ -177,25 +177,33 @@ class PozicijaForm(forms.ModelForm):
         miltai = bool(cleaned.get("paslauga_miltai"))
         par = bool(cleaned.get("paslauga_paruosimas"))
 
-        if ktl and miltai:
-            self.add_error("paslauga_ktl", "Negalima pasirinkti kartu su „Miltai“.")
-            self.add_error("paslauga_miltai", "Negalima pasirinkti kartu su „KTL“.")
-
+        # A1: jei yra KTL arba Miltai – Paruošimas privalomas
         if ktl or miltai:
             cleaned["paslauga_paruosimas"] = True
             par = True
 
+        def _is_empty(v):
+            return not (v or "").strip()
+
+        # B2: jei Paruošimas vienas pats – default tik jei tuščia
         if par and (not ktl) and (not miltai):
-            if not (cleaned.get("paruosimas") or "").strip():
+            if _is_empty(cleaned.get("paruosimas", "")):
                 cleaned["paruosimas"] = "Gardobond 24T"
 
-        if ktl and not miltai:
-            cleaned["padengimas"] = "KTL BASF CG 570"
-            cleaned["padengimo_standartas"] = ""
-            cleaned["spalva"] = "Juoda RAL 9005"
+        # B2 + Variant B: KTL presetai leidžiami net jei Miltai irgi pažymėti,
+        # bet pildom tik tuščius laukus (neperrašom vartotojo įvedimo)
+        if ktl:
+            if _is_empty(cleaned.get("padengimas", "")):
+                cleaned["padengimas"] = "KTL BASF CG 570"
+            # standartą perrašinėti nerekomenduoju; paliekam ramybėje, nebent tuščias (čia iš esmės no-op)
+            if cleaned.get("padengimo_standartas", None) is None:
+                cleaned["padengimo_standartas"] = ""
 
-        if miltai and not ktl:
-            cleaned["spalva"] = ""
+            if _is_empty(cleaned.get("spalva", "")):
+                cleaned["spalva"] = "Juoda RAL 9005"
+
+        # Variant B: Miltai nebevalo "spalva"
+        # (tai buvo senoji taisyklė; ją pašalinam)
 
         # --- Papildomos paslaugos ---
         pp = (cleaned.get("papildomos_paslaugos") or "ne").strip().lower()

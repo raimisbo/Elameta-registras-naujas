@@ -1,5 +1,6 @@
 {# pozicijos/templates/pozicijos/form.html #}
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}
   {% if pozicija %}Redaguoti poziciją {{ pozicija.poz_kodas }}{% else %}Nauja pozicija{% endif %}
@@ -382,7 +383,6 @@
           <div class="maskavimas-item" style="border-bottom:1px solid #f3f4f6; padding:8px 0;">
             {{ maskavimo_formset.empty_form.id }}
             <div style="display:none;">{{ maskavimo_formset.empty_form.DELETE }}</div>
-              <div style="display:none;">{{ maskavimo_formset.empty_form.DELETE }}</div>
 
             <div class="field-row">
               <div class="field-label">{{ maskavimo_formset.empty_form.maskuote.label }}</div>
@@ -478,6 +478,7 @@
 
       <section class="poz-card poz-card--full">
         <h2 class="poz-card-title">Kainos</h2>
+        <div class="field-help" id="kaina-eur-preview" style="margin:-6px 0 10px;">Pagrindinė kaina (preview): <strong>—</strong></div>
         {% if pozicija and pozicija.pk %}
           {% include "pozicijos/components/kainos_formset.html" with formset=kainos_formset show_history_links=1 %}
         {% else %}
@@ -507,238 +508,7 @@
 </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-  // --- Auto-grow textarea (pagal data-autoresize="1") ---
-  function autoGrow(el) {
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = (el.scrollHeight) + 'px';
-  }
-
-  document.querySelectorAll('textarea[data-autoresize="1"]').forEach(function(el){
-    autoGrow(el);
-    el.addEventListener('input', function(){ autoGrow(el); });
-  });
-
-  // --- Maskavimas: Yra / Nėra + formset ---
-  var masTipas = document.getElementById('id_maskavimo_tipas');
-  var masItems = document.getElementById('maskavimas-items');
-  var masAddBtn = document.getElementById('maskavimas-add');
-  var masTpl = document.getElementById('maskavimas-empty-form');
-
-  function getTotalFormsEl() {
-    return document.getElementById('id_maskavimas-TOTAL_FORMS');
-  }
-
-  function anyVisibleMaskItem() {
-    if (!masItems) return false;
-    var items = masItems.querySelectorAll('.maskavimas-item');
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].style.display !== 'none') return true;
-    }
-    return false;
-  }
-
-  function markAllForDelete() {
-    if (!masItems) return;
-    masItems.querySelectorAll('.maskavimas-item').forEach(function (item) {
-      var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
-      if (del) del.checked = true;
-      item.style.display = 'none';
-    });
-  }
-
-  function syncMaskavimasUI() {
-    if (!masTipas || !masItems) return;
-    var val = (masTipas.value || '').toLowerCase();
-
-    if (val === 'yra') {
-      masItems.style.display = '';
-    } else {
-      masItems.style.display = 'none';
-    }
-
-    // jei jau yra eilučių (edit) – priverstinai laikom "yra"
-    if (anyVisibleMaskItem() && val !== 'yra') {
-      masTipas.value = 'yra';
-      masItems.style.display = '';
-    }
-  }
-
-  function addMaskRow() {
-    if (!masTpl || !masItems) return;
-    var totalEl = getTotalFormsEl();
-    if (!totalEl) return;
-
-    var idx = parseInt(totalEl.value || '0', 10);
-
-    var html = (masTpl.innerHTML || '').replace(/__prefix__/g, String(idx));
-    var wrap = document.createElement('div');
-    wrap.innerHTML = html.trim();
-    var node = wrap.firstElementChild;
-    if (!node) return;
-
-    masItems.appendChild(node);
-    totalEl.value = String(idx + 1);
-
-    // auto-perjungiam į "Yra"
-    if (masTipas) masTipas.value = 'yra';
-    masItems.style.display = '';
-  }
-
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.maskavimas-remove');
-    if (!btn) return;
-
-    var item = btn.closest('.maskavimas-item');
-    if (!item) return;
-
-    var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
-    if (del) del.checked = true;
-    item.style.display = 'none';
-
-    if (!anyVisibleMaskItem() && masTipas) {
-      masTipas.value = 'nera';
-      masItems.style.display = 'none';
-    }
-  });
-
-  if (masTipas) {
-    masTipas.addEventListener('change', function () {
-      var val = (masTipas.value || '').toLowerCase();
-      if (val === 'nera') {
-        markAllForDelete();
-      }
-      syncMaskavimasUI();
-    });
-  }
-
-  if (masAddBtn) {
-    masAddBtn.addEventListener('click', function () {
-      addMaskRow();
-      syncMaskavimasUI();
-    });
-  }
-
-  // --- Paslauga: KTL / Miltai / Paruošimas ---
-  var chkKTL = document.getElementById('id_paslauga_ktl');
-  var chkMiltai = document.getElementById('id_paslauga_miltai');
-  var chkPar = document.getElementById('id_paslauga_paruosimas');
-
-  var inpPar = document.getElementById('id_paruosimas');
-  var inpPad = document.getElementById('id_padengimas');
-  var inpStd = document.getElementById('id_padengimo_standartas');
-  var inpSpalva = document.getElementById('id_spalva');
-
-  var miltaiBox = document.getElementById('miltai-subblock');
-  var rowSpalvaTop = document.getElementById('row-spalva-top');
-
-  function setVal(el, val) {
-    if (!el) return;
-    el.value = val;
-  }
-
-  function syncPaslaugosUI(changedEl) {
-    if (!chkKTL || !chkMiltai || !chkPar) return;
-
-    var ktl = !!chkKTL.checked;
-    var miltai = !!chkMiltai.checked;
-
-    if (ktl && miltai) {
-      if (changedEl === chkKTL) {
-        chkMiltai.checked = false;
-        miltai = false;
-      } else {
-        chkKTL.checked = false;
-        ktl = false;
-      }
-    }
-
-    if (ktl || miltai) {
-      chkPar.checked = true;
-    }
-
-    var parOnly = !!chkPar.checked && !ktl && !miltai;
-    if (parOnly && inpPar && !((inpPar.value || '').trim())) {
-      setVal(inpPar, 'Gardobond 24T');
-    }
-
-    if (ktl) {
-      if (inpPad) setVal(inpPad, 'KTL BASF CG 570');
-      if (inpStd) setVal(inpStd, '');
-      if (inpSpalva) setVal(inpSpalva, 'Juoda RAL 9005');
-    }
-
-    if (miltaiBox) miltaiBox.style.display = miltai ? '' : 'none';
-    if (rowSpalvaTop) rowSpalvaTop.style.display = miltai ? 'none' : '';
-
-    if (miltai && inpSpalva) setVal(inpSpalva, '');
-  }
-
-  function bind(el) {
-    if (!el) return;
-    el.addEventListener('change', function(){ syncPaslaugosUI(el); });
-  }
-  bind(chkKTL);
-  bind(chkMiltai);
-  bind(chkPar);
-
-  // --- Papildomos paslaugos: Taip/Ne ---
-  var ppSel = document.getElementById('id_papildomos_paslaugos');
-  var ppRow = document.getElementById('papildomos-paslaugos-aprasymas-row');
-  var ppTxt = document.getElementById('id_papildomos_paslaugos_aprasymas');
-
-  function syncPapildomosPaslaugosUI() {
-    if (!ppSel || !ppRow) return;
-    var val = (ppSel.value || '').toLowerCase();
-    var show = (val === 'taip');
-    ppRow.style.display = show ? '' : 'none';
-    if (!show && ppTxt) {
-      ppTxt.value = '';
-      autoGrow(ppTxt);
-    }
-    if (show && ppTxt) autoGrow(ppTxt);
-  }
-
-  if (ppSel) ppSel.addEventListener('change', syncPapildomosPaslaugosUI);
-
-  // --- Matmenys XYZ preview (mm) ---
-  var xEl = document.getElementById('id_x_mm');
-  var yEl = document.getElementById('id_y_mm');
-  var zEl = document.getElementById('id_z_mm');
-  var xyzPreview = document.getElementById('matmenys-xyz-preview');
-
-  function fmtDim(v) {
-    v = (v || '').toString().trim();
-    return v ? v : '—';
-  }
-
-  function syncXYZ() {
-    if (!xyzPreview) return;
-
-    var x = xEl ? fmtDim(xEl.value) : '—';
-    var y = yEl ? fmtDim(yEl.value) : '—';
-    var z = zEl ? fmtDim(zEl.value) : '—';
-
-    if (x === '—' && y === '—' && z === '—') {
-      xyzPreview.textContent = '—';
-      return;
-    }
-    xyzPreview.textContent = x + '×' + y + '×' + z + ' mm';
-  }
-
-  if (xEl) xEl.addEventListener('input', syncXYZ);
-  if (yEl) yEl.addEventListener('input', syncXYZ);
-  if (zEl) zEl.addEventListener('input', syncXYZ);
-
-  // init
-  syncMaskavimasUI();
-  syncPaslaugosUI(null);
-  syncPapildomosPaslaugosUI();
-  syncXYZ();
-});
-</script>
-
+{% block page_js %}
+  <script src="{% static 'pozicijos/js/poz_form_engine.js' %}"></script>
+{% endblock %}
 {% endblock %}

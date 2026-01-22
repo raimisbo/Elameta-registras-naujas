@@ -37,7 +37,7 @@ class Command(BaseCommand):
             kaina = poz.kaina_eur
 
             # Jei jau yra bent viena 'aktuali' kaina šiai pozicijai – nieko nebedarom
-            if poz.kainu_eilutes.filter(busena="aktuali").exists():
+            if poz.kainos_eilutes.filter(busena="aktuali").exists():
                 skipped_existing_aktuali += 1
                 continue
 

@@ -15,6 +15,7 @@ from .forms import PozicijaForm, PozicijosBrezinysForm, MaskavimoFormSet
 from .forms_kainos import KainaFormSet
 from .schemas.columns import COLUMNS
 from .services.previews import regenerate_missing_preview
+from .services.sync import sync_pozicija_kaina_eur
 from .services.listing import (
     visible_cols_from_request,
     apply_filters,
@@ -155,9 +156,8 @@ def pozicija_detail(request, pk):
 
 
 def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
-    akt = poz.aktualios_kainos().first()
-    poz.kaina_eur = akt.kaina if akt else None
-    poz.save(update_fields=["kaina_eur", "updated"])
+    # Palikta dėl suderinamumo (naudojama create/edit). Vienas tiesos šaltinis – services.sync.
+    sync_pozicija_kaina_eur(poz)
 
 
 def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:

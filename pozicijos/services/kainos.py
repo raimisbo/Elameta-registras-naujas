@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 
 from ..models import KainosEilute, Pozicija
+from .sync import sync_pozicija_kaina_eur
 
 
 def _group_filter_for(row: KainosEilute) -> Q:
@@ -74,13 +75,10 @@ def set_aktuali(row: KainosEilute, save: bool = True) -> KainosEilute:
         old.save()
 
     # --- SUSIEJIMAS SU SĄRAŠO KAINOS STULPELIU ---
-    # Čia darom „santrauką“: pozicija.kaina_eur = naujos AKTUALIOS eilutės suma.
-    # Sąrašo „Kaina“ stulpelis, jei naudoja pozicija.kaina_eur, visada rodys naujausią aktualią kainą.
+    # Pozicija.kaina_eur atnaujinam vienu oficialiu keliu (services.sync).
     poz = row.pozicija
     if poz is not None:
-        poz.kaina_eur = row.kaina
-        # jei nori, atnaujinam ir updated lauką; jis pas tave yra modelyje
-        poz.save(update_fields=["kaina_eur", "updated"])
+        sync_pozicija_kaina_eur(poz)
 
     return row
 
@@ -96,7 +94,7 @@ def aktualios_kainos(
     """
     as_of = as_of or date.today()
 
-    qs = pozicija.kainu_eilutes.filter(
+    qs = pozicija.kainos_eilutes.filter(
         busena="aktuali",
     ).filter(
         Q(galioja_nuo__isnull=True) | Q(galioja_nuo__lte=as_of)

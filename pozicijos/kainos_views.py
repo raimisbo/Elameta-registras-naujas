@@ -12,21 +12,12 @@ from django.views.decorators.http import require_http_methods, require_POST
 from .models import Pozicija, KainosEilute
 from .forms_kainos import KainaFormSet, KainaFormSetNoDelete
 from .services.kainos import set_aktuali
+from .services.sync import sync_pozicija_kaina_eur
 
 
 def _sync_pozicija_kaina_eur(pozicija: Pozicija) -> None:
-    """
-    Pozicija.kaina_eur laikom kaip "pagrindinę" kainą pagal aktualią eilutę.
-    Jei aktualių eilučių nėra – paliekam None/0 pagal tavo modelio logiką.
-    """
-    akt = (
-        KainosEilute.objects
-        .filter(pozicija=pozicija, busena="aktuali")
-        .order_by("prioritetas", "-created")
-        .first()
-    )
-    pozicija.kaina_eur = akt.kaina if akt else None
-    pozicija.save(update_fields=["kaina_eur"])
+    """Suderinamumo wrapperis; vienas tiesos šaltinis – services.sync."""
+    sync_pozicija_kaina_eur(pozicija)
 
 
 def _get_filters(request: HttpRequest) -> tuple[str, str]:
@@ -200,6 +191,8 @@ def kaina_delete(request: HttpRequest, id: int) -> HttpResponse:
         return redirect("pozicijos:kainos_list", pk=poz_id)
 
     k.delete()
+    # Po trynimo privalom perskaičiuoti pozicija.kaina_eur, kad sąrašas nerodytų pasenusios reikšmės.
+    sync_pozicija_kaina_eur(Pozicija.objects.get(pk=poz_id))
     messages.success(request, "Kainos eilutė ištrinta.")
     return redirect("pozicijos:kainos_list", pk=poz_id)
 

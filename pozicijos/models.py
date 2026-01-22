@@ -156,7 +156,8 @@ class Pozicija(models.Model):
 
     # ---- Kainos API (naudojama views) ----
     def aktualios_kainos(self):
-        qs = self.kainos_eilutes.all()
+        # Sutarta prasmė: grąžinam tik AKTUALIAS kainas.
+        qs = self.kainos_eilutes.filter(busena="aktuali")
         field_names = {f.name for f in qs.model._meta.get_fields()}
         order_fields = []
         if "prioritetas" in field_names:
