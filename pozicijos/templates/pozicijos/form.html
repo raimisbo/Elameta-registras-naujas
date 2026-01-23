@@ -161,7 +161,7 @@
           </div>
         </div>
 
-        {# Matmenys XYZ (mm) - NAUJA #}
+        {# Matmenys XYZ (mm) #}
         <div class="field-row">
           <div class="field-label">{{ form.x_mm.label }}</div>
           <div class="field-control">
@@ -198,36 +198,121 @@
 
       <section class="poz-card">
         <h2 class="poz-card-title">Kabinimas</h2>
+        <div class="field-help">Kabinimo laukai rodomi pagal pažymėtas paslaugas: KTL ir/ar Miltai.</div>
 
-        <div class="field-row">
-          <div class="field-label">{{ form.kabinimo_budas.label }}</div>
-          <div class="field-control">
-            {{ form.kabinimo_budas }}
-            {% if form.kabinimo_budas.errors %}<div class="field-errors">{{ form.kabinimo_budas.errors|striptags }}</div>{% endif %}
+        {# KTL sub-blokas #}
+        <div id="kabinimas-ktl-subblock" class="subblock" style="{% if not form.paslauga_ktl.value %}display:none;{% endif %}">
+          <div style="font-weight:700; margin-bottom:6px;">KTL kabinimas</div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_kabinimo_budas.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_kabinimo_budas }}
+              {% if form.ktl_kabinimo_budas.errors %}<div class="field-errors">{{ form.ktl_kabinimo_budas.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_kabinimas_reme_txt.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_kabinimas_reme_txt }}
+              {% if form.ktl_kabinimas_reme_txt.errors %}<div class="field-errors">{{ form.ktl_kabinimas_reme_txt.errors|striptags }}</div>{% endif %}
+              <div class="field-help">Kol kas paliekama tuščia – įrašoma ranka.</div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_detaliu_kiekis_reme.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_detaliu_kiekis_reme }}
+              {% if form.ktl_detaliu_kiekis_reme.errors %}<div class="field-errors">{{ form.ktl_detaliu_kiekis_reme.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_faktinis_kiekis_reme.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_faktinis_kiekis_reme }}
+              {% if form.ktl_faktinis_kiekis_reme.errors %}<div class="field-errors">{{ form.ktl_faktinis_kiekis_reme.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_ilgis_mm.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_ilgis_mm }}
+              {% if form.ktl_ilgis_mm.errors %}<div class="field-errors">{{ form.ktl_ilgis_mm.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_aukstis_mm.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_aukstis_mm }}
+              {% if form.ktl_aukstis_mm.errors %}<div class="field-errors">{{ form.ktl_aukstis_mm.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_gylis_mm.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_gylis_mm }}
+              {% if form.ktl_gylis_mm.errors %}<div class="field-errors">{{ form.ktl_gylis_mm.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">Matmenų sandauga</div>
+            <div class="field-control">
+              <div id="ktl-matmenu-sandauga-preview" style="padding-top:6px;">—</div>
+              <div class="field-help">Rodoma kaip preview (galim padaryti ir atskirą DB lauką, jei nuspręsi).</div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.ktl_kabinimas_aprasymas.label }}</div>
+            <div class="field-control">
+              {{ form.ktl_kabinimas_aprasymas }}
+              {% if form.ktl_kabinimas_aprasymas.errors %}<div class="field-errors">{{ form.ktl_kabinimas_aprasymas.errors|striptags }}</div>{% endif %}
+            </div>
           </div>
         </div>
 
-        <div class="field-row">
-          <div class="field-label">{{ form.kabinimas_reme.label }}</div>
-          <div class="field-control">
-            {{ form.kabinimas_reme }}
-            {% if form.kabinimas_reme.errors %}<div class="field-errors">{{ form.kabinimas_reme.errors|striptags }}</div>{% endif %}
-          </div>
-        </div>
+        {# Miltai sub-blokas #}
+        <div id="kabinimas-miltai-subblock" class="subblock" style="{% if not form.paslauga_miltai.value %}display:none;{% endif %}">
+          <div style="font-weight:700; margin-bottom:6px;">Miltai kabinimas</div>
 
-        <div class="field-row">
-          <div class="field-label">{{ form.detaliu_kiekis_reme.label }}</div>
-          <div class="field-control">
-            {{ form.detaliu_kiekis_reme }}
-            {% if form.detaliu_kiekis_reme.errors %}<div class="field-errors">{{ form.detaliu_kiekis_reme.errors|striptags }}</div>{% endif %}
+          <div class="field-row">
+            <div class="field-label">{{ form.miltai_kiekis_per_valanda.label }}</div>
+            <div class="field-control">
+              {{ form.miltai_kiekis_per_valanda }}
+              {% if form.miltai_kiekis_per_valanda.errors %}<div class="field-errors">{{ form.miltai_kiekis_per_valanda.errors|striptags }}</div>{% endif %}
+              <div class="field-help">Decimal, 1 skaičius po kablelio.</div>
+            </div>
           </div>
-        </div>
 
-        <div class="field-row">
-          <div class="field-label">{{ form.faktinis_kiekis_reme.label }}</div>
-          <div class="field-control">
-            {{ form.faktinis_kiekis_reme }}
-            {% if form.faktinis_kiekis_reme.errors %}<div class="field-errors">{{ form.faktinis_kiekis_reme.errors|striptags }}</div>{% endif %}
+          <div class="field-row">
+            <div class="field-label">{{ form.miltai_detaliu_kiekis_reme.label }}</div>
+            <div class="field-control">
+              {{ form.miltai_detaliu_kiekis_reme }}
+              {% if form.miltai_detaliu_kiekis_reme.errors %}<div class="field-errors">{{ form.miltai_detaliu_kiekis_reme.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.miltai_faktinis_kiekis_reme.label }}</div>
+            <div class="field-control">
+              {{ form.miltai_faktinis_kiekis_reme }}
+              {% if form.miltai_faktinis_kiekis_reme.errors %}<div class="field-errors">{{ form.miltai_faktinis_kiekis_reme.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">{{ form.miltai_kabinimas_aprasymas.label }}</div>
+            <div class="field-control">
+              {{ form.miltai_kabinimas_aprasymas }}
+              {% if form.miltai_kabinimas_aprasymas.errors %}<div class="field-errors">{{ form.miltai_kabinimas_aprasymas.errors|striptags }}</div>{% endif %}
+            </div>
           </div>
         </div>
       </section>

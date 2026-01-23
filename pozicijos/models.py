@@ -48,6 +48,20 @@ class Pozicija(models.Model):
     kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, blank=True, default="")
     detaliu_kiekis_reme = models.CharField("Detalių kiekis rėme", max_length=120, blank=True, default="")
     faktinis_kiekis_reme = models.CharField("Faktinis kiekis rėme", max_length=120, blank=True, default="")
+    ktl_kabinimo_budas = models.CharField("KTL kabinimo būdas", max_length=200, blank=True, default="")
+    ktl_kabinimas_reme_txt = models.CharField("KTL kabinimas rėme", max_length=200, blank=True, default="")
+    ktl_detaliu_kiekis_reme = models.IntegerField("KTL detalių kiekis rėme", null=True, blank=True)
+    ktl_faktinis_kiekis_reme = models.IntegerField("KTL faktinis kiekis rėme", null=True, blank=True)
+    ktl_ilgis_mm = models.DecimalField("KTL ilgis (mm)", max_digits=10, decimal_places=1, null=True, blank=True)
+    ktl_aukstis_mm = models.DecimalField("KTL aukštis (mm)", max_digits=10, decimal_places=1, null=True, blank=True)
+    ktl_gylis_mm = models.DecimalField("KTL gylis (mm)", max_digits=10, decimal_places=1, null=True, blank=True)
+    ktl_kabinimas_aprasymas = models.TextField("KTL kabinimo aprašymas", blank=True, default="")
+
+    miltai_kiekis_per_valanda = models.DecimalField("Miltai: kiekis per valandą", max_digits=10, decimal_places=1,
+                                                    null=True, blank=True)
+    miltai_detaliu_kiekis_reme = models.IntegerField("Miltai: detalių kiekis rėme", null=True, blank=True)
+    miltai_faktinis_kiekis_reme = models.IntegerField("Miltai: faktinis kiekis rėme", null=True, blank=True)
+    miltai_kabinimas_aprasymas = models.TextField("Miltai: kabinimo aprašymas", blank=True, default="")
 
     # Paruošimas / padengimas
     paruosimas = models.CharField("Paruošimas", max_length=200, blank=True, default="")
