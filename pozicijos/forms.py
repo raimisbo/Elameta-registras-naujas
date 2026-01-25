@@ -59,13 +59,13 @@ class PozicijaForm(forms.ModelForm):
             "y_mm",
             "z_mm",
 
-            # --- Kabinimas (NAUJA: KTL + Miltai) ---
-            # Miltai
-            "miltai_kiekis_per_valanda",
-            "miltai_detaliu_kiekis_reme",
-            "miltai_faktinis_kiekis_reme",
-            "miltai_kabinimas_aprasymas",
-            # KTL
+            # Legacy kabinimas (paliekam)
+            "kabinimo_budas",
+            "kabinimas_reme",
+            "detaliu_kiekis_reme",
+            "faktinis_kiekis_reme",
+
+            # Kabinimas (KTL) - NAUJA
             "ktl_kabinimo_budas",
             "ktl_kabinimas_reme_txt",
             "ktl_detaliu_kiekis_reme",
@@ -75,7 +75,13 @@ class PozicijaForm(forms.ModelForm):
             "ktl_gylis_mm",
             "ktl_kabinimas_aprasymas",
 
-            # --- Paslauga ---
+            # Kabinimas (Miltai) - NAUJA
+            "miltai_kiekis_per_valanda",
+            "miltai_detaliu_kiekis_reme",
+            "miltai_faktinis_kiekis_reme",
+            "miltai_kabinimas_aprasymas",
+
+            # Paslaugos
             "paruosimas",
             "padengimas",
             "padengimo_standartas",
@@ -85,7 +91,6 @@ class PozicijaForm(forms.ModelForm):
             "paslauga_miltai",
             "paslauga_paruosimas",
 
-            # Miltų subblokas (paslauga)
             "miltu_kodas",
             "miltu_spalva",
             "miltu_tiekejas",
@@ -94,17 +99,22 @@ class PozicijaForm(forms.ModelForm):
 
             "paslaugu_pastabos",
 
-            # --- Maskavimas ---
+            # Maskavimas
             "maskavimo_tipas",
-            "maskavimas",  # legacy / optional (nebenaudojam kaip privalomo)
+            "maskavimas",  # legacy / optional
 
             "atlikimo_terminas",
             "testai_kokybe",
+
+            # Pakavimas
             "pakavimo_tipas",
             "pakavimas",
             "instrukcija",
+
+            # Papildomos
             "papildomos_paslaugos",
             "papildomos_paslaugos_aprasymas",
+
             "pastabos",
         ]
 
@@ -133,27 +143,21 @@ class PozicijaForm(forms.ModelForm):
             "y_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
             "z_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
 
-            # --- Kabinimas: Miltai ---
-            "miltai_kiekis_per_valanda": forms.NumberInput(attrs={
-                "min": 0,
-                "step": "0.1",
-                "inputmode": "decimal",
-                "data-decimals": "1",
-                "placeholder": "vnt/val."
-            }),
+            # Kabinimas (KTL / Miltai) - NAUJA
+            "ktl_kabinimo_budas": forms.TextInput(attrs={"placeholder": "laisvas tekstas"}),
+            "ktl_kabinimas_reme_txt": forms.TextInput(attrs={"placeholder": "įrašysite ranka"}),
+            "ktl_detaliu_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
+            "ktl_faktinis_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
+
+            "ktl_ilgis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "placeholder": "mm", "data-decimals": "1"}),
+            "ktl_aukstis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "placeholder": "mm", "data-decimals": "1"}),
+            "ktl_gylis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "placeholder": "mm", "data-decimals": "1"}),
+
+            "ktl_kabinimas_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
+            "miltai_kiekis_per_valanda": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "data-decimals": "1"}),
             "miltai_detaliu_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
             "miltai_faktinis_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
             "miltai_kabinimas_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
-
-            # --- Kabinimas: KTL ---
-            "ktl_kabinimo_budas": forms.TextInput(attrs={"placeholder": "laisvas tekstas"}),
-            "ktl_kabinimas_reme_txt": forms.TextInput(attrs={"placeholder": ""}),
-            "ktl_detaliu_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
-            "ktl_faktinis_kiekis_reme": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
-            "ktl_ilgis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "data-decimals": "1", "placeholder": "mm"}),
-            "ktl_aukstis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "data-decimals": "1", "placeholder": "mm"}),
-            "ktl_gylis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "data-decimals": "1", "placeholder": "mm"}),
-            "ktl_kabinimas_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -207,7 +211,6 @@ class PozicijaForm(forms.ModelForm):
         cleaned["maskavimo_tipas"] = tipas
 
         # Legacy laukas: nebėra privalomas.
-        # Jei "nera" – išvalom; jei "yra" – paliekam optional tekstą.
         if tipas == "nera":
             cleaned["maskavimas"] = ""
         else:
@@ -231,14 +234,14 @@ class PozicijaForm(forms.ModelForm):
             if _is_empty(cleaned.get("paruosimas", "")):
                 cleaned["paruosimas"] = "Gardobond 24T"
 
-        # B2 + Variant B: KTL presetai pildomi tik tuščius laukus (neperrašom vartotojo)
+        # B2 + Variant B: KTL presetai (pildom tik tuščius)
         if ktl:
             if _is_empty(cleaned.get("padengimas", "")):
                 cleaned["padengimas"] = "KTL BASF CG 570"
+            if cleaned.get("padengimo_standartas", None) is None:
+                cleaned["padengimo_standartas"] = ""
             if _is_empty(cleaned.get("spalva", "")):
                 cleaned["spalva"] = "Juoda RAL 9005"
-
-        # Variant B: Miltai nebevalo "spalva" (nieko nedarom)
 
         # --- Papildomos paslaugos ---
         pp = (cleaned.get("papildomos_paslaugos") or "ne").strip().lower()

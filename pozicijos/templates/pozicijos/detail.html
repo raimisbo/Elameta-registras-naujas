@@ -188,28 +188,7 @@
       </div>
     </section>
 
-    <section class="poz-card">
-      <h2 class="poz-card-title">Kabinimas</h2>
-      <div class="poz-fields">
-        <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.kabinimo_budas|default:"—" }}</span></div>
-        <div class="poz-field-row"><span class="poz-field-label">Kabinimas rėme</span><span class="poz-field-value">{{ pozicija.kabinimas_reme|default:"—" }}</span></div>
-        <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.detaliu_kiekis_reme %}{{ pozicija.detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
-        <div class="poz-field-row">
-          <span class="poz-field-label">Faktinis kiekis rėme</span>
-          {% with det=pozicija.detaliu_kiekis_reme fak=pozicija.faktinis_kiekis_reme %}
-            {% if det and fak and det != fak %}
-              <span class="poz-field-value poz-field-value--alert">
-            {% elif det and not fak %}
-              <span class="poz-field-value poz-field-value--alert">
-            {% else %}
-              <span class="poz-field-value">
-            {% endif %}
-              {% if fak %}{{ fak }}{% else %}—{% endif %}
-            </span>
-          {% endwith %}
-        </div>
-      </div>
-    </section>
+    
 
     <section class="poz-card">
       <h2 class="poz-card-title">Paslauga</h2>
@@ -261,6 +240,111 @@
             {% endif %}
           </span>
         </div>
+      </div>
+    </section>
+
+    <section class="poz-card">
+      <h2 class="poz-card-title">Kabinimas</h2>
+
+      <div class="poz-fields">
+
+        <div style="margin:2px 0 6px; font-weight:700;">
+          KTL {% if pozicija.paslauga_ktl %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
+        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.ktl_kabinimo_budas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Kabinimas rėme</span><span class="poz-field-value">{{ pozicija.ktl_kabinimas_reme_txt|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.ktl_detaliu_kiekis_reme %}{{ pozicija.ktl_detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Faktinis kiekis rėme</span>
+          {% with det=pozicija.ktl_detaliu_kiekis_reme fak=pozicija.ktl_faktinis_kiekis_reme %}
+            {% if det and fak and det != fak %}
+              <span class="poz-field-value poz-field-value--alert">
+            {% elif det and not fak %}
+              <span class="poz-field-value poz-field-value--alert">
+            {% else %}
+              <span class="poz-field-value">
+            {% endif %}
+              {% if fak %}{{ fak }}{% else %}—{% endif %}
+            </span>
+          {% endwith %}
+        </div>
+
+        <div class="poz-field-row">
+          <span class="poz-field-label">Matmenys (I×A×G)</span>
+          <span class="poz-field-value">
+            {% if pozicija.ktl_ilgis_mm or pozicija.ktl_aukstis_mm or pozicija.ktl_gylis_mm %}
+              {% if pozicija.ktl_ilgis_mm %}{{ pozicija.ktl_ilgis_mm|floatformat:1 }}{% else %}—{% endif %}
+              ×
+              {% if pozicija.ktl_aukstis_mm %}{{ pozicija.ktl_aukstis_mm|floatformat:1 }}{% else %}—{% endif %}
+              ×
+              {% if pozicija.ktl_gylis_mm %}{{ pozicija.ktl_gylis_mm|floatformat:1 }}{% else %}—{% endif %}
+              mm
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="poz-field-row">
+          <span class="poz-field-label">Aprašymas</span>
+          <span class="poz-field-value">{% if pozicija.ktl_kabinimas_aprasymas %}<div class="poz-notes-text">{{ pozicija.ktl_kabinimas_aprasymas|linebreaksbr }}</div>{% else %}—{% endif %}</span>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
+
+        <div style="margin:2px 0 6px; font-weight:700;">
+          Miltai {% if pozicija.paslauga_miltai %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Kiekis per valandą</span>
+          <span class="poz-field-value">{% if pozicija.miltai_kiekis_per_valanda %}{{ pozicija.miltai_kiekis_per_valanda|floatformat:1 }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.miltai_detaliu_kiekis_reme %}{{ pozicija.miltai_detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Faktinis kiekis rėme</span>
+          {% with det=pozicija.miltai_detaliu_kiekis_reme fak=pozicija.miltai_faktinis_kiekis_reme %}
+            {% if det and fak and det != fak %}
+              <span class="poz-field-value poz-field-value--alert">
+            {% elif det and not fak %}
+              <span class="poz-field-value poz-field-value--alert">
+            {% else %}
+              <span class="poz-field-value">
+            {% endif %}
+              {% if fak %}{{ fak }}{% else %}—{% endif %}
+            </span>
+          {% endwith %}
+        </div>
+        <div class="poz-field-row">
+          <span class="poz-field-label">Aprašymas</span>
+          <span class="poz-field-value">{% if pozicija.miltai_kabinimas_aprasymas %}<div class="poz-notes-text">{{ pozicija.miltai_kabinimas_aprasymas|linebreaksbr }}</div>{% else %}—{% endif %}</span>
+        </div>
+
+        {% if pozicija.kabinimo_budas or pozicija.kabinimas_reme or pozicija.detaliu_kiekis_reme or pozicija.faktinis_kiekis_reme %}
+          <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
+          <details style="margin-top:2px;">
+            <summary style="cursor:pointer; color:#6b7280;">Senas kabinimas (legacy)</summary>
+            <div style="margin-top:8px;">
+              <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.kabinimo_budas|default:"—" }}</span></div>
+              <div class="poz-field-row"><span class="poz-field-label">Kabinimas rėme</span><span class="poz-field-value">{{ pozicija.kabinimas_reme|default:"—" }}</span></div>
+              <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.detaliu_kiekis_reme %}{{ pozicija.detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
+              <div class="poz-field-row">
+                <span class="poz-field-label">Faktinis kiekis rėme</span>
+                {% with det=pozicija.detaliu_kiekis_reme fak=pozicija.faktinis_kiekis_reme %}
+                  {% if det and fak and det != fak %}
+                    <span class="poz-field-value poz-field-value--alert">
+                  {% elif det and not fak %}
+                    <span class="poz-field-value poz-field-value--alert">
+                  {% else %}
+                    <span class="poz-field-value">
+                  {% endif %}
+                    {% if fak %}{{ fak }}{% else %}—{% endif %}
+                  </span>
+                {% endwith %}
+              </div>
+            </div>
+          </details>
+        {% endif %}
+
       </div>
     </section>
 

@@ -9,6 +9,12 @@
 (function () {
   'use strict';
 
+  // Jei skriptas dėl kokios nors priežasties įsikrauna 2 kartus – nebootinam pakartotinai.
+  if (window.__POZ_FORM_ENGINE_LOADED__ === true) {
+    return;
+  }
+  window.__POZ_FORM_ENGINE_LOADED__ = true;
+
   function $(sel, root) {
     return (root || document).querySelector(sel);
   }
@@ -45,6 +51,16 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function setText(el, txt) {
+    if (!el) return;
+    el.textContent = txt;
+  }
+
+  function setShown(el, shown) {
+    if (!el) return;
+    el.style.display = shown ? '' : 'none';
   }
 
   // ------------------------
@@ -361,7 +377,7 @@
   // Paslauga (sutarta: KTL + Miltai gali būti abu)
   // - Paruošimas privalomas, jei KTL arba Miltai true (A1)
   // - Presetai pildomi init metu ir įjungimo momentu, bet tik jei laukas tuščias (B2 + "tik jei tuščia")
-  // - Spalva rodoma abiem (Variantas B): Miltai nebeslepia ir nebevalo "spalva"
+  // - Spalva rodoma abiem (Variantas B)
   // ------------------------
   function initPaslaugos() {
     var chkKTL = document.getElementById('id_paslauga_ktl');
@@ -399,7 +415,6 @@
     }
 
     function enforceParuosimasIfNeeded(source) {
-      // A1: tyliai priverčiam Paruošimą būti ON, jei yra KTL arba Miltai
       var need = (!!chkKTL.checked) || (!!chkMiltai.checked);
       if (need && !chkPar.checked) {
         chkPar.checked = true;
@@ -408,7 +423,6 @@
     }
 
     function applyPresets(reason, source) {
-      // B2: presetai init metu ir įjungimo momentu – tik jei laukai tušti
       var ktl = !!chkKTL.checked;
       var miltai = !!chkMiltai.checked;
       var par = !!chkPar.checked;
@@ -419,12 +433,12 @@
 
       if (ktl) {
         setIfEmpty(inpPad, 'KTL BASF CG 570');
+        // standarto neperrašom, nebent sistema duotų None
+        if (inpStd && inpStd.value == null) inpStd.value = '';
         setIfEmpty(inpSpalva, 'Juoda RAL 9005');
       }
 
       if (miltaiBox) miltaiBox.style.display = miltai ? '' : 'none';
-
-      // Variant B: spalvos eilutė visada matoma
       if (rowSpalvaTop) rowSpalvaTop.style.display = '';
 
       emitPaslauga(reason || 'sync', source || null);
@@ -463,128 +477,56 @@
   }
 
   // ------------------------
-  // Kabinimas (blokas formoje)
-  // - Rodom KTL subbloką, kai paslauga_ktl pažymėta
-  // - Rodom Miltai subbloką, kai paslauga_miltai pažymėta
-  // - Jei abu pažymėti – rodom abu
-  // - Nieko nevalom/neištrinamos reikšmės, tik UI rodymas
-  // - KTL matmenų sandauga: rodom preview (tik rodoma), kai yra ilgis+aukštis+gylis
+  // Kabinimas (KTL + Miltai rodomi nepriklausomai, pagal Paslaugos checkbox'us)
   // ------------------------
   function initKabinimas() {
-    var ktlBox = document.getElementById('kabinimas-ktl-subblock');
-    var miltaiBox = document.getElementById('kabinimas-miltai-subblock');
-
-    // jei šito failo nenaudoji form.html su kabinimo subblokais – tiesiog išeinam
-    if (!ktlBox && !miltaiBox) return;
-
-    if (document.documentElement.dataset && document.documentElement.dataset.kabinimasBooted === '1') return;
-    if (document.documentElement.dataset) document.documentElement.dataset.kabinimasBooted = '1';
-
     var chkKTL = document.getElementById('id_paslauga_ktl');
     var chkMiltai = document.getElementById('id_paslauga_miltai');
 
-    function show(el, on) {
-      if (!el) return;
-      el.style.display = on ? '' : 'none';
-    }
+    var ktlStatus = document.getElementById('ktl-kabinimas-status');
+    var ktlBlock = document.getElementById('ktl-kabinimas-subblock');
 
-    function syncVisibility(reason) {
+    var miltaiStatus = document.getElementById('miltai-kabinimas-status');
+    var miltaiBlock = document.getElementById('miltai-kabinimas-subblock');
+
+    // Jei šito template neturi – išeinam tyliai.
+    if ((!ktlStatus && !ktlBlock) && (!miltaiStatus && !miltaiBlock)) return;
+    if (!chkKTL && !chkMiltai) return;
+
+    function sync(reason) {
       var ktlOn = !!(chkKTL && chkKTL.checked);
       var miltaiOn = !!(chkMiltai && chkMiltai.checked);
 
-      show(ktlBox, ktlOn);
-      show(miltaiBox, miltaiOn);
+      setText(ktlStatus, ktlOn ? 'Įjungta' : '—');
+      setShown(ktlBlock, ktlOn);
+
+      setText(miltaiStatus, miltaiOn ? 'Įjungta' : '—');
+      setShown(miltaiBlock, miltaiOn);
 
       emit('kabinimas:changed', {
         ktl: ktlOn,
         miltai: miltaiOn,
         reason: reason || 'sync'
       });
-
-      // kartu atnaujinam sandaugą (jei KTL blokas matomas arba jei laukai egzistuoja)
-      syncKtlSandauga(reason || 'sync');
     }
 
-    // --- KTL sandaugos preview ---
-    var ilgisEl = document.getElementById('id_ktl_ilgis_mm');
-    var aukstisEl = document.getElementById('id_ktl_aukstis_mm');
-    var gylisEl = document.getElementById('id_ktl_gylis_mm');
-    var sandaugaEl = document.getElementById('ktl-matmenu-sandauga-preview');
-
-    function parseDec1(v) {
-      var s = (v == null ? '' : String(v)).trim();
-      if (!s) return null;
-      s = s.replace(/\s+/g, '').replace(',', '.');
-      // paliekam tik skaičius/tašką/minusą
-      s = s.replace(/[^0-9.\-]/g, '');
-      var n = Number(s);
-      if (!isFinite(n)) return null;
-      return n;
-    }
-
-    function formatNumber(n, decimals) {
-      var d = parseInt(decimals || '0', 10) || 0;
-      try {
-        return Number(n).toFixed(d);
-      } catch (_) {
-        return String(n);
-      }
-    }
-
-    function syncKtlSandauga(reason) {
-      if (!sandaugaEl) return;
-      // jei nėra laukų – rodom brūkšnį
-      if (!ilgisEl || !aukstisEl || !gylisEl) {
-        sandaugaEl.textContent = '—';
-        return;
-      }
-
-      var a = parseDec1(ilgisEl.value);
-      var b = parseDec1(aukstisEl.value);
-      var c = parseDec1(gylisEl.value);
-
-      if (a == null || b == null || c == null) {
-        sandaugaEl.textContent = '—';
-        return;
-      }
-
-      var prod = a * b * c;
-      // rodymo taisyklė: stabiliai su 1 skaitmeniu po kablelio (nes įvestys 1 dec)
-      sandaugaEl.textContent = formatNumber(prod, 1) + ' mm³';
-      emit('kabinimas:ktl_sandauga', {
-        ilgis: a, aukstis: b, gylis: c, sandauga: prod,
-        reason: reason || 'sync'
-      });
-    }
-
-    function bindOne(el) {
+    function bind(el) {
       if (!el) return;
-      if (el.dataset && el.dataset.boundKabinimasSandauga === '1') return;
-      if (el.dataset) el.dataset.boundKabinimasSandauga = '1';
-
-      el.addEventListener('input', function () { syncKtlSandauga('input'); });
-      el.addEventListener('blur', function () { syncKtlSandauga('blur'); });
+      if (el.dataset && el.dataset.boundKabinimas === '1') return;
+      if (el.dataset) el.dataset.boundKabinimas = '1';
+      el.addEventListener('change', function () { sync('change'); });
     }
 
-    bindOne(ilgisEl);
-    bindOne(aukstisEl);
-    bindOne(gylisEl);
+    bind(chkKTL);
+    bind(chkMiltai);
 
-    // klausom paslaugų event bus (tai yra pagrindinis integracijos taškas)
-    document.addEventListener('paslauga:changed', function () {
-      syncVisibility('paslauga:changed');
-    });
-
-    // fallback: jei kas nors pakeitė checkbox'us be emit (retas atvejis) – irgi sugaudom
-    if (chkKTL) {
-      chkKTL.addEventListener('change', function () { syncVisibility('ktl-change'); });
-    }
-    if (chkMiltai) {
-      chkMiltai.addEventListener('change', function () { syncVisibility('miltai-change'); });
+    // Jei paslauga emitina event'ą – paklausom ir jo (suderinamumui)
+    if (!(document.documentElement.dataset && document.documentElement.dataset.boundKabinimasBus === '1')) {
+      if (document.documentElement.dataset) document.documentElement.dataset.boundKabinimasBus = '1';
+      document.addEventListener('paslauga:changed', function () { sync('bus'); });
     }
 
-    // init
-    syncVisibility('init');
+    sync('init');
   }
 
   // ------------------------
@@ -723,15 +665,12 @@
     if (document.documentElement.dataset && document.documentElement.dataset.rulesRouterBound === '1') return;
     if (document.documentElement.dataset) document.documentElement.dataset.rulesRouterBound = '1';
 
-    // Šiame etape routeris paliekamas plėtrai:
-    // vėliau čia kabinsim Pakavimą ir Maskavimą reaguojant į paslaugų kombinaciją.
     document.addEventListener('paslauga:changed', function () {});
+    document.addEventListener('kabinimas:changed', function () {});
     document.addEventListener('maskavimas:changed', function () {});
     document.addEventListener('papildomos:changed', function () {});
     document.addEventListener('xyz:changed', function () {});
     document.addEventListener('kainos:changed', function () {});
-    document.addEventListener('kabinimas:changed', function () {});
-    document.addEventListener('kabinimas:ktl_sandauga', function () {});
   }
 
   // ------------------------
@@ -744,15 +683,13 @@
     initMaskavimas();
     initPaslaugos();
 
-    // nauja: kabinimas priklauso nuo paslaugos (KTL/Miltai)
+    // Kabinimas priklauso nuo paslaugų checkbox'ų, todėl inicijuojam po initPaslaugos()
     initKabinimas();
 
     initPapildomosPaslaugos();
     initXYZ();
-
     initAllKainosFormsets();
     initKainosPreview();
-
     bindRulesRouter();
   }
 

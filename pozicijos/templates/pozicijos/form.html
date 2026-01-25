@@ -161,7 +161,7 @@
           </div>
         </div>
 
-        {# Matmenys XYZ (mm) #}
+        {# Matmenys XYZ (mm) - NAUJA #}
         <div class="field-row">
           <div class="field-label">{{ form.x_mm.label }}</div>
           <div class="field-control">
@@ -195,15 +195,15 @@
           </div>
         </div>
       </section>
-
       <section class="poz-card">
         <h2 class="poz-card-title">Kabinimas</h2>
-        <div class="field-help">Kabinimo laukai rodomi pagal pažymėtas paslaugas: KTL ir/ar Miltai.</div>
 
-        {# KTL sub-blokas #}
-        <div id="kabinimas-ktl-subblock" class="subblock" style="{% if not form.paslauga_ktl.value %}display:none;{% endif %}">
-          <div style="font-weight:700; margin-bottom:6px;">KTL kabinimas</div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin:2px 0 8px;">
+          <div style="font-weight:700;">KTL</div>
+          <div id="ktl-kabinimas-status" style="font-size:.9rem; color:#6b7280;">—</div>
+        </div>
 
+        <div id="ktl-kabinimas-subblock" style="display:none;">
           <div class="field-row">
             <div class="field-label">{{ form.ktl_kabinimo_budas.label }}</div>
             <div class="field-control">
@@ -217,7 +217,6 @@
             <div class="field-control">
               {{ form.ktl_kabinimas_reme_txt }}
               {% if form.ktl_kabinimas_reme_txt.errors %}<div class="field-errors">{{ form.ktl_kabinimas_reme_txt.errors|striptags }}</div>{% endif %}
-              <div class="field-help">Kol kas paliekama tuščia – įrašoma ranka.</div>
             </div>
           </div>
 
@@ -264,8 +263,9 @@
           <div class="field-row">
             <div class="field-label">Matmenų sandauga</div>
             <div class="field-control">
-              <div id="ktl-matmenu-sandauga-preview" style="padding-top:6px;">—</div>
-              <div class="field-help">Rodoma kaip preview (galim padaryti ir atskirą DB lauką, jei nuspręsi).</div>
+              <div style="padding-top:6px; color:#6b7280;">
+                {% if form.instance.ktl_matmenu_sandauga %}{{ form.instance.ktl_matmenu_sandauga|floatformat:1 }}{% else %}—{% endif %}
+              </div>
             </div>
           </div>
 
@@ -278,16 +278,19 @@
           </div>
         </div>
 
-        {# Miltai sub-blokas #}
-        <div id="kabinimas-miltai-subblock" class="subblock" style="{% if not form.paslauga_miltai.value %}display:none;{% endif %}">
-          <div style="font-weight:700; margin-bottom:6px;">Miltai kabinimas</div>
+        <hr style="border:0;border-top:1px solid #f3f4f6;margin:12px 0;">
 
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin:2px 0 8px;">
+          <div style="font-weight:700;">Miltai</div>
+          <div id="miltai-kabinimas-status" style="font-size:.9rem; color:#6b7280;">—</div>
+        </div>
+
+        <div id="miltai-kabinimas-subblock" style="display:none;">
           <div class="field-row">
             <div class="field-label">{{ form.miltai_kiekis_per_valanda.label }}</div>
             <div class="field-control">
               {{ form.miltai_kiekis_per_valanda }}
               {% if form.miltai_kiekis_per_valanda.errors %}<div class="field-errors">{{ form.miltai_kiekis_per_valanda.errors|striptags }}</div>{% endif %}
-              <div class="field-help">Decimal, 1 skaičius po kablelio.</div>
             </div>
           </div>
 
@@ -315,8 +318,47 @@
             </div>
           </div>
         </div>
-      </section>
 
+        {% if form.instance.kabinimo_budas or form.instance.kabinimas_reme or form.instance.detaliu_kiekis_reme or form.instance.faktinis_kiekis_reme %}
+          <hr style="border:0;border-top:1px solid #f3f4f6;margin:12px 0;">
+          <details>
+            <summary style="cursor:pointer; color:#6b7280;">Senas kabinimas (legacy)</summary>
+            <div style="margin-top:10px;">
+              <div class="field-row">
+                <div class="field-label">{{ form.kabinimo_budas.label }}</div>
+                <div class="field-control">
+                  {{ form.kabinimo_budas }}
+                  {% if form.kabinimo_budas.errors %}<div class="field-errors">{{ form.kabinimo_budas.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">{{ form.kabinimas_reme.label }}</div>
+                <div class="field-control">
+                  {{ form.kabinimas_reme }}
+                  {% if form.kabinimas_reme.errors %}<div class="field-errors">{{ form.kabinimas_reme.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">{{ form.detaliu_kiekis_reme.label }}</div>
+                <div class="field-control">
+                  {{ form.detaliu_kiekis_reme }}
+                  {% if form.detaliu_kiekis_reme.errors %}<div class="field-errors">{{ form.detaliu_kiekis_reme.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field-label">{{ form.faktinis_kiekis_reme.label }}</div>
+                <div class="field-control">
+                  {{ form.faktinis_kiekis_reme }}
+                  {% if form.faktinis_kiekis_reme.errors %}<div class="field-errors">{{ form.faktinis_kiekis_reme.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+            </div>
+          </details>
+        {% endif %}
+      </section>
       <section class="poz-card">
         <h2 class="poz-card-title">Paslauga</h2>
 

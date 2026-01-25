@@ -48,6 +48,9 @@ class Pozicija(models.Model):
     kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, blank=True, default="")
     detaliu_kiekis_reme = models.CharField("Detalių kiekis rėme", max_length=120, blank=True, default="")
     faktinis_kiekis_reme = models.CharField("Faktinis kiekis rėme", max_length=120, blank=True, default="")
+
+
+    # --- Kabinimas (KTL) ---
     ktl_kabinimo_budas = models.CharField("KTL kabinimo būdas", max_length=200, blank=True, default="")
     ktl_kabinimas_reme_txt = models.CharField("KTL kabinimas rėme", max_length=200, blank=True, default="")
     ktl_detaliu_kiekis_reme = models.IntegerField("KTL detalių kiekis rėme", null=True, blank=True)
@@ -57,11 +60,12 @@ class Pozicija(models.Model):
     ktl_gylis_mm = models.DecimalField("KTL gylis (mm)", max_digits=10, decimal_places=1, null=True, blank=True)
     ktl_kabinimas_aprasymas = models.TextField("KTL kabinimo aprašymas", blank=True, default="")
 
-    miltai_kiekis_per_valanda = models.DecimalField("Miltai: kiekis per valandą", max_digits=10, decimal_places=1,
-                                                    null=True, blank=True)
+    # --- Kabinimas (Miltai) ---
+    miltai_kiekis_per_valanda = models.DecimalField("Miltai: kiekis per valandą", max_digits=10, decimal_places=1, null=True, blank=True)
     miltai_detaliu_kiekis_reme = models.IntegerField("Miltai: detalių kiekis rėme", null=True, blank=True)
     miltai_faktinis_kiekis_reme = models.IntegerField("Miltai: faktinis kiekis rėme", null=True, blank=True)
     miltai_kabinimas_aprasymas = models.TextField("Miltai: kabinimo aprašymas", blank=True, default="")
+
 
     # Paruošimas / padengimas
     paruosimas = models.CharField("Paruošimas", max_length=200, blank=True, default="")
@@ -145,6 +149,17 @@ class Pozicija(models.Model):
 
     class Meta:
         ordering = ["-created"]
+    @property
+    def ktl_matmenu_sandauga(self):
+        """Grąžina KTL matmenų (I×A×G) sandaugą, jei visi trys matmenys suvesti."""
+        if self.ktl_ilgis_mm is None or self.ktl_aukstis_mm is None or self.ktl_gylis_mm is None:
+            return None
+        try:
+            return self.ktl_ilgis_mm * self.ktl_aukstis_mm * self.ktl_gylis_mm
+        except Exception:
+            return None
+
+
 
     def __str__(self):
         return f"{self.poz_kodas or self.id} — {self.poz_pavad}".strip()

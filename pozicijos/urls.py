@@ -26,9 +26,11 @@ urlpatterns = [
 
     # pasiūlymai
     path("<int:pk>/proposal/", proposal_views.proposal_prepare, name="proposal_prepare"),
+    # alias senesniems šablonams (jei kažkur dar naudoji pasiulymas_prepare)
+    path("<int:pk>/pasiulymas/", proposal_views.proposal_prepare, name="pasiulymas_prepare"),
     path("<int:pk>/pdf/", proposal_views.proposal_pdf, name="pdf"),
 
-    # KAINOS (nauja)
+    # KAINOS
     path("<int:pk>/kainos/", kainos_views.kainos_list, name="kainos_list"),
     path("<int:pk>/kainos/nauja/", kainos_views.kaina_create, name="kaina_create"),
     path("kainos/<int:id>/redaguoti/", kainos_views.kaina_update, name="kaina_update"),
