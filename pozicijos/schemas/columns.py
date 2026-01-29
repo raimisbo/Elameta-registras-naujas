@@ -88,47 +88,6 @@ COLUMNS: list[dict] = [
         "width": 140,
         "default": True,
     },
-
-    # ---------------- Kabinimas ----------------
-    {
-        "key": "kabinimo_budas",
-        "label": "Kabinimo būdas",
-        "type": "char",
-        "filter": "text",
-        "searchable": False,
-        "width": 140,
-        "default": False,
-    },
-    {
-        "key": "kabinimas_reme",
-        "label": "Kabinimas rėme",
-        "type": "char",
-        "filter": "text",
-        "searchable": False,
-        "width": 140,
-        "default": False,
-    },
-    {
-        "key": "detaliu_kiekis_reme",
-        "label": "Detalių kiekis rėme",
-        "type": "number",
-        "filter": "range",
-        "searchable": False,
-        "width": 110,
-        "default": False,
-        "align": "right",
-    },
-    {
-        "key": "faktinis_kiekis_reme",
-        "label": "Faktinis kiekis rėme",
-        "type": "number",
-        "filter": "range",
-        "searchable": False,
-        "width": 120,
-        "default": False,
-        "align": "right",
-    },
-
     # ---------------- Kabinimas (nauja struktūra) ----------------
     {
         "key": "ktl_kabinimo_budas",

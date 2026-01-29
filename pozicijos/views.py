@@ -22,13 +22,10 @@ from .services.listing import (
     apply_sorting,
 )
 
-
 FORM_SUGGEST_FIELDS = [
     "klientas",
     "projektas",
     "metalas",
-    "kabinimo_budas",
-    "kabinimas_reme",
     "paruosimas",
     "padengimas",
     "padengimo_standartas",
@@ -39,7 +36,6 @@ FORM_SUGGEST_FIELDS = [
     "instrukcija",
 ]
 
-
 def _get_form_suggestions() -> dict[str, list[str]]:
     suggestions: dict[str, list[str]] = {}
     qs = Pozicija.objects.all()
@@ -48,13 +44,11 @@ def _get_form_suggestions() -> dict[str, list[str]]:
         suggestions[field] = [v for v in values if v]
     return suggestions
 
-
 def _safe_int(value, default: int) -> int:
     try:
         return int(value)
     except Exception:
         return default
-
 
 def _base_list_qs():
     """
@@ -70,8 +64,6 @@ def _base_list_qs():
             kaina_max=Max("kainos_eilutes__kaina", filter=Q(kainos_eilutes__busena="aktuali")),
         )
     )
-
-
 
 def pozicijos_list(request):
     visible_cols = visible_cols_from_request(request)
@@ -97,7 +89,6 @@ def pozicijos_list(request):
     }
     return render(request, "pozicijos/list.html", context)
 
-
 def pozicijos_tbody(request):
     visible_cols = visible_cols_from_request(request)
     page_size = _safe_int(request.GET.get("page_size", 25), 25)
@@ -121,7 +112,6 @@ def pozicijos_tbody(request):
         },
     )
 
-
 def pozicijos_stats(request):
     qs = Pozicija.objects.all()
     qs = apply_filters(qs, request)
@@ -139,7 +129,6 @@ def pozicijos_stats(request):
 
     return JsonResponse({"labels": labels, "values": values, "total": total})
 
-
 def pozicija_detail(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
     breziniai = PozicijosBrezinys.objects.filter(pozicija=poz).order_by("id")
@@ -154,11 +143,9 @@ def pozicija_detail(request, pk):
     }
     return render(request, "pozicijos/detail.html", context)
 
-
 def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
     # Palikta dėl suderinamumo (naudojama create/edit). Vienas tiesos šaltinis – services.sync.
     sync_pozicija_kaina_eur(poz)
-
 
 def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
     """
@@ -168,7 +155,7 @@ def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
     - jei "nera" -> legacy laukas maskavimas išvalomas
     """
     qs = MaskavimoEilute.objects.filter(pozicija=poz)
-    has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False) | Q(aprasymas__gt="")).exists()
+    has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False)).exists()
 
     new_tipas = "yra" if has_any else "nera"
     update_fields: list[str] = []
@@ -184,7 +171,6 @@ def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
     if update_fields:
         update_fields.append("updated")
         poz.save(update_fields=update_fields)
-
 
 def pozicija_create(request):
     pozicija = None
@@ -213,8 +199,7 @@ def pozicija_create(request):
                 for inst in m_instances:
                     txt = (getattr(inst, "maskuote", "") or "").strip()
                     qty = getattr(inst, "vietu_kiekis", None)
-                    apr = (getattr(inst, "aprasymas", "") or "").strip()
-                    if (not txt) and (qty is None) and (not apr):
+                    if not txt and qty is None:
                         continue  # ignoruojam pilnai tuščią porą
                     inst.pozicija = pozicija
                     inst.save()
@@ -247,7 +232,6 @@ def pozicija_create(request):
         "maskavimo_formset": mask_formset,
     }
     return render(request, "pozicijos/form.html", context)
-
 
 def pozicija_edit(request, pk):
     pozicija = get_object_or_404(Pozicija, pk=pk)
@@ -286,8 +270,7 @@ def pozicija_edit(request, pk):
                 for inst in m_instances:
                     txt = (getattr(inst, "maskuote", "") or "").strip()
                     qty = getattr(inst, "vietu_kiekis", None)
-                    apr = (getattr(inst, "aprasymas", "") or "").strip()
-                    if (not txt) and (qty is None) and (not apr):
+                    if not txt and qty is None:
                         # jei egzistuojantis įrašas tapo tuščias – ištrinam
                         if getattr(inst, "pk", None):
                             inst.delete()
@@ -323,7 +306,6 @@ def pozicija_edit(request, pk):
     }
     return render(request, "pozicijos/form.html", context)
 
-
 @require_POST
 def brezinys_upload(request, pk):
     poz = get_object_or_404(Pozicija, pk=pk)
@@ -344,7 +326,6 @@ def brezinys_upload(request, pk):
 
     return redirect("pozicijos:detail", pk=poz.pk)
 
-
 @require_POST
 def brezinys_delete(request, pk, bid):
     poz = get_object_or_404(Pozicija, pk=pk)
@@ -352,13 +333,11 @@ def brezinys_delete(request, pk, bid):
     br.delete()
     return redirect("pozicijos:detail", pk=pk)
 
-
 @xframe_options_sameorigin
 def brezinys_3d(request, pk, bid):
     poz = get_object_or_404(Pozicija, pk=pk)
     br = get_object_or_404(PozicijosBrezinys, pk=bid, pozicija=poz)
     return render(request, "pozicijos/brezinys_3d.html", {"pozicija": poz, "brezinys": br})
-
 
 def pozicijos_import_csv(request):
     result = None

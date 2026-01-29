@@ -43,12 +43,6 @@ class Pozicija(models.Model):
     y_mm = models.DecimalField("Y (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
     z_mm = models.DecimalField("Z (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
 
-    # Kabinimas
-    kabinimo_budas = models.CharField("Kabinimo būdas", max_length=120, blank=True, default="")
-    kabinimas_reme = models.CharField("Kabinimas rėme", max_length=120, blank=True, default="")
-    detaliu_kiekis_reme = models.CharField("Detalių kiekis rėme", max_length=120, blank=True, default="")
-    faktinis_kiekis_reme = models.CharField("Faktinis kiekis rėme", max_length=120, blank=True, default="")
-
 
     # --- Kabinimas (KTL) ---
     ktl_kabinimo_budas = models.CharField("KTL kabinimo būdas", max_length=200, blank=True, default="")
@@ -235,9 +229,8 @@ class Pozicija(models.Model):
 class MaskavimoEilute(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="maskavimo_eilutes")
 
-    maskuote = models.CharField("Tipas", max_length=255, blank=True, default="")
-    vietu_kiekis = models.PositiveIntegerField("Kiekis", null=True, blank=True)
-    aprasymas = models.TextField("Aprašymas", blank=True, default="")
+    maskuote = models.CharField("Maskuotė", max_length=255, blank=True, default="")
+    vietu_kiekis = models.PositiveIntegerField("Maskavimo vietų kiekis", null=True, blank=True)
 
     created = models.DateTimeField("Sukurta", auto_now_add=True)
     updated = models.DateTimeField("Atnaujinta", auto_now=True)
@@ -246,18 +239,13 @@ class MaskavimoEilute(models.Model):
         ordering = ["id"]
 
     def __str__(self):
-        tipas = (self.maskuote or "").strip()
-        apr = (getattr(self, "aprasymas", "") or "").strip()
-        qty = self.vietu_kiekis
-        parts = []
-        if tipas:
-            parts.append(tipas)
-        if qty is not None:
-            parts.append(str(qty))
-        if apr:
-            parts.append(apr)
-        if parts:
-            return " | ".join(parts)
+        txt = (self.maskuote or "").strip()
+        if txt and self.vietu_kiekis is not None:
+            return f"{txt} ({self.vietu_kiekis})"
+        if txt:
+            return txt
+        if self.vietu_kiekis is not None:
+            return str(self.vietu_kiekis)
         return f"Maskavimas #{self.pk or 'new'}"
 
 

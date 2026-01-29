@@ -318,46 +318,6 @@
             </div>
           </div>
         </div>
-
-        {% if form.instance.kabinimo_budas or form.instance.kabinimas_reme or form.instance.detaliu_kiekis_reme or form.instance.faktinis_kiekis_reme %}
-          <hr style="border:0;border-top:1px solid #f3f4f6;margin:12px 0;">
-          <details>
-            <summary style="cursor:pointer; color:#6b7280;">Senas kabinimas (legacy)</summary>
-            <div style="margin-top:10px;">
-              <div class="field-row">
-                <div class="field-label">{{ form.kabinimo_budas.label }}</div>
-                <div class="field-control">
-                  {{ form.kabinimo_budas }}
-                  {% if form.kabinimo_budas.errors %}<div class="field-errors">{{ form.kabinimo_budas.errors|striptags }}</div>{% endif %}
-                </div>
-              </div>
-
-              <div class="field-row">
-                <div class="field-label">{{ form.kabinimas_reme.label }}</div>
-                <div class="field-control">
-                  {{ form.kabinimas_reme }}
-                  {% if form.kabinimas_reme.errors %}<div class="field-errors">{{ form.kabinimas_reme.errors|striptags }}</div>{% endif %}
-                </div>
-              </div>
-
-              <div class="field-row">
-                <div class="field-label">{{ form.detaliu_kiekis_reme.label }}</div>
-                <div class="field-control">
-                  {{ form.detaliu_kiekis_reme }}
-                  {% if form.detaliu_kiekis_reme.errors %}<div class="field-errors">{{ form.detaliu_kiekis_reme.errors|striptags }}</div>{% endif %}
-                </div>
-              </div>
-
-              <div class="field-row">
-                <div class="field-label">{{ form.faktinis_kiekis_reme.label }}</div>
-                <div class="field-control">
-                  {{ form.faktinis_kiekis_reme }}
-                  {% if form.faktinis_kiekis_reme.errors %}<div class="field-errors">{{ form.faktinis_kiekis_reme.errors|striptags }}</div>{% endif %}
-                </div>
-              </div>
-            </div>
-          </details>
-        {% endif %}
       </section>
       <section class="poz-card">
         <h2 class="poz-card-title">Paslauga</h2>
@@ -499,14 +459,6 @@
                 </div>
               </div>
 
-              <div class="field-row">
-                <div class="field-label">{{ f.aprasymas.label }}</div>
-                <div class="field-control">
-                  {{ f.aprasymas }}
-                  {% if f.aprasymas.errors %}<div class="field-errors">{{ f.aprasymas.errors|striptags }}</div>{% endif %}
-                </div>
-              </div>
-
               <div style="display:flex; justify-content:flex-end;">
                 <button type="button" class="btn btn-secondary maskavimas-remove">Pašalinti</button>
               </div>
@@ -530,13 +482,6 @@
               <div class="field-label">{{ maskavimo_formset.empty_form.vietu_kiekis.label }}</div>
               <div class="field-control">
                 {{ maskavimo_formset.empty_form.vietu_kiekis }}
-              </div>
-            </div>
-
-            <div class="field-row">
-              <div class="field-label">{{ maskavimo_formset.empty_form.aprasymas.label }}</div>
-              <div class="field-control">
-                {{ maskavimo_formset.empty_form.aprasymas }}
               </div>
             </div>
 

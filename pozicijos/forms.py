@@ -60,10 +60,6 @@ class PozicijaForm(forms.ModelForm):
             "z_mm",
 
             # Legacy kabinimas (paliekam)
-            "kabinimo_budas",
-            "kabinimas_reme",
-            "detaliu_kiekis_reme",
-            "faktinis_kiekis_reme",
 
             # Kabinimas (KTL) - NAUJA
             "ktl_kabinimo_budas",
@@ -274,11 +270,10 @@ class PozicijosBrezinysForm(forms.ModelForm):
 class MaskavimoEiluteForm(forms.ModelForm):
     class Meta:
         model = MaskavimoEilute
-        fields = ["maskuote", "vietu_kiekis", "aprasymas"]
+        fields = ["maskuote", "vietu_kiekis"]
         widgets = {
-            "maskuote": forms.TextInput(attrs={"placeholder": "Tipas"}),
+            "maskuote": forms.TextInput(attrs={"placeholder": "Maskuotė"}),
             "vietu_kiekis": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric", "placeholder": "Kiekis"}),
-            "aprasymas": forms.Textarea(attrs={"rows": 2, "placeholder": "Aprašymas", "data-autoresize": "1"}),
         }
 
 
