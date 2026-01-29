@@ -499,6 +499,14 @@
                 </div>
               </div>
 
+              <div class="field-row">
+                <div class="field-label">{{ f.aprasymas.label }}</div>
+                <div class="field-control">
+                  {{ f.aprasymas }}
+                  {% if f.aprasymas.errors %}<div class="field-errors">{{ f.aprasymas.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
               <div style="display:flex; justify-content:flex-end;">
                 <button type="button" class="btn btn-secondary maskavimas-remove">Pašalinti</button>
               </div>
@@ -522,6 +530,13 @@
               <div class="field-label">{{ maskavimo_formset.empty_form.vietu_kiekis.label }}</div>
               <div class="field-control">
                 {{ maskavimo_formset.empty_form.vietu_kiekis }}
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field-label">{{ maskavimo_formset.empty_form.aprasymas.label }}</div>
+              <div class="field-control">
+                {{ maskavimo_formset.empty_form.aprasymas }}
               </div>
             </div>
 

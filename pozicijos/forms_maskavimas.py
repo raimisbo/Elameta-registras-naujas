@@ -10,10 +10,11 @@ from .models import MaskavimoEilute
 class MaskavimoEiluteForm(forms.ModelForm):
     class Meta:
         model = MaskavimoEilute
-        fields = ["maskuote", "vietu_kiekis"]
+        fields = ["maskuote", "vietu_kiekis", "aprasymas"]
         widgets = {
-            "maskuote": forms.TextInput(attrs={"placeholder": "Maskuotė"}),
+            "maskuote": forms.TextInput(attrs={"placeholder": "Tipas"}),
             "vietu_kiekis": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric", "placeholder": "Kiekis"}),
+            "aprasymas": forms.Textarea(attrs={"rows": 2, "placeholder": "Aprašymas", "data-autoresize": "1"}),
         }
 
 

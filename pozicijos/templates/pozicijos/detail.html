@@ -188,7 +188,7 @@
       </div>
     </section>
 
-    
+
 
     <section class="poz-card">
       <h2 class="poz-card-title">Paslauga</h2>
@@ -361,25 +361,26 @@
           {% if pozicija.maskavimo_tipas == "yra" %}
             {% if lines %}
               <div class="poz-field-row">
-                <span class="poz-field-label">Maskuotės</span>
+                <span class="poz-field-label">Maskavimai</span>
                 <span class="poz-field-value">
                   {% for m in lines %}
                     <div style="padding:6px 0; {% if not forloop.first %}border-top:1px solid #e5e7eb;{% endif %}">
-                      <div><strong>Maskuotė:</strong> {{ m.maskuote|default:"—" }}</div>
-                      <div><strong>Vietų kiekis:</strong> {% if m.vietu_kiekis is not None %}{{ m.vietu_kiekis }}{% else %}—{% endif %}</div>
+                      <div><strong>Tipas:</strong> {{ m.maskuote|default:"—" }}</div>
+                      <div><strong>Kiekis:</strong> {% if m.vietu_kiekis is not None %}{{ m.vietu_kiekis }}{% else %}—{% endif %}</div>
+                      <div><strong>Aprašymas:</strong> {% if m.aprasymas %}{{ m.aprasymas|linebreaksbr }}{% else %}—{% endif %}</div>
                     </div>
                   {% endfor %}
                 </span>
               </div>
             {% else %}
               <div class="poz-field-row">
-                <span class="poz-field-label">Maskuotės</span>
+                <span class="poz-field-label">Maskavimai</span>
                 <span class="poz-field-value">—</span>
               </div>
             {% endif %}
           {% else %}
             <div class="poz-field-row">
-              <span class="poz-field-label">Maskuotės</span>
+              <span class="poz-field-label">Maskavimai</span>
               <span class="poz-field-value">—</span>
             </div>
           {% endif %}

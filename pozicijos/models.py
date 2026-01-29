@@ -235,8 +235,9 @@ class Pozicija(models.Model):
 class MaskavimoEilute(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="maskavimo_eilutes")
 
-    maskuote = models.CharField("Maskuotė", max_length=255, blank=True, default="")
-    vietu_kiekis = models.PositiveIntegerField("Maskavimo vietų kiekis", null=True, blank=True)
+    maskuote = models.CharField("Tipas", max_length=255, blank=True, default="")
+    vietu_kiekis = models.PositiveIntegerField("Kiekis", null=True, blank=True)
+    aprasymas = models.TextField("Aprašymas", blank=True, default="")
 
     created = models.DateTimeField("Sukurta", auto_now_add=True)
     updated = models.DateTimeField("Atnaujinta", auto_now=True)
@@ -245,13 +246,18 @@ class MaskavimoEilute(models.Model):
         ordering = ["id"]
 
     def __str__(self):
-        txt = (self.maskuote or "").strip()
-        if txt and self.vietu_kiekis is not None:
-            return f"{txt} ({self.vietu_kiekis})"
-        if txt:
-            return txt
-        if self.vietu_kiekis is not None:
-            return str(self.vietu_kiekis)
+        tipas = (self.maskuote or "").strip()
+        apr = (getattr(self, "aprasymas", "") or "").strip()
+        qty = self.vietu_kiekis
+        parts = []
+        if tipas:
+            parts.append(tipas)
+        if qty is not None:
+            parts.append(str(qty))
+        if apr:
+            parts.append(apr)
+        if parts:
+            return " | ".join(parts)
         return f"Maskavimas #{self.pk or 'new'}"
 
 
