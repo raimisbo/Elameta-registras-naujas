@@ -155,7 +155,7 @@ def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
     - jei "nera" -> legacy laukas maskavimas išvalomas
     """
     qs = MaskavimoEilute.objects.filter(pozicija=poz)
-    has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False)).exists()
+    has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False) | Q(aprasymas__gt="")).exists()
 
     new_tipas = "yra" if has_any else "nera"
     update_fields: list[str] = []
@@ -199,8 +199,9 @@ def pozicija_create(request):
                 for inst in m_instances:
                     txt = (getattr(inst, "maskuote", "") or "").strip()
                     qty = getattr(inst, "vietu_kiekis", None)
-                    if not txt and qty is None:
-                        continue  # ignoruojam pilnai tuščią porą
+                    desc = (getattr(inst, "aprasymas", "") or "").strip()
+                    if not txt and qty is None and not desc:
+                        continue  # ignoruojam pilnai tuščią eilutę
                     inst.pozicija = pozicija
                     inst.save()
 
@@ -270,7 +271,8 @@ def pozicija_edit(request, pk):
                 for inst in m_instances:
                     txt = (getattr(inst, "maskuote", "") or "").strip()
                     qty = getattr(inst, "vietu_kiekis", None)
-                    if not txt and qty is None:
+                    desc = (getattr(inst, "aprasymas", "") or "").strip()
+                    if not txt and qty is None and not desc:
                         # jei egzistuojantis įrašas tapo tuščias – ištrinam
                         if getattr(inst, "pk", None):
                             inst.delete()

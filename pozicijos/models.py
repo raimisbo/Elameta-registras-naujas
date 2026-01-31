@@ -231,6 +231,7 @@ class MaskavimoEilute(models.Model):
 
     maskuote = models.CharField("Maskuotė", max_length=255, blank=True, default="")
     vietu_kiekis = models.PositiveIntegerField("Maskavimo vietų kiekis", null=True, blank=True)
+    aprasymas = models.TextField("Aprašymas", blank=True, default="")
 
     created = models.DateTimeField("Sukurta", auto_now_add=True)
     updated = models.DateTimeField("Atnaujinta", auto_now=True)

@@ -343,6 +343,7 @@
                     <div style="padding:6px 0; {% if not forloop.first %}border-top:1px solid #e5e7eb;{% endif %}">
                       <div><strong>Maskuotė:</strong> {{ m.maskuote|default:"—" }}</div>
                       <div><strong>Vietų kiekis:</strong> {% if m.vietu_kiekis is not None %}{{ m.vietu_kiekis }}{% else %}—{% endif %}</div>
+                      <div><strong>Aprašymas:</strong> {% if m.aprasymas %}<span class="poz-notes-text">{{ m.aprasymas|linebreaksbr }}</span>{% else %}—{% endif %}</div>
                     </div>
                   {% endfor %}
                 </span>

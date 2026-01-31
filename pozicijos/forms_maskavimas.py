@@ -11,6 +11,11 @@ class MaskavimoEiluteForm(forms.ModelForm):
     class Meta:
         model = MaskavimoEilute
         fields = ["maskuote", "vietu_kiekis", "aprasymas"]
+        labels = {
+            "maskuote": "Tipas",
+            "vietu_kiekis": "Kiekis",
+            "aprasymas": "Aprašymas",
+        }
         widgets = {
             "maskuote": forms.TextInput(attrs={"placeholder": "Tipas"}),
             "vietu_kiekis": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric", "placeholder": "Kiekis"}),
