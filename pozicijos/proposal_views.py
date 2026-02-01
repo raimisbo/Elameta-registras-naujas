@@ -455,7 +455,52 @@ def proposal_pdf(request, pk: int):
         c.line(margin_left, y, width - margin_right, y)
         y -= 8
 
-    # Main info (pastabos po Price)
+    
+
+    def draw_table_flow(tbl: Table, table_width: float, extra_gap: float = 14) -> None:
+        """Draw a ReportLab Table, splitting across pages if needed.
+
+        This avoids the situation where the first page contains only the header ('kepurė')
+        and the whole table is moved to the next page.
+        """
+        nonlocal y
+
+        parts = [tbl]
+        while parts:
+            t = parts.pop(0)
+
+            # Available height in the current page (from current y down to bottom margin)
+            avail_h = y - bottom_margin
+            if avail_h <= 0:
+                y = new_page_y()
+                continue
+
+            tw, th = t.wrap(table_width, 0)
+
+            if th <= avail_h:
+                t.drawOn(c, margin_left, y - th)
+                y = y - th - extra_gap
+                continue
+
+            # Try to split the table to fill the remaining space on this page
+            split_parts = t.split(table_width, avail_h)
+            if not split_parts:
+                # Not splittable -> move it to next page as-is
+                y = new_page_y()
+                parts.insert(0, t)
+                continue
+
+            first = split_parts[0]
+            rest = split_parts[1:]
+
+            fw, fh = first.wrap(table_width, 0)
+            first.drawOn(c, margin_left, y - fh)
+            y = y - fh - extra_gap
+
+            if rest:
+                y = new_page_y()
+                parts = rest + parts
+# Main info (pastabos po Price)
     draw_section_title(labels["section_main"])
 
     rows_for_table: list[tuple[str, object]] = [(lbl, val) for (lbl, val) in field_rows]
@@ -484,12 +529,7 @@ def proposal_pdf(request, pk: int):
                 ]
             )
         )
-
-        tw, th = tbl.wrap(table_width, 0)
-        if y - th < bottom_margin:
-            y = new_page_y()
-        tbl.drawOn(c, margin_left, y - th)
-        y = y - th - 14
+        draw_table_flow(tbl, table_width)
     else:
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
@@ -532,12 +572,7 @@ def proposal_pdf(request, pk: int):
                 ]
             )
         )
-
-        tw, th = tbl.wrap(table_width, 0)
-        if y - th < bottom_margin:
-            y = new_page_y()
-        tbl.drawOn(c, margin_left, y - th)
-        y = y - th - 14
+        draw_table_flow(tbl, table_width)
     else:
         c.setFont(font_regular, 9)
         c.setFillColor(colors.HexColor("#6b7280"))
