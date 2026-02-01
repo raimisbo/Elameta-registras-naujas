@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db import models
 from django.utils.text import slugify
@@ -38,11 +38,10 @@ class Pozicija(models.Model):
     plotas = models.CharField("Plotas", max_length=120, blank=True, default="")
     svoris = models.CharField("Svoris", max_length=120, blank=True, default="")
 
-    # Matmenys (mm) - NAUJA
+    # Matmenys (mm)
     x_mm = models.DecimalField("X (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
     y_mm = models.DecimalField("Y (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
     z_mm = models.DecimalField("Z (mm)", max_digits=10, decimal_places=2, null=True, blank=True)
-
 
     # --- Kabinimas (KTL) ---
     ktl_kabinimo_budas = models.CharField("KTL kabinimo būdas", max_length=200, blank=True, default="")
@@ -54,20 +53,69 @@ class Pozicija(models.Model):
     ktl_gylis_mm = models.DecimalField("KTL gylis (mm)", max_digits=10, decimal_places=1, null=True, blank=True)
     ktl_kabinimas_aprasymas = models.TextField("KTL kabinimo aprašymas", blank=True, default="")
 
+    # KTL dangos storis (µm) – atskiras nuo Miltų
+    ktl_dangos_storis_um = models.DecimalField(
+        "KTL dangos storis (µm)",
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+
+    # KTL sandauga DB (I×A×G) – UI read-only, DB reikšmę skaičiuoja serveris
+    ktl_matmenu_sandauga_db = models.DecimalField(
+        "KTL matmenų sandauga (I×A×G)",
+        max_digits=20,
+        decimal_places=3,
+        null=True,
+        blank=True,
+    )
+
+    # KTL pastabos (atskirai nuo bendrų)
+    ktl_pastabos = models.TextField("KTL pastabos", blank=True, default="")
+
     # --- Kabinimas (Miltai) ---
-    miltai_kiekis_per_valanda = models.DecimalField("Miltai: kiekis per valandą", max_digits=10, decimal_places=1, null=True, blank=True)
+    miltai_kiekis_per_valanda = models.DecimalField(
+        "Miltai: kiekis per valandą",
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
     miltai_detaliu_kiekis_reme = models.IntegerField("Miltai: detalių kiekis rėme", null=True, blank=True)
     miltai_faktinis_kiekis_reme = models.IntegerField("Miltai: faktinis kiekis rėme", null=True, blank=True)
     miltai_kabinimas_aprasymas = models.TextField("Miltai: kabinimo aprašymas", blank=True, default="")
 
+    # Miltai faktinis kiekis per val. (atskiras laukas)
+    miltai_faktinis_per_valanda = models.DecimalField(
+        "Miltai: faktinis kiekis per valandą",
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
 
-    # Paruošimas / padengimas
+    # Miltai dangos storis (µm) – atskiras nuo KTL
+    miltai_dangos_storis_um = models.DecimalField(
+        "Miltai dangos storis (µm)",
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+
+    # Miltai pastabos (atskirai nuo bendrų)
+    miltai_pastabos = models.TextField("Miltai pastabos", blank=True, default="")
+
+    # Paruošimas / padengimas (bendra Paslaugos bloko dalis)
     paruosimas = models.CharField("Paruošimas", max_length=200, blank=True, default="")
     padengimas = models.CharField("Padengimas", max_length=200, blank=True, default="")
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, blank=True, default="")
+
+    # Legacy spalva (pasiliekam suderinamumui; UI naudosi Miltai spalvą)
     spalva = models.CharField("Spalva", max_length=120, blank=True, default="")
 
-    # SVARBU: po 0029 tai TEKSTINIS laukas (leidžia 70, 60-80, >60 ir t.t.)
+    # Legacy storis (po 0029 – tekstinis). UI nenaudosi, bet paliekam istorijai/suderinamumui.
     padengimo_storis_um = models.CharField(
         "Padengimo storis (µm)",
         max_length=32,
@@ -80,15 +128,16 @@ class Pozicija(models.Model):
     paslauga_miltai = models.BooleanField("Miltai", default=False)
     paslauga_paruosimas = models.BooleanField("Paruošimas", default=False)
 
+    # Miltai bloko laukai
     miltu_kodas = models.CharField("Miltelių kodas", max_length=100, blank=True, default="")
     miltu_spalva = models.CharField("Miltelių spalva", max_length=120, blank=True, default="")
     miltu_tiekejas = models.CharField("Miltelių tiekėjas", max_length=120, blank=True, default="")
     miltu_blizgumas = models.CharField("Blizgumas", max_length=50, blank=True, default="")
-    miltu_kaina = models.DecimalField("Miltelių kaina", max_digits=10, decimal_places=2, null=True, blank=True)
+    miltu_kaina = models.DecimalField("Miltelių kaina", max_digits=12, decimal_places=4, null=True, blank=True)
 
     paslaugu_pastabos = models.TextField("Paslaugų pastabos", blank=True, default="")
 
-    # Maskavimas
+    # Maskavimas (legacy tipas + tekstas; realus maskavimas – eilutėmis)
     maskavimo_tipas = models.CharField(
         "Maskavimas",
         max_length=10,
@@ -96,7 +145,6 @@ class Pozicija(models.Model):
         default="nera",
         blank=False,
     )
-    # Legacy/optional: senas laukas paliekamas suderinamumui
     maskavimas = models.TextField("Maskavimo aprašymas", max_length=200, blank=True, default="")
 
     # --- Terminai ---
@@ -131,9 +179,10 @@ class Pozicija(models.Model):
         default="",
     )
 
-    # Kaina (sinchronizuojama iš kainų eilučių) — po 0028: 4 skaitmenys po kablelio
+    # Kaina (sinchronizuojama iš kainų eilučių) – 4 skaitmenys po kablelio
     kaina_eur = models.DecimalField("Kaina (EUR)", max_digits=12, decimal_places=4, null=True, blank=True)
 
+    # Bendros pastabos
     pastabos = models.TextField("Pastabos", blank=True, default="")
 
     created = models.DateTimeField("Sukurta", auto_now_add=True)
@@ -143,17 +192,38 @@ class Pozicija(models.Model):
 
     class Meta:
         ordering = ["-created"]
+
+    def save(self, *args, **kwargs):
+        # HARD constraint (sutarta): jei planuojamas dažymas (KTL arba Miltai) – Paruošimas privalomas
+        if self.paslauga_ktl or self.paslauga_miltai:
+            self.paslauga_paruosimas = True
+
+        # Server-side sandauga (sutarta C): I×A×G, UI read-only, DB reikšmė – tiesos šaltinis
+        self.ktl_matmenu_sandauga_db = None
+        if self.ktl_ilgis_mm is not None and self.ktl_aukstis_mm is not None and self.ktl_gylis_mm is not None:
+            try:
+                val = self.ktl_ilgis_mm * self.ktl_aukstis_mm * self.ktl_gylis_mm
+                self.ktl_matmenu_sandauga_db = val.quantize(Decimal("0.001"))
+            except (InvalidOperation, Exception):
+                self.ktl_matmenu_sandauga_db = None
+
+        super().save(*args, **kwargs)
+
     @property
     def ktl_matmenu_sandauga(self):
-        """Grąžina KTL matmenų (I×A×G) sandaugą, jei visi trys matmenys suvesti."""
+        """
+        Suderinamumui su tuo, kas jau naudota projekte:
+        - jei DB reikšmė yra -> grąžinam ją
+        - jei nėra -> skaičiuojam iš matmenų
+        """
+        if self.ktl_matmenu_sandauga_db is not None:
+            return self.ktl_matmenu_sandauga_db
         if self.ktl_ilgis_mm is None or self.ktl_aukstis_mm is None or self.ktl_gylis_mm is None:
             return None
         try:
             return self.ktl_ilgis_mm * self.ktl_aukstis_mm * self.ktl_gylis_mm
         except Exception:
             return None
-
-
 
     def __str__(self):
         return f"{self.poz_kodas or self.id} — {self.poz_pavad}".strip()
@@ -179,7 +249,6 @@ class Pozicija(models.Model):
 
     # ---- Kainos API (naudojama views) ----
     def aktualios_kainos(self):
-        # Sutarta prasmė: grąžinam tik AKTUALIAS kainas.
         qs = self.kainos_eilutes.filter(busena="aktuali")
         field_names = {f.name for f in qs.model._meta.get_fields()}
         order_fields = []
@@ -227,7 +296,15 @@ class Pozicija(models.Model):
 
 
 class MaskavimoEilute(models.Model):
+    PASLAUGA_CHOICES = [
+        ("ktl", "KTL"),
+        ("miltai", "Miltai"),
+    ]
+
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="maskavimo_eilutes")
+
+    # Nauja: KTL/Miltai atskyrimas (sutarta: visi seni įrašai laikomi KTL)
+    paslauga = models.CharField("Paslauga", max_length=10, choices=PASLAUGA_CHOICES, default="ktl")
 
     maskuote = models.CharField("Maskuotė", max_length=255, blank=True, default="")
     vietu_kiekis = models.PositiveIntegerField("Maskavimo vietų kiekis", null=True, blank=True)
@@ -285,20 +362,12 @@ class PozicijosBrezinys(models.Model):
         return self.ext in ("stp", "step")
 
     def _preview_relpath(self) -> str:
-        """
-        Naujas stabilus preview kelias (media relative):
-        pozicijos/breziniai/previews/<slug>-<id>.png
-        """
         base = os.path.splitext(self.filename)[0]
         slug = slugify(base)[:80] or "brezinys"
         pk = self.pk or "tmp"
         return f"pozicijos/breziniai/previews/{slug}-{pk}.png"
 
     def _legacy_preview_relpath(self) -> str:
-        """
-        Legacy variantas (jei kada nors buvo laikoma šalia originalo):
-        pozicijos/breziniai/YYYY/MM/<original>.png
-        """
         name = getattr(self.failas, "name", "") or ""
         if not name:
             return ""

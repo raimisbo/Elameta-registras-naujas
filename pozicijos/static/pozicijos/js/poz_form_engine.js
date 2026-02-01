@@ -259,118 +259,84 @@
   }
 
   // ------------------------
-  // Maskavimas
+  // Maskavimas (2 formsetai: KTL + Miltai)
   // ------------------------
-  function initMaskavimas() {
-    var masTipas = document.getElementById('id_maskavimo_tipas');
-    var masItems = document.getElementById('maskavimas-items');
-    var masAddBtn = document.getElementById('maskavimas-add');
-    var masTpl = document.getElementById('maskavimas-empty-form');
+  function initMaskavimasFormset(prefix) {
+    var items = document.getElementById(prefix + '-items');
+    var addBtn = document.querySelector('.maskavimas-add[data-mask-prefix="' + prefix + '"]');
+    var tpl = document.getElementById(prefix + '-empty-form');
 
-    if (!masTipas || !masItems) return;
+    var totalEl = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+    if (!items || !totalEl) return;
 
-    function getTotalFormsEl() {
-      return document.getElementById('id_maskavimas-TOTAL_FORMS');
-    }
-
-    function anyVisibleMaskItem() {
-      var items = masItems.querySelectorAll('.maskavimas-item');
-      for (var i = 0; i < items.length; i++) {
-        if (items[i].style.display !== 'none') return true;
+    function anyVisible() {
+      var list = items.querySelectorAll('.maskavimas-item[data-mask-prefix="' + prefix + '"]');
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].style.display !== 'none') return true;
       }
       return false;
     }
 
-    function visibleCount() {
-      var items = masItems.querySelectorAll('.maskavimas-item');
-      var c = 0;
-      for (var i = 0; i < items.length; i++) {
-        if (items[i].style.display !== 'none') c++;
-      }
-      return c;
+    function sync(reason) {
+      items.style.display = anyVisible() ? '' : 'none';
+      emit('maskavimas:changed', { prefix: prefix, count: anyVisible() ? 1 : 0, reason: reason || 'sync' });
     }
 
-    function markAllForDelete() {
-      $all('.maskavimas-item', masItems).forEach(function (item) {
-        var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
-        if (del) del.checked = true;
-        item.style.display = 'none';
-      });
-    }
+    function addRow() {
+      if (!tpl) return;
+      var idx = parseInt(totalEl.value || '0', 10) || 0;
 
-    function syncMaskavimasUI(changedReason) {
-      var val = (masTipas.value || '').toLowerCase();
-
-      if (val === 'yra') masItems.style.display = '';
-      else masItems.style.display = 'none';
-
-      if (anyVisibleMaskItem() && val !== 'yra') {
-        masTipas.value = 'yra';
-        masItems.style.display = '';
-        val = 'yra';
-      }
-
-      emit('maskavimas:changed', {
-        tipas: val,
-        count: visibleCount(),
-        reason: changedReason || 'sync'
-      });
-    }
-
-    function addMaskRow() {
-      if (!masTpl) return;
-      var totalEl = getTotalFormsEl();
-      if (!totalEl) return;
-
-      var idx = parseInt(totalEl.value || '0', 10);
-
-      var html = (masTpl.innerHTML || '').replace(/__prefix__/g, String(idx));
+      var html = (tpl.innerHTML || '').replace(/__prefix__/g, String(idx));
       var wrap = document.createElement('div');
       wrap.innerHTML = html.trim();
       var node = wrap.firstElementChild;
       if (!node) return;
 
-      masItems.appendChild(node);
+      items.appendChild(node);
       totalEl.value = String(idx + 1);
+      totalEl.setAttribute('value', String(idx + 1));
 
-      masTipas.value = 'yra';
-      masItems.style.display = '';
+      initAutoResize(node);
+      bindDecimalInputs(node);
+
+      sync('add-row');
     }
 
-    // remove handler (delegation)
-    document.addEventListener('click', function (e) {
-      var btn = e.target && e.target.closest ? e.target.closest('.maskavimas-remove') : null;
-      if (!btn) return;
+    // delegation remove
+    if (!(items.dataset && items.dataset.maskDelegated === '1')) {
+      if (items.dataset) items.dataset.maskDelegated = '1';
 
-      var item = btn.closest('.maskavimas-item');
-      if (!item) return;
+      items.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('.maskavimas-remove[data-mask-prefix="' + prefix + '"]') : null;
+        if (!btn) return;
 
-      var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
-      if (del) del.checked = true;
-      item.style.display = 'none';
+        var item = btn.closest('.maskavimas-item[data-mask-prefix="' + prefix + '"]');
+        if (!item) return;
 
-      if (!anyVisibleMaskItem()) {
-        masTipas.value = 'nera';
-        masItems.style.display = 'none';
-      }
-
-      syncMaskavimasUI('remove-row');
-    });
-
-    masTipas.addEventListener('change', function () {
-      var val = (masTipas.value || '').toLowerCase();
-      if (val === 'nera') markAllForDelete();
-      syncMaskavimasUI('tipas-change');
-    });
-
-    if (masAddBtn) {
-      masAddBtn.addEventListener('click', function () {
-        addMaskRow();
-        syncMaskavimasUI('add-row');
+        var del = item.querySelector('input[type="checkbox"][name$="-DELETE"]');
+        if (del) del.checked = true;
+        item.style.display = 'none';
+        sync('remove-row');
       });
     }
 
-    syncMaskavimasUI('init');
+    if (addBtn && !(addBtn.dataset && addBtn.dataset.maskAddBound === '1')) {
+      if (addBtn.dataset) addBtn.dataset.maskAddBound = '1';
+      addBtn.addEventListener('click', function () { addRow(); });
+    }
+
+    // init existing
+    $all('.maskavimas-item[data-mask-prefix="' + prefix + '"]', items).forEach(function (node) {
+      initAutoResize(node);
+      bindDecimalInputs(node);
+    });
+
+    sync('init');
+  }
+
+  function initMaskavimas() {
+    initMaskavimasFormset('maskavimas_ktl');
+    initMaskavimasFormset('maskavimas_miltai');
   }
 
   // ------------------------
@@ -389,10 +355,14 @@
     var inpPar = document.getElementById('id_paruosimas');
     var inpPad = document.getElementById('id_padengimas');
     var inpStd = document.getElementById('id_padengimo_standartas');
-    var inpSpalva = document.getElementById('id_spalva');
 
+    // legacy spalva – paslepta, bet sinchronizuojam su miltų spalva
+    var inpSpalvaLegacy = document.getElementById('id_spalva');
+    var inpMiltuSpalva = document.getElementById('id_miltu_spalva');
+
+    var ktlBox = document.getElementById('ktl-subblock');
     var miltaiBox = document.getElementById('miltai-subblock');
-    var rowSpalvaTop = document.getElementById('row-spalva-top');
+    var subGrid = document.getElementById('paslauga-subgrid');
 
     function isEmpty(el) {
       if (!el) return true;
@@ -404,7 +374,74 @@
       if (isEmpty(el)) el.value = val;
     }
 
-    function emitPaslauga(reason, source) {
+    function enforceParuosimas() {
+      var need = (!!chkKTL.checked) || (!!chkMiltai.checked);
+      if (need) {
+        chkPar.checked = true;
+        chkPar.disabled = true;
+        var wrap = document.getElementById('paruosimas-lock-wrap');
+        if (wrap) wrap.title = 'Privalomas, kai įjungtas KTL arba Miltai';
+      } else {
+        chkPar.disabled = false;
+      }
+    }
+
+    function syncLegacySpalva() {
+      if (!inpSpalvaLegacy) return;
+      if (!!chkMiltai.checked && inpMiltuSpalva) {
+        inpSpalvaLegacy.value = inpMiltuSpalva.value || '';
+      } else {
+        inpSpalvaLegacy.value = '';
+      }
+    }
+
+    function syncKTLsandauga() {
+      var a = document.getElementById('id_ktl_ilgis_mm');
+      var b = document.getElementById('id_ktl_aukstis_mm');
+      var c = document.getElementById('id_ktl_gylis_mm');
+      var out = document.getElementById('ktl-sandauga-preview');
+      if (!a || !b || !c || !out) return;
+
+      function val(x) {
+        var s = (x.value || '').toString().trim().replace(',', '.');
+        if (!s) return null;
+        var n = Number(s);
+        return isFinite(n) ? n : null;
+      }
+      var av = val(a), bv = val(b), cv = val(c);
+      if (av == null || bv == null || cv == null) {
+        out.value = '';
+        return;
+      }
+      var r = av * bv * cv;
+      if (!isFinite(r)) out.value = '';
+      else out.value = r.toFixed(1);
+    }
+
+    function sync(reason, source) {
+      enforceParuosimas();
+
+      // presetai (tik tuštiems)
+      if (!!chkPar.checked && !(!!chkKTL.checked) && !(!!chkMiltai.checked)) {
+        setIfEmpty(inpPar, 'Gardobond 24T');
+      }
+      if (!!chkKTL.checked) {
+        setIfEmpty(inpPad, 'KTL BASF CG 570');
+        if (inpStd && inpStd.value == null) inpStd.value = '';
+      }
+
+      setShown(ktlBox, !!chkKTL.checked);
+      setShown(miltaiBox, !!chkMiltai.checked);
+
+      if (subGrid) {
+        var both = (!!chkKTL.checked) && (!!chkMiltai.checked);
+        if (both) subGrid.classList.remove('one-col');
+        else subGrid.classList.add('one-col');
+      }
+
+      syncLegacySpalva();
+      syncKTLsandauga();
+
       emit('paslauga:changed', {
         ktl: !!chkKTL.checked,
         miltai: !!chkMiltai.checked,
@@ -414,66 +451,37 @@
       });
     }
 
-    function enforceParuosimasIfNeeded(source) {
-      var need = (!!chkKTL.checked) || (!!chkMiltai.checked);
-      if (need && !chkPar.checked) {
-        chkPar.checked = true;
-      }
-      emitPaslauga('enforce', source || 'constraint');
-    }
-
-    function applyPresets(reason, source) {
-      var ktl = !!chkKTL.checked;
-      var miltai = !!chkMiltai.checked;
-      var par = !!chkPar.checked;
-
-      if (par && !ktl && !miltai) {
-        setIfEmpty(inpPar, 'Gardobond 24T');
-      }
-
-      if (ktl) {
-        setIfEmpty(inpPad, 'KTL BASF CG 570');
-        // standarto neperrašom, nebent sistema duotų None
-        if (inpStd && inpStd.value == null) inpStd.value = '';
-        setIfEmpty(inpSpalva, 'Juoda RAL 9005');
-      }
-
-      if (miltaiBox) miltaiBox.style.display = miltai ? '' : 'none';
-      if (rowSpalvaTop) rowSpalvaTop.style.display = '';
-
-      emitPaslauga(reason || 'sync', source || null);
-    }
-
-    function sync(changedEl, reason) {
-      var source = null;
-      if (changedEl === chkKTL) source = 'ktl';
-      else if (changedEl === chkMiltai) source = 'miltai';
-      else if (changedEl === chkPar) source = 'paruosimas';
-
-      if (changedEl === chkPar) {
-        var need = (!!chkKTL.checked) || (!!chkMiltai.checked);
-        if (need && !chkPar.checked) {
-          chkPar.checked = true;
-        }
-      } else {
-        enforceParuosimasIfNeeded(source);
-      }
-
-      applyPresets(reason || 'change', source);
-    }
-
-    function bind(el) {
+    function bind(el, src) {
       if (!el) return;
-      if (el.dataset && el.dataset.boundPaslaugos === '1') return;
-      if (el.dataset) el.dataset.boundPaslaugos = '1';
-      el.addEventListener('change', function () { sync(el, 'change'); });
+      var key = 'boundPaslaugos' + (src || '');
+      if (el.dataset && el.dataset[key] === '1') return;
+      if (el.dataset) el.dataset[key] = '1';
+      el.addEventListener('change', function () { sync('change', src || null); });
     }
 
-    bind(chkKTL);
-    bind(chkMiltai);
-    bind(chkPar);
+    bind(chkKTL, 'ktl');
+    bind(chkMiltai, 'miltai');
 
-    sync(null, 'init');
+    // Paruošimas – jei privalomas, neleidžiam išjungti (JS enforce)
+    bind(chkPar, 'paruosimas');
+
+    if (inpMiltuSpalva && !(inpMiltuSpalva.dataset && inpMiltuSpalva.dataset.boundMiltuSpalva === '1')) {
+      if (inpMiltuSpalva.dataset) inpMiltuSpalva.dataset.boundMiltuSpalva = '1';
+      inpMiltuSpalva.addEventListener('input', function () { syncLegacySpalva(); });
+      inpMiltuSpalva.addEventListener('change', function () { syncLegacySpalva(); });
+    }
+
+    ['id_ktl_ilgis_mm', 'id_ktl_aukstis_mm', 'id_ktl_gylis_mm'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (el.dataset && el.dataset.boundSandauga === '1') return;
+      if (el.dataset) el.dataset.boundSandauga = '1';
+      el.addEventListener('input', function () { syncKTLsandauga(); });
+      el.addEventListener('change', function () { syncKTLsandauga(); });
+      el.addEventListener('blur', function () { syncKTLsandauga(); });
+    });
+
+    sync('init', null);
   }
 
   // ------------------------

@@ -10,6 +10,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # =============================
+        # Pozicija (main) – nauji KTL/Miltai laukų stulpeliai
+        # =============================
         migrations.AddField(
             model_name="pozicija",
             name="ktl_dangos_storis_um",
@@ -83,6 +86,10 @@ class Migration(migrations.Migration):
                 blank=True,
             ),
         ),
+
+        # =============================
+        # HistoricalPozicija (simple_history) – tie patys laukų pakeitimai
+        # =============================
         migrations.AddField(
             model_name="historicalpozicija",
             name="ktl_dangos_storis_um",
@@ -156,6 +163,11 @@ class Migration(migrations.Migration):
                 blank=True,
             ),
         ),
+
+        # =============================
+        # MaskavimoEilute – grupavimas pagal paslaugą
+        # (visi seni įrašai automatiškai taps KTL, nes default="ktl")
+        # =============================
         migrations.AddField(
             model_name="maskavimoeilute",
             name="paslauga",
