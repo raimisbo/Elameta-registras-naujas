@@ -80,8 +80,21 @@
   @media (max-width: 980px){
     .paslauga-subgrid{ grid-template-columns:1fr; }
   }
+  .pozicija-edit-page textarea,
+  .pozicija-form-page textarea,
+    textarea {
+    width: 100% !important;
+    box-sizing: border-box;
+    min-height: 90px;
+    resize: vertical; /* kad vartotojas galėtų didinti tik į aukštį */
+  }
+  .field-control,
+  .form-control,
+  .poz-field-value,
+  .poz-field-control {
+    min-width: 0;
+  }
 
-  textarea { resize: vertical; }
 </style>
 {% endblock %}
 

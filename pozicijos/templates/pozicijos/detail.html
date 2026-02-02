@@ -189,10 +189,8 @@
       </div>
     </section>
 
-
-
-    
-    <section class="poz-card">
+    <!-- DETAIL LOCK: paslauga-full + ktl-left + miltai-right | nekeisti struktūros, keisti tik laukų eilutes -->
+    <section class="poz-card poz-card--full">
       <h2 class="poz-card-title">Paslauga</h2>
       <div class="poz-fields">
 
@@ -218,13 +216,27 @@
         <div class="poz-field-row"><span class="poz-field-label">Metiniai kiekiai</span><span class="poz-field-value">{{ pozicija.metiniai_kiekiai_display|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Projekto laikotarpis</span><span class="poz-field-value">{{ pozicija.projekto_gyvavimo_display|default:"—" }}</span></div>
 
-        <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
-
-        <div style="margin:2px 0 6px; font-weight:700;">
-          KTL {% if pozicija.paslauga_ktl %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
+        <div class="poz-field-row">
+          <span class="poz-field-label">Paslaugos pastabos</span>
+          <span class="poz-field-value">
+            {% if pozicija.paslaugu_pastabos %}
+              <div class="poz-notes-text">{{ pozicija.paslaugu_pastabos|linebreaksbr }}</div>
+            {% else %}
+              —
+            {% endif %}
+          </span>
         </div>
 
-        <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.ktl_kabinimo_budas|default:"—" }}</span></div>
+      </div>
+    </section>
+
+    <section class="poz-card">
+      <h2 class="poz-card-title">
+        KTL {% if pozicija.paslauga_ktl %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
+      </h2>
+
+      <div class="poz-fields">
+        <div class="poz-field-row"><span class="poz-field-label">Kabinimo būdas</span><span class="poz-field-value">{{ pozicija.ktl_kabinimo_budas|capfirst|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Kabinimas rėme</span><span class="poz-field-value">{{ pozicija.ktl_kabinimas_reme_txt|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Detalių kiekis rėme</span><span class="poz-field-value">{% if pozicija.ktl_detaliu_kiekis_reme %}{{ pozicija.ktl_detaliu_kiekis_reme }}{% else %}—{% endif %}</span></div>
 
@@ -259,7 +271,6 @@
         </div>
 
         <div class="poz-field-row"><span class="poz-field-label">I×A×G sandauga</span><span class="poz-field-value">{% if pozicija.ktl_matmenu_sandauga_db %}{{ pozicija.ktl_matmenu_sandauga_db|floatformat:1 }}{% else %}—{% endif %}</span></div>
-
         <div class="poz-field-row"><span class="poz-field-label">Dangos storis (µm)</span><span class="poz-field-value">{% if pozicija.ktl_dangos_storis_um is not None %}{{ pozicija.ktl_dangos_storis_um|floatformat:1 }}{% else %}—{% endif %}</span></div>
 
         <div class="poz-field-row">
@@ -288,13 +299,15 @@
           <span class="poz-field-label">Pastabos (KTL)</span>
           <span class="poz-field-value">{% if pozicija.ktl_pastabos %}<div class="poz-notes-text">{{ pozicija.ktl_pastabos|linebreaksbr }}</div>{% else %}—{% endif %}</span>
         </div>
+      </div>
+    </section>
 
-        <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
+    <section class="poz-card">
+      <h2 class="poz-card-title">
+        Miltai {% if pozicija.paslauga_miltai %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
+      </h2>
 
-        <div style="margin:2px 0 6px; font-weight:700;">
-          Miltai {% if pozicija.paslauga_miltai %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
-        </div>
-
+      <div class="poz-fields">
         <div class="poz-field-row"><span class="poz-field-label">Miltelių kodas</span><span class="poz-field-value">{{ pozicija.miltu_kodas|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Miltelių spalva</span><span class="poz-field-value">{{ pozicija.miltu_spalva|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Miltelių tiekėjas</span><span class="poz-field-value">{{ pozicija.miltu_tiekejas|default:"—" }}</span></div>
@@ -359,18 +372,6 @@
           <span class="poz-field-label">Pastabos (Miltai)</span>
           <span class="poz-field-value">{% if pozicija.miltai_pastabos %}<div class="poz-notes-text">{{ pozicija.miltai_pastabos|linebreaksbr }}</div>{% else %}—{% endif %}</span>
         </div>
-
-        <div class="poz-field-row">
-          <span class="poz-field-label">Paslaugų pastabos</span>
-          <span class="poz-field-value">
-            {% if pozicija.paslaugu_pastabos %}
-              <div class="poz-notes-text">{{ pozicija.paslaugu_pastabos|linebreaksbr }}</div>
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-
       </div>
     </section>
 
@@ -438,7 +439,6 @@
                         {% if eil.kiekis_nuo %}{{ eil.kiekis_nuo }}{% endif %}..{% if eil.kiekis_iki %}{{ eil.kiekis_iki }}{% endif %}
                       {% else %}
                         —
-
                       {% endif %}
                     {% endif %}
                   </td>
