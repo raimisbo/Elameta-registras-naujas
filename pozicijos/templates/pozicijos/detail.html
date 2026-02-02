@@ -111,6 +111,7 @@
       <h2 class="poz-card-title">Detalė</h2>
       <div class="poz-fields">
         <div class="poz-field-row"><span class="poz-field-label">Metalas</span><span class="poz-field-value">{{ pozicija.metalas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Metalo storis</span><span class="poz-field-value">{% if pozicija.metalo_storis is not None %}{{ pozicija.metalo_storis }}{% else %}—{% endif %}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Plotas</span><span class="poz-field-value">{% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Svoris</span><span class="poz-field-value">{% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}</span></div>
 
@@ -213,6 +214,9 @@
         <div class="poz-field-row"><span class="poz-field-label">Paruošimas</span><span class="poz-field-value">{{ pozicija.paruosimas|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Padengimas</span><span class="poz-field-value">{{ pozicija.padengimas|default:"—" }}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Padengimo standartas</span><span class="poz-field-value">{{ pozicija.padengimo_standartas|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Partijų dydžiai</span><span class="poz-field-value">{{ pozicija.partiju_dydziai|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Metiniai kiekiai</span><span class="poz-field-value">{{ pozicija.metiniai_kiekiai_display|default:"—" }}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Projekto laikotarpis</span><span class="poz-field-value">{{ pozicija.projekto_gyvavimo_display|default:"—" }}</span></div>
 
         <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
 

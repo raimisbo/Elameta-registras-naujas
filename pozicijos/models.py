@@ -35,6 +35,16 @@ class Pozicija(models.Model):
 
     # Medžiaga / detalė
     metalas = models.CharField("Metalas", max_length=120, blank=True, default="")
+
+    metalo_storis = models.DecimalField(
+        "Metalo storis",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Skaičius (pvz. 1.50).",
+    )
     plotas = models.CharField("Plotas", max_length=120, blank=True, default="")
     svoris = models.CharField("Svoris", max_length=120, blank=True, default="")
 
@@ -111,6 +121,14 @@ class Pozicija(models.Model):
     paruosimas = models.CharField("Paruošimas", max_length=200, blank=True, default="")
     padengimas = models.CharField("Padengimas", max_length=200, blank=True, default="")
     padengimo_standartas = models.CharField("Padengimo standartas", max_length=200, blank=True, default="")
+
+    # Bendri paslaugos kiekiai / planavimas (ne KTL/Miltai)
+    partiju_dydziai = models.CharField("Partijų dydžiai", max_length=255, blank=True, default="")
+    metinis_kiekis_nuo = models.IntegerField("Metinis kiekis nuo", null=True, blank=True)
+    metinis_kiekis_iki = models.IntegerField("Metinis kiekis iki", null=True, blank=True)
+    projekto_gyvavimo_nuo = models.DateField("Projekto gyvavimo nuo", null=True, blank=True)
+    projekto_gyvavimo_iki = models.DateField("Projekto gyvavimo iki", null=True, blank=True)
+
 
     # Legacy spalva (pasiliekam suderinamumui; UI naudosi Miltai spalvą)
     spalva = models.CharField("Spalva", max_length=120, blank=True, default="")
@@ -326,6 +344,27 @@ class MaskavimoEilute(models.Model):
             return str(self.vietu_kiekis)
         return f"Maskavimas #{self.pk or 'new'}"
 
+
+
+    @property
+    def metiniai_kiekiai_display(self) -> str:
+        if self.metinis_kiekis_nuo is not None and self.metinis_kiekis_iki is not None:
+            return f"{self.metinis_kiekis_nuo}–{self.metinis_kiekis_iki}"
+        if self.metinis_kiekis_nuo is not None:
+            return str(self.metinis_kiekis_nuo)
+        if self.metinis_kiekis_iki is not None:
+            return str(self.metinis_kiekis_iki)
+        return ""
+
+    @property
+    def projekto_gyvavimo_display(self) -> str:
+        if self.projekto_gyvavimo_nuo and self.projekto_gyvavimo_iki:
+            return f"{self.projekto_gyvavimo_nuo} – {self.projekto_gyvavimo_iki}"
+        if self.projekto_gyvavimo_nuo:
+            return str(self.projekto_gyvavimo_nuo)
+        if self.projekto_gyvavimo_iki:
+            return str(self.projekto_gyvavimo_iki)
+        return ""
 
 class PozicijosBrezinys(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="breziniai")

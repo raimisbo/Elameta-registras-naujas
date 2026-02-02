@@ -231,7 +231,8 @@ def apply_filters(qs: QuerySet, request) -> QuerySet:
         # tekstiniai filtrai – icontains
         if field in [
             "klientas", "projektas", "poz_kodas", "poz_pavad",
-            "metalas", "padengimas", "spalva",
+            "metalas", "padengimas", "padengimo_standartas", "spalva",
+            "partiju_dydziai",
             "pakavimas", "maskavimas", "testai_kokybe",
         ]:
             qs = qs.filter(**{f"{field}__icontains": value})

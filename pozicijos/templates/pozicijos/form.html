@@ -108,6 +108,13 @@
     </div>
 
     <form method="post" enctype="multipart/form-data">
+      {% if form.errors %}
+        <div class="form-errors" style="margin:10px 0; padding:10px; border:1px solid #ef4444; background:#fff5f5; border-radius:8px;">
+          <div style="font-weight:700; margin-bottom:6px;">Patikrinkite formos klaidas</div>
+          {% if form.non_field_errors %}<div>{{ form.non_field_errors }}</div>{% endif %}
+        </div>
+      {% endif %}
+
       {% csrf_token %}
 
       {% if form.non_field_errors %}
@@ -165,7 +172,15 @@
           </div>
         </div>
 
+        
         <div class="field-row">
+          <div class="field-label">{{ form.metalo_storis.label }}</div>
+          <div class="field-control">
+            {{ form.metalo_storis }}
+            {% if form.metalo_storis.errors %}<div class="field-errors">{{ form.metalo_storis.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+<div class="field-row">
           <div class="field-label">{{ form.plotas.label }}</div>
           <div class="field-control">
             {{ form.plotas }}
@@ -252,6 +267,43 @@
             {% if form.padengimo_standartas.errors %}<div class="field-errors">{{ form.padengimo_standartas.errors|striptags }}</div>{% endif %}
           </div>
         </div>
+
+
+        <div class="field-row">
+          <div class="field-label">{{ form.partiju_dydziai.label }}</div>
+          <div class="field-control">
+            {{ form.partiju_dydziai }}
+            {% if form.partiju_dydziai.errors %}<div class="field-errors">{{ form.partiju_dydziai.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-label">Metiniai kiekiai</div>
+          <div class="field-control" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div>{{ form.metinis_kiekis_nuo }}</div>
+            <div>–</div>
+            <div>{{ form.metinis_kiekis_iki }}</div>
+          </div>
+        </div>
+        {% if form.metinis_kiekis_nuo.errors or form.metinis_kiekis_iki.errors %}
+          <div class="field-errors">
+            {{ form.metinis_kiekis_nuo.errors|striptags }} {{ form.metinis_kiekis_iki.errors|striptags }}
+          </div>
+        {% endif %}
+
+        <div class="field-row">
+          <div class="field-label">Projekto gyvavimo laikotarpis</div>
+          <div class="field-control" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div>{{ form.projekto_gyvavimo_nuo }}</div>
+            <div>–</div>
+            <div>{{ form.projekto_gyvavimo_iki }}</div>
+          </div>
+        </div>
+        {% if form.projekto_gyvavimo_nuo.errors or form.projekto_gyvavimo_iki.errors %}
+          <div class="field-errors">
+            {{ form.projekto_gyvavimo_nuo.errors|striptags }} {{ form.projekto_gyvavimo_iki.errors|striptags }}
+          </div>
+        {% endif %}
 
         <div id="paslauga-subgrid" class="paslauga-subgrid one-col">
 

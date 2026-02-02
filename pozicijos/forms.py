@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 from django import forms
 from django.forms import modelformset_factory
 
@@ -70,6 +71,7 @@ class PozicijaForm(forms.ModelForm):
 
             # Detalė
             "metalas",
+            "metalo_storis",
             "plotas",
             "svoris",
             "x_mm",
@@ -84,6 +86,11 @@ class PozicijaForm(forms.ModelForm):
             "padengimas",
             "padengimo_standartas",
 
+            "partiju_dydziai",
+            "metinis_kiekis_nuo",
+            "metinis_kiekis_iki",
+            "projekto_gyvavimo_nuo",
+            "projekto_gyvavimo_iki",
             # Spalva – legacy (UI nerodom; sinchronizuojam su Miltų spalva)
             "spalva",
 
@@ -138,6 +145,8 @@ class PozicijaForm(forms.ModelForm):
         widgets = {
             "atlikimo_terminas": forms.NumberInput(attrs={"min": 0, "step": 1, "inputmode": "numeric"}),
 
+            "metalo_storis": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "placeholder": "mm"}),
+
             "instrukcija": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "paslaugu_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
             "papildomos_paslaugos_aprasymas": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
@@ -174,6 +183,12 @@ class PozicijaForm(forms.ModelForm):
 
             "miltai_dangos_storis_um": forms.NumberInput(attrs={"min": 0, "step": "0.1", "inputmode": "decimal", "data-decimals": "1"}),
             "miltai_pastabos": forms.Textarea(attrs={"rows": 2, "data-autoresize": "1"}),
+            "partiju_dydziai": forms.TextInput(attrs={"placeholder": "pvz. 50, 100, 250"}),
+            "metinis_kiekis_nuo": forms.NumberInput(attrs={"min": 0}),
+            "metinis_kiekis_iki": forms.NumberInput(attrs={"min": 0}),
+            "projekto_gyvavimo_nuo": forms.DateInput(attrs={"type": "date"}),
+            "projekto_gyvavimo_iki": forms.DateInput(attrs={"type": "date"}),
+
         }
 
     def __init__(self, *args, **kwargs):
@@ -191,6 +206,15 @@ class PozicijaForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+
+        # --- Metalo storis (mm): leidžiam kablelį, 2 sk. po kablelio ---
+        metalo_storis_raw = (self.data.get("metalo_storis") or "").strip()
+        if metalo_storis_raw:
+            try:
+                cleaned["metalo_storis"] = Decimal(metalo_storis_raw.replace(",", ".")).quantize(Decimal("0.01"))
+            except (InvalidOperation, ValueError):
+                self.add_error("metalo_storis", "Įveskite skaičių (mm), pvz. 1.50")
+
 
         # --- Paslaugos logika: KTL / Miltai / Paruošimas ---
         ktl = bool(cleaned.get("paslauga_ktl"))
@@ -238,6 +262,20 @@ class PozicijaForm(forms.ModelForm):
         else:
             if not pp_txt:
                 self.add_error("papildomos_paslaugos_aprasymas", "Kai pasirinkta „Taip“, aprašymas yra privalomas.")
+        # --- Paslauga: metiniai kiekiai (nuo/iki) ---
+        mk_nuo = cleaned.get("metinis_kiekis_nuo")
+        mk_iki = cleaned.get("metinis_kiekis_iki")
+        if mk_nuo is not None and mk_iki is not None and mk_nuo > mk_iki:
+            self.add_error("metinis_kiekis_nuo", "„Nuo“ negali būti didesnis už „Iki“.")
+            self.add_error("metinis_kiekis_iki", "„Iki“ negali būti mažesnis už „Nuo“.")
+
+        # --- Paslauga: projekto gyvavimo laikotarpis (nuo/iki) ---
+        pg_nuo = cleaned.get("projekto_gyvavimo_nuo")
+        pg_iki = cleaned.get("projekto_gyvavimo_iki")
+        if pg_nuo and pg_iki and pg_nuo > pg_iki:
+            self.add_error("projekto_gyvavimo_nuo", "„Nuo“ negali būti vėliau už „Iki“.")
+            self.add_error("projekto_gyvavimo_iki", "„Iki“ negali būti anksčiau už „Nuo“.")
+
 
         return cleaned
 
