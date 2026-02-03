@@ -22,7 +22,20 @@
 
   .pozicija-detail-page .poz-cards-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr); gap:16px; align-items:flex-start; }
 
-  .pozicija-detail-page .poz-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px 14px 10px; box-shadow:0 1px 3px rgba(15,23,42,0.06); }
+  .pozicija-detail-page .poz-card {
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    border-radius:6px;
+    padding:12px 14px 10px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.10);
+    transition: box-shadow 140ms ease, transform 140ms ease;
+  }
+
+  .pozicija-detail-page .poz-card:hover {
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+    transform: translateY(-1px);
+  }
+
   .pozicija-detail-page .poz-card--full { grid-column:1 / -1; }
 
   .pozicija-detail-page .poz-card--client { grid-column:1; grid-row:1; }

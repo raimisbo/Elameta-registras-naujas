@@ -95,6 +95,20 @@
     min-width: 0;
   }
 
+  /* Kortelių/sekcijų “pakėlimas” edit lange */
+  .poz-card {
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.10);
+    transition: box-shadow 140ms ease, transform 140ms ease;
+  }
+
+  .poz-card:hover {
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+    transform: translateY(-1px);
+  }
+
+
 </style>
 {% endblock %}
 
