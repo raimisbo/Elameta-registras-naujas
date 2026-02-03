@@ -337,6 +337,7 @@
   function initMaskavimas() {
     initMaskavimasFormset('maskavimas_ktl');
     initMaskavimasFormset('maskavimas_miltai');
+    initMaskavimasFormset('metalo_storis');
   }
 
   // ------------------------

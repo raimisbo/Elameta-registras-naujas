@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 from django.forms import modelformset_factory
 
-from .models import Pozicija, PozicijosBrezinys, MaskavimoEilute
+from .models import Pozicija, PozicijosBrezinys, MaskavimoEilute, MetaloStorisEilute
 
 # KTL kabinimo būdo pasirinkimai (tik UI widgetui)
 KTL_KABINIMO_CHOICES = [
@@ -308,3 +308,22 @@ MaskavimoFormSet = modelformset_factory(
     extra=0,
     can_delete=True,
 )
+
+# --- Metalo storis (formset) ---
+
+class MetaloStorisEiluteForm(forms.ModelForm):
+    class Meta:
+        model = MetaloStorisEilute
+        fields = ["storis_mm"]
+        widgets = {
+            "storis_mm": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal", "data-decimals": "2", "placeholder": "mm"}),
+        }
+
+
+MetaloStorisFormSet = modelformset_factory(
+    MetaloStorisEilute,
+    form=MetaloStorisEiluteForm,
+    extra=0,
+    can_delete=True,
+)
+

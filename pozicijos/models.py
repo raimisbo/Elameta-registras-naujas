@@ -206,7 +206,6 @@ class Pozicija(models.Model):
     created = models.DateTimeField("Sukurta", auto_now_add=True)
     updated = models.DateTimeField("Atnaujinta", auto_now=True)
 
-    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created"]
@@ -423,6 +422,23 @@ class PozicijosBrezinys(models.Model):
         return ""
 
 
+class MetaloStorisEilute(models.Model):
+    """Kelios 'Metalo storis' reikšmės vienai pozicijai (kaip maskavimas – pridėti/šalinti)."""
+    pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="metalo_storiai")
+    storis_mm = models.DecimalField("Metalo storis (mm)", max_digits=6, decimal_places=2, null=True, blank=True)
+
+    created = models.DateTimeField("Sukurta", auto_now_add=True)
+    updated = models.DateTimeField("Atnaujinta", auto_now=True)
+
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        v = self.storis_mm
+        return f"{self.pozicija_id} | {v} mm" if v is not None else f"{self.pozicija_id} | —"
+
+
 class KainosEilute(models.Model):
     pozicija = models.ForeignKey(Pozicija, on_delete=models.CASCADE, related_name="kainos_eilutes")
 
@@ -446,7 +462,6 @@ class KainosEilute(models.Model):
     created = models.DateTimeField("Sukurta", auto_now_add=True)
     updated = models.DateTimeField("Atnaujinta", auto_now=True)
 
-    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created"]

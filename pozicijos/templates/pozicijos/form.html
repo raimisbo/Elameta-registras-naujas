@@ -199,14 +199,50 @@
           </div>
         </div>
 
-        
+
+
+        {# Metalo storis – kaip formset (pridėti/šalinti) #}
         <div class="field-row">
-          <div class="field-label">{{ form.metalo_storis.label }}</div>
+          <div class="field-label">Metalo storis (mm)</div>
           <div class="field-control">
-            {{ form.metalo_storis }}
-            {% if form.metalo_storis.errors %}<div class="field-errors">{{ form.metalo_storis.errors|striptags }}</div>{% endif %}
+            {{ metalo_storis_formset.management_form }}
+            <button type="button" class="btn-sm maskavimas-add" data-mask-prefix="metalo_storis">Pridėti</button>
           </div>
         </div>
+
+        <div id="metalo_storis-items" class="subblock" style="display:none;">
+          {% for f in metalo_storis_formset.forms %}
+            <div class="maskavimas-item" data-mask-prefix="metalo_storis">
+              {{ f.id }}
+              <div class="field-row" style="margin:0;">
+                <div class="field-label">{{ f.storis_mm.label }}</div>
+                <div class="field-control">
+                  {{ f.storis_mm }}
+                  {% if f.storis_mm.errors %}<div class="field-errors">{{ f.storis_mm.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              {{ f.DELETE }}
+              <div class="actions" style="margin-top:6px;">
+                <button type="button" class="btn-sm maskavimas-remove" data-mask-prefix="metalo_storis">Ištrinti</button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <template id="metalo_storis-empty-form">
+          <div class="maskavimas-item" data-mask-prefix="metalo_storis">
+            {{ metalo_storis_formset.empty_form.id }}
+            <div class="field-row" style="margin:0;">
+              <div class="field-label">{{ metalo_storis_formset.empty_form.storis_mm.label }}</div>
+              <div class="field-control">{{ metalo_storis_formset.empty_form.storis_mm }}</div>
+            </div>
+            {{ metalo_storis_formset.empty_form.DELETE }}
+            <div class="actions" style="margin-top:6px;">
+              <button type="button" class="btn-sm maskavimas-remove" data-mask-prefix="metalo_storis">Ištrinti</button>
+            </div>
+          </div>
+        </template>
 <div class="field-row">
           <div class="field-label">{{ form.plotas.label }}</div>
           <div class="field-control">
