@@ -313,6 +313,20 @@ class Pozicija(models.Model):
         return None
 
 
+
+    @property
+    def metalo_storiai_display(self):
+        vals = list(
+            self.metalo_storio_eilutes
+            .filter(storis_mm__isnull=False)
+            .values_list("storis_mm", flat=True)
+        )
+        if vals:
+            return ", ".join(f"{v} mm" for v in vals)
+        if self.metalo_storis is not None:
+            return f"{self.metalo_storis} mm"
+        return "—"
+
 class MaskavimoEilute(models.Model):
     PASLAUGA_CHOICES = [
         ("ktl", "KTL"),
@@ -453,3 +467,31 @@ class KainosEilute(models.Model):
 
     def __str__(self):
         return f"{self.pozicija_id} | {self.kaina} {self.matas}".strip()
+
+
+class MetaloStorisEilute(models.Model):
+    pozicija = models.ForeignKey(
+        "Pozicija",
+        on_delete=models.CASCADE,
+        related_name="metalo_storio_eilutes",
+        verbose_name="Pozicija",
+    )
+    storis_mm = models.DecimalField(
+        "Metalo storis (mm)",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    created = models.DateTimeField("Sukurta", auto_now_add=True)
+    updated = models.DateTimeField("Atnaujinta", auto_now=True)
+
+    class Meta:
+        verbose_name = "Metalo storio eilutė"
+        verbose_name_plural = "Metalo storio eilutės"
+        ordering = ["id"]
+
+    def __str__(self):
+        if self.storis_mm is None:
+            return f"#{self.pk} — ∅"
+        return f"#{self.pk} — {self.storis_mm} mm"

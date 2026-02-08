@@ -62,8 +62,8 @@ COLUMNS: list[dict] = [
     {
         "key": "metalo_storiai_display",
         "label": "Metalo storis",
-        "type": "number",
-        "filter": "range",
+        "type": "char",
+        "filter": "text",
         "searchable": False,
         "width": 120,
         "default": True,
