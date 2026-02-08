@@ -4,6 +4,15 @@
 
 {% block title %}
   {% if pozicija %}Redaguoti poziciją {{ pozicija.poz_kodas }}{% else %}Nauja pozicija{% endif %}
+
+
+
+
+
+
+
+
+
 {% endblock %}
 
 {% block page_css %}
@@ -83,6 +92,12 @@
 
   textarea { resize: vertical; }
 </style>
+
+
+
+
+
+
 {% endblock %}
 
 {% block content %}
@@ -174,12 +189,49 @@
 
         
         <div class="field-row">
-          <div class="field-label">{{ form.metalo_storis.label }}</div>
+          <div class="field-label">Metalo storis (mm)</div>
           <div class="field-control">
             {{ form.metalo_storis }}
             {% if form.metalo_storis.errors %}<div class="field-errors">{{ form.metalo_storis.errors|striptags }}</div>{% endif %}
           </div>
         </div>
+
+          <!-- BEGIN_METALO_STORIS_BLOCK -->
+          <div class="subblock">
+            <button type="button" class="btn btn-secondary" id="metalo-storis-add" onclick="window.addMetaloStorisRow && window.addMetaloStorisRow()">+ Pridėti metalo storį</button>
+            <div id="metalo-storis-items" style="margin-top:8px;">
+              {% if pozicija %}
+                {% for ms in pozicija.metalo_storio_eilutes.all|slice:'1:' %}
+                  <div class="maskavimas-item metalo-storis-item" style="border:1px solid #e5e7eb; border-radius:8px; padding:8px; margin-top:8px;">
+                    <div class="field-row">
+                      <div class="field-label">Metalo storis (mm)</div>
+                      <div class="field-control">
+                        <input type="number" name="metalo_storis_values[]" value="{{ ms.storis_mm|default_if_none:'' }}" step="0.01" min="0" inputmode="decimal">
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary metalo-storis-remove">Pašalinti</button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+
+          <template id="metalo-storis-row-template">
+            <div class="maskavimas-item metalo-storis-item" style="border:1px solid #e5e7eb; border-radius:8px; padding:8px; margin-top:8px;">
+              <div class="field-row">
+                <div class="field-label">Metalo storis (mm)</div>
+                <div class="field-control">
+                  <input type="number" name="metalo_storis_values[]" value="" step="0.01" min="0" inputmode="decimal">
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary metalo-storis-remove">Pašalinti</button>
+            </div>
+          </template>
+          <!-- END_METALO_STORIS_BLOCK -->
+
+
+          
+
 <div class="field-row">
           <div class="field-label">{{ form.plotas.label }}</div>
           <div class="field-control">
@@ -777,5 +829,57 @@
 
 {% block page_js %}
   <script src="{% static 'pozicijos/js/poz_form_engine.js' %}"></script>
+
+
+
+
+
+
 {% endblock %}
+
+
+
+
+
+
+
+
+<!-- BEGIN_METALO_STORIS_JS -->
+<script>
+window.addMetaloStorisRow = function() {
+  var items = document.getElementById("metalo-storis-items");
+  var tpl = document.getElementById("metalo-storis-row-template");
+  if (!items || !tpl) return false;
+  items.insertAdjacentHTML("beforeend", tpl.innerHTML);
+
+  // bind remove naujai/esančioms eilutėms
+  items.querySelectorAll(".metalo-storis-remove").forEach(function(btn){
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      var row = btn.closest(".metalo-storis-item");
+      if (row) row.remove();
+    });
+  });
+  return false;
+};
+
+// inicialiai prisirišam remove esamoms eilutėms
+document.addEventListener("DOMContentLoaded", function() {
+  var items = document.getElementById("metalo-storis-items");
+  if (!items) return;
+  items.querySelectorAll(".metalo-storis-remove").forEach(function(btn){
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      var row = btn.closest(".metalo-storis-item");
+      if (row) row.remove();
+    });
+  });
+});
+</script>
+<!-- END_METALO_STORIS_JS -->
+
 {% endblock %}

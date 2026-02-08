@@ -4,13 +4,13 @@ from __future__ import annotations
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, IntegerField, Value, Q, Min, Max
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.decorators.http import require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .services.import_csv import import_pozicijos_from_csv
-from .models import Pozicija, PozicijosBrezinys, KainosEilute, MaskavimoEilute
+from .models import Pozicija, PozicijosBrezinys, KainosEilute, MaskavimoEilute, MetaloStorisEilute
 from .forms import PozicijaForm, PozicijosBrezinysForm, MaskavimoFormSet
 from .forms_kainos import KainaFormSet
 from .schemas.columns import COLUMNS
@@ -38,7 +38,7 @@ FORM_SUGGEST_FIELDS = [
 
 def _get_form_suggestions() -> dict[str, list[str]]:
     suggestions: dict[str, list[str]] = {}
-    qs = Pozicija.objects.all()
+    qs = Pozicija.objects.all().prefetch_related('metalo_storio_eilutes')
     for field in FORM_SUGGEST_FIELDS:
         values = qs.order_by(field).values_list(field, flat=True).distinct()
         suggestions[field] = [v for v in values if v]
@@ -135,35 +135,26 @@ def pozicija_detail(request: HttpRequest, pk: int) -> HttpResponse:
     mask_ktl = obj.maskavimo_eilutes.filter(paslauga="ktl").order_by("id")
     mask_milt = obj.maskavimo_eilutes.filter(paslauga="miltai").order_by("id")
     breziniai = obj.breziniai.all().order_by("-uploaded") if hasattr(obj, "breziniai") else []
-
-    # kainų niekur nekeičiame – tik paimame, kad detalė rodytų kaip anksčiau
     kainos_akt = obj.kainos_eilutes.filter(busena="aktuali").order_by("kiekis_nuo", "kiekis_iki", "id") if hasattr(obj, "kainos_eilutes") else []
 
     return render(
         request,
         "pozicijos/detail.html",
         {
-            "obj": obj,                 # jei kažkur liko include'ų su obj
-            "pozicija": obj,            # svarbiausia – tavo detail.html naudoja pozicija.*
+            "obj": obj,
+            "pozicija": obj,
             "mask_ktl": mask_ktl,
             "mask_miltai": mask_milt,
             "breziniai": breziniai,
-            "kainos_akt": kainos_akt,   # tik rodymui, kainų logikos neliečiam
+            "kainos_akt": kainos_akt,
+            "metalo_storiai": obj.metalo_storio_eilutes.filter(storis_mm__isnull=False).order_by("id"),
         },
     )
 
-
 def _sync_kaina_eur_from_lines(poz: Pozicija) -> None:
-    # Palikta dėl suderinamumo (naudojama create/edit). Vienas tiesos šaltinis – services.sync.
     sync_pozicija_kaina_eur(poz)
 
 def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
-    """
-    Server-side saugiklis:
-    - jei yra bent viena maskavimo eilutė su reikšme -> tipas "yra"
-    - jei nėra -> tipas "nera"
-    - jei "nera" -> legacy laukas maskavimas išvalomas
-    """
     qs = MaskavimoEilute.objects.filter(pozicija=poz)
     has_any = qs.filter(Q(maskuote__gt="") | Q(vietu_kiekis__isnull=False) | Q(aprasymas__gt="")).exists()
 
@@ -182,15 +173,7 @@ def _sync_maskavimo_tipas_from_lines(poz: Pozicija) -> None:
         update_fields.append("updated")
         poz.save(update_fields=update_fields)
 
-
 def _save_mask_formset(mask_formset, pozicija: Pozicija, paslauga: str) -> None:
-    """
-    Išsaugo vieno sub-bloko (KTL arba Miltai) maskavimo formsetą.
-    Taisyklės:
-    - pilnai tuščios eilutės ignoruojamos (o jei buvo DB – ištrinamos)
-    - DELETE pažymėtos ištrinamos
-    - paslauga nustatoma server-side ("ktl" / "miltai")
-    """
     instances = mask_formset.save(commit=False)
 
     for inst in instances:
@@ -202,7 +185,6 @@ def _save_mask_formset(mask_formset, pozicija: Pozicija, paslauga: str) -> None:
         desc = (getattr(inst, "aprasymas", "") or "").strip()
 
         if not txt and qty is None and not desc:
-            # jei egzistuojantis įrašas tapo tuščias – ištrinam
             if getattr(inst, "pk", None):
                 inst.delete()
             continue
@@ -212,6 +194,68 @@ def _save_mask_formset(mask_formset, pozicija: Pozicija, paslauga: str) -> None:
     for f in mask_formset.deleted_forms:
         if f.instance.pk:
             f.instance.delete()
+
+def _save_metalo_storis_formset(ms_formset, pozicija: Pozicija) -> None:
+    instances = ms_formset.save(commit=False)
+
+    for inst in instances:
+        inst.pozicija = pozicija
+        if inst.storis_mm is None:
+            if inst.pk:
+                inst.delete()
+            continue
+        inst.save()
+
+    for f in ms_formset.deleted_forms:
+        if f.instance.pk:
+            f.instance.delete()
+
+    first = (
+        MetaloStorisEilute.objects
+        .filter(pozicija=pozicija, storis_mm__isnull=False)
+        .order_by("id")
+        .first()
+    )
+    pozicija.metalo_storis = first.storis_mm if first else None
+    pozicija.save(update_fields=["metalo_storis", "updated"])
+
+
+def _save_metalo_storis_values(pozicija: Pozicija, post_data) -> None:
+    from decimal import Decimal, InvalidOperation
+
+    raw_values = []
+    raw_values.append(post_data.get("metalo_storis", ""))  # pagrindinis laukas
+
+    # dinaminės eilutės: metalo_storis_values arba metalo_storis_values[]
+    for key, vals in post_data.lists():
+        if key.startswith("metalo_storis_values"):
+            raw_values.extend(vals)
+
+    parsed = []
+    for raw in raw_values:
+        t = (raw or "").strip().replace(",", ".")
+        if not t:
+            continue
+        try:
+            d = Decimal(t)
+        except InvalidOperation:
+            continue
+        if d < 0:
+            continue
+        parsed.append(d)
+
+    # pilnas replace
+    MetaloStorisEilute.objects.filter(pozicija=pozicija).delete()
+    if parsed:
+        MetaloStorisEilute.objects.bulk_create(
+            [MetaloStorisEilute(pozicija=pozicija, storis_mm=d) for d in parsed]
+        )
+
+    # legacy fallback
+    first = parsed[0] if parsed else None
+    if pozicija.metalo_storis != first:
+        pozicija.metalo_storis = first
+        pozicija.save(update_fields=["metalo_storis", "updated"])
 
 
 def pozicija_create(request):
@@ -232,11 +276,15 @@ def pozicija_create(request):
             queryset=MaskavimoEilute.objects.none(),
         )
 
-        if form.is_valid() and formset.is_valid() and mask_ktl_formset.is_valid() and mask_miltai_formset.is_valid():
+        if (
+            form.is_valid()
+            and formset.is_valid()
+            and mask_ktl_formset.is_valid()
+            and mask_miltai_formset.is_valid()
+        ):
             with transaction.atomic():
                 pozicija = form.save()
 
-                # --- Kainos ---
                 formset.instance = pozicija
                 instances = formset.save(commit=False)
                 for inst in instances:
@@ -246,9 +294,9 @@ def pozicija_create(request):
                     if f.instance.pk:
                         f.instance.delete()
 
-                # --- Maskavimas (KTL + Miltai) ---
                 _save_mask_formset(mask_ktl_formset, pozicija, "ktl")
                 _save_mask_formset(mask_miltai_formset, pozicija, "miltai")
+                _save_metalo_storis_values(pozicija, request.POST)
 
                 _sync_maskavimo_tipas_from_lines(pozicija)
                 _sync_kaina_eur_from_lines(pozicija)
@@ -270,9 +318,9 @@ def pozicija_create(request):
         "kainos_formset": formset,
         "maskavimo_ktl_formset": mask_ktl_formset,
         "maskavimo_miltai_formset": mask_miltai_formset,
+
     }
     return render(request, "pozicijos/form.html", context)
-
 
 def pozicija_edit(request, pk):
     pozicija = get_object_or_404(Pozicija, pk=pk)
@@ -288,6 +336,7 @@ def pozicija_edit(request, pk):
 
     m_ktl_qs = MaskavimoEilute.objects.filter(pozicija=pozicija, paslauga="ktl").order_by("id")
     m_milt_qs = MaskavimoEilute.objects.filter(pozicija=pozicija, paslauga="miltai").order_by("id")
+    ms_qs = MetaloStorisEilute.objects.filter(pozicija=pozicija).order_by("id")
 
     if request.method == "POST":
         form = PozicijaForm(request.POST, request.FILES, instance=pozicija)
@@ -296,11 +345,15 @@ def pozicija_edit(request, pk):
         mask_ktl_formset = MaskavimoFormSet(request.POST, prefix="maskavimas_ktl", queryset=m_ktl_qs)
         mask_miltai_formset = MaskavimoFormSet(request.POST, prefix="maskavimas_miltai", queryset=m_milt_qs)
 
-        if form.is_valid() and formset.is_valid() and mask_ktl_formset.is_valid() and mask_miltai_formset.is_valid():
+        if (
+            form.is_valid()
+            and formset.is_valid()
+            and mask_ktl_formset.is_valid()
+            and mask_miltai_formset.is_valid()
+        ):
             with transaction.atomic():
                 form.save()
 
-                # --- Kainos ---
                 instances = formset.save(commit=False)
                 for inst in instances:
                     inst.pozicija = pozicija
@@ -309,9 +362,9 @@ def pozicija_edit(request, pk):
                     if f.instance.pk:
                         f.instance.delete()
 
-                # --- Maskavimas (KTL + Miltai) ---
                 _save_mask_formset(mask_ktl_formset, pozicija, "ktl")
                 _save_mask_formset(mask_miltai_formset, pozicija, "miltai")
+                _save_metalo_storis_values(pozicija, request.POST)
 
                 _sync_maskavimo_tipas_from_lines(pozicija)
                 _sync_kaina_eur_from_lines(pozicija)
@@ -333,9 +386,9 @@ def pozicija_edit(request, pk):
         "kainos_formset": formset,
         "maskavimo_ktl_formset": mask_ktl_formset,
         "maskavimo_miltai_formset": mask_miltai_formset,
+
     }
     return render(request, "pozicijos/form.html", context)
-
 
 @require_POST
 def brezinys_upload(request, pk):
@@ -345,7 +398,6 @@ def brezinys_upload(request, pk):
         title = request.POST.get("pavadinimas", "").strip()
         br = PozicijosBrezinys.objects.create(pozicija=poz, failas=f, pavadinimas=title)
 
-        # STEP/STP – preview sąmoningai nenaudojam
         if not br.is_step:
             res = regenerate_missing_preview(br)
             if res.ok:

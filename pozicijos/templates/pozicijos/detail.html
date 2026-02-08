@@ -111,7 +111,11 @@
       <h2 class="poz-card-title">Detalė</h2>
       <div class="poz-fields">
         <div class="poz-field-row"><span class="poz-field-label">Metalas</span><span class="poz-field-value">{{ pozicija.metalas|default:"—" }}</span></div>
-        <div class="poz-field-row"><span class="poz-field-label">Metalo storis</span><span class="poz-field-value">{% if pozicija.metalo_storis is not None %}{{ pozicija.metalo_storis }}{% else %}—{% endif %}</span></div>
+        <div class="poz-field-row"><span class="poz-field-label">Metalo storis</span><span class="poz-field-value">{% if metalo_storiai %}
+{% for ms in metalo_storiai %}{{ ms.storis_mm }} mm{% if not forloop.last %}, {% endif %}{% endfor %}
+{% else %}
+{% if pozicija.metalo_storis is not None %}{{ pozicija.metalo_storis }} mm{% else %}—{% endif %}
+{% endif %}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Plotas</span><span class="poz-field-value">{% if pozicija.plotas %}{{ pozicija.plotas }}{% else %}—{% endif %}</span></div>
         <div class="poz-field-row"><span class="poz-field-label">Svoris</span><span class="poz-field-value">{% if pozicija.svoris %}{{ pozicija.svoris }}{% else %}—{% endif %}</span></div>
 

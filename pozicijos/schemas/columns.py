@@ -60,7 +60,7 @@ COLUMNS: list[dict] = [
         "default": True,
     },
     {
-        "key": "metalo_storis",
+        "key": "metalo_storiai_display",
         "label": "Metalo storis",
         "type": "number",
         "filter": "range",
