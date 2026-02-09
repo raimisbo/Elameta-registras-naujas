@@ -71,6 +71,71 @@
     .pozicija-detail-page .poz-card, .pozicija-detail-page .poz-card--full { grid-column:1 / -1; grid-row:auto; }
     .pozicija-detail-page .poz-card--client, .pozicija-detail-page .poz-card--detail, .pozicija-detail-page .poz-card--brez { grid-column:1 / -1; grid-row:auto; }
   }
+
+  .pozicija-detail-page .poz-cards-grid > .poz-card--paslauga{
+    grid-column:1 / -1 !important;
+    grid-row:auto;
+  }
+
+  .pozicija-detail-page .paslauga-subgrid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:14px;
+    align-items:start;
+    margin:8px 0 12px;
+  }
+  .pozicija-detail-page .paslauga-subcard{
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:10px 12px;
+    background:#fff;
+    min-width:0;
+  }
+  @media (max-width:1100px){
+    .pozicija-detail-page .paslauga-subgrid{ grid-template-columns:1fr; }
+  }
+
+  /* Paslauga micro polish */
+  .pozicija-detail-page .paslauga-subgrid{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+    gap:16px;
+    align-items:stretch;
+    margin:10px 0 12px;
+  }
+  .pozicija-detail-page .paslauga-subcard{
+    min-width:0;
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    padding:12px 14px;
+    background:#fff;
+  }
+  .pozicija-detail-page .paslauga-subcard > div[style*="font-weight:700"]{
+    margin:0 0 10px 0 !important;
+    padding-bottom:7px;
+    border-bottom:1px solid #eef0f2;
+    line-height:1.25;
+  }
+  .pozicija-detail-page .paslauga-subcard .poz-field-row{
+    display:grid;
+    grid-template-columns:minmax(140px,42%) minmax(0,1fr);
+    gap:10px;
+    align-items:start;
+    margin:0 0 6px 0;
+  }
+  .pozicija-detail-page .paslauga-subcard .poz-field-label{
+    color:#6b7280;
+    font-weight:600;
+  }
+  .pozicija-detail-page .paslauga-subcard .poz-field-value{
+    color:#111827;
+  }
+  @media (max-width: 1100px){
+    .pozicija-detail-page .paslauga-subgrid{
+      grid-template-columns:1fr !important;
+    }
+  }
+
 </style>
 {% endblock %}
 
@@ -196,7 +261,7 @@
 
 
     
-    <section class="poz-card">
+    <section class="poz-card poz-card--paslauga">
       <h2 class="poz-card-title">Paslauga</h2>
       <div class="poz-fields">
 
@@ -224,7 +289,9 @@
 
         <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
 
-        <div style="margin:2px 0 6px; font-weight:700;">
+        <div class="paslauga-subgrid">
+          <div class="paslauga-subcard">
+<div style="margin:2px 0 6px; font-weight:700;">
           KTL {% if pozicija.paslauga_ktl %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
         </div>
 
@@ -292,10 +359,9 @@
           <span class="poz-field-label">Pastabos (KTL)</span>
           <span class="poz-field-value">{% if pozicija.ktl_pastabos %}<div class="poz-notes-text">{{ pozicija.ktl_pastabos|linebreaksbr }}</div>{% else %}—{% endif %}</span>
         </div>
-
-        <hr style="border:0;border-top:1px solid #e5e7eb;margin:10px 0;">
-
-        <div style="margin:2px 0 6px; font-weight:700;">
+          </div>
+          <div class="paslauga-subcard">
+<div style="margin:2px 0 6px; font-weight:700;">
           Miltai {% if pozicija.paslauga_miltai %}<span style="color:#16a34a; font-weight:600;">(Įjungta)</span>{% else %}<span style="color:#6b7280; font-weight:600;">(Išjungta)</span>{% endif %}
         </div>
 
@@ -363,8 +429,10 @@
           <span class="poz-field-label">Pastabos (Miltai)</span>
           <span class="poz-field-value">{% if pozicija.miltai_pastabos %}<div class="poz-notes-text">{{ pozicija.miltai_pastabos|linebreaksbr }}</div>{% else %}—{% endif %}</span>
         </div>
+          </div>
+        </div>
 
-        <div class="poz-field-row">
+<div class="poz-field-row">
           <span class="poz-field-label">Paslaugų pastabos</span>
           <span class="poz-field-value">
             {% if pozicija.paslaugu_pastabos %}
